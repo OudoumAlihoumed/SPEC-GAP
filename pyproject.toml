@@ -16,3 +16,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "ipython"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
