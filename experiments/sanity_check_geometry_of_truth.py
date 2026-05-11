@@ -97,6 +97,12 @@ FALSE_STATEMENTS = [
 
 
 def run_sanity_check(device: str = "cuda", n_statements: int | None = None):
+    import huggingface_hub
+    token = os.environ.get("HF_TOKEN_SANITY")
+    if not token:
+        raise EnvironmentError("Set HF_TOKEN_SANITY environment variable")
+    huggingface_hub.login(token=token)
+
     true_stmts = TRUE_STATEMENTS[:n_statements] if n_statements else TRUE_STATEMENTS
     false_stmts = FALSE_STATEMENTS[:n_statements] if n_statements else FALSE_STATEMENTS
 
