@@ -1,0 +1,18 @@
+[project]
+name = "spec-gap-activation-probe"
+version = "0.1.0"
+description = "Activation extraction and probing for Llama 3 8B Instruct"
+requires-python = ">=3.10"
+dependencies = [
+    "transformer-lens>=2.0",
+    "torch>=2.1",
+    "einops",
+    "jaxtyping",
+    "scikit-learn",
+    "numpy",
+    "pandas",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ipython"]
