@@ -4,7 +4,7 @@ from jaxtyping import Float
 from torch import Tensor
 
 DEFAULT_LAYERS = (16, 20, 24)
-MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
+MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
 HIDDEN_DIM = 4096
 
 
