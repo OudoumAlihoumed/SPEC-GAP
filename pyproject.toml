@@ -12,6 +12,7 @@ dependencies = [
     "numpy",
     "pandas",
     "matplotlib",
+    "langgraph>=0.2",
 ]
 
 [project.optional-dependencies]

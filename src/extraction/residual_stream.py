@@ -41,13 +41,14 @@ def extract_residual_stream(
     layers: tuple[int, ...] = DEFAULT_LAYERS,
     token_position: str | int = "last",
     batch_size: int = 1,
+    prepend_bos: bool = True,
 ) -> dict[int, Float[Tensor, "n_prompts hidden"]]:
     results = {layer: [] for layer in layers}
     name_filter = _get_cache_filter(layers)
 
     for i in range(0, len(prompts), batch_size):
         batch = prompts[i : i + batch_size]
-        tokens = model.to_tokens(batch, prepend_bos=True)
+        tokens = model.to_tokens(batch, prepend_bos=prepend_bos)
 
         with torch.no_grad():
             _, cache = model.run_with_cache(
