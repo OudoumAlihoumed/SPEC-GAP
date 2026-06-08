@@ -1,8 +1,13 @@
 """
-Week 2: Goldowsky-Dill linear probe on multi-agent collusion data.
+Week 2: Goldowsky-Dill linear probe on local development collusion data.
 
 Trains probes on residual stream activations from Llama 3.1 8B Instruct
 to distinguish colluding vs honest agents in committee deliberation scenarios.
+
+This script uses the lightweight fixture in src/data/collusion_scenarios.py so
+it can run without downloading upstream benchmark code. The canonical Week 2
+run for reporting is notebooks/02_collusion_probe.ipynb, which pulls
+NARCBench-Core upstream scenarios.
 
 Usage:
     python experiments/week2_collusion_probe.py
