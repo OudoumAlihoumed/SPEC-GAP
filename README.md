@@ -71,6 +71,43 @@ Do not cite final numerical results from this repo until the deterministic Colab
 4. `notebooks/04_pipeline_scaffold.ipynb`
    Demonstrates the LangGraph planner-worker-executor scaffold, trajectory JSONL logging, hop modes, trust modes, and injection hooks.
 
+## Colab Artifact Flow
+
+All notebooks now use the same artifact root:
+
+```text
+/content/drive/MyDrive/spec-gap-activation-probe/artifacts/
+```
+
+Each notebook writes into its own numbered subdirectory:
+
+```text
+artifacts/
+├── 01_sanity_check/
+│   ├── sanity_check_results_cv.json
+│   └── sanity_check_results.json
+├── 02_collusion_probe/
+│   ├── week2_collusion_probe_results.json
+│   ├── week2_collusion_probe_activations.npz
+│   ├── week2_collusion_probe_responses.json
+│   ├── week2_ep_results.json
+│   ├── week2_ep_partitions_multilayer.png
+│   ├── week2_ep_partition_sizes.png
+│   └── manifest.json
+├── 03_analysis/
+│   ├── week3_preliminary_results.md
+│   └── week3_*.png
+└── 04_pipeline_scaffold/
+    └── trajectories/
+        └── *.jsonl
+```
+
+`03_analysis.ipynb` reads Week 2 outputs from `artifacts/02_collusion_probe/`, so run `02_collusion_probe.ipynb` first and execute its final "Save generated artifacts" cell. The EP files are optional; if you skip EP, Week 3 will still run on the required probe results and activations.
+
+`04_pipeline_scaffold.ipynb` is independent of Week 2/3. When opened from Colab, it clones the public GitHub repository without a token so `src/` imports work, then writes trajectory JSONL files to `artifacts/04_pipeline_scaffold/trajectories/`.
+
+To use a different artifact location, set `SPEC_GAP_ARTIFACT_ROOT` before running the setup cell in a notebook.
+
 ## Key Artifacts
 
 The notebooks generate local artifacts such as:
