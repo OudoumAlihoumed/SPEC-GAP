@@ -71,6 +71,12 @@ Do not cite final numerical results from this repo until the deterministic Colab
 4. `notebooks/04_pipeline_scaffold.ipynb`
    Demonstrates the LangGraph planner-worker-executor scaffold, trajectory JSONL logging, hop modes, trust modes, and injection hooks.
 
+5. `notebooks/05_week1_runway_artifact_review.ipynb`
+   Reads the saved runway artifacts, summarizes responses, probe metrics, LSO behavior, calibration, and exemplar partitioning, and writes a readable response-review CSV for qualitative inspection.
+
+6. `notebooks/06_week2_trajectory_schema_smoke.ipynb`
+   Runs CPU-only clean and injected planner-worker-executor smoke trajectories in both 2-hop and 3-hop modes using the existing `src/pipeline/` scaffold. This verifies that the locked JSONL trajectory schema is usable before replacing stubs with real model and retrieval calls.
+
 ## Colab Artifact Flow
 
 All notebooks now use the same artifact root:
@@ -105,6 +111,8 @@ artifacts/
 `03_analysis.ipynb` reads Week 2 outputs from `artifacts/02_collusion_probe/`, so run `02_collusion_probe.ipynb` first and execute its final "Save generated artifacts" cell. The EP files are optional; if you skip EP, Week 3 will still run on the required probe results and activations.
 
 `04_pipeline_scaffold.ipynb` is independent of Week 2/3. When opened from Colab, it clones the public GitHub repository without a token so `src/` imports work, then writes trajectory JSONL files to `artifacts/04_pipeline_scaffold/trajectories/`.
+
+`05_week1_runway_artifact_review.ipynb` and `06_week2_trajectory_schema_smoke.ipynb` are fellowship bridge notebooks. They do not create new headline results. The first consolidates and checks the existing runway artifacts; the second verifies that the existing LangGraph scaffold produces schema-valid trajectories for the next SPEC-GAP exploit-chain phase.
 
 To use a different artifact location, set `SPEC_GAP_ARTIFACT_ROOT` before running the setup cell in a notebook.
 
