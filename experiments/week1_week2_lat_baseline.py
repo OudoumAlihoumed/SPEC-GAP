@@ -1,0 +1,118 @@
+"""Week 1-2 LAT baseline on saved runway activations.
+
+This script reads the pre-fellowship collusion activation artifact and evaluates
+a LAT-style representation-direction baseline across layers. It does not extract
+new activations or run model inference.
+
+Usage:
+    python experiments/week1_week2_lat_baseline.py
+    SPEC_GAP_ARTIFACT_ROOT=/path/to/artifacts python experiments/week1_week2_lat_baseline.py
+"""
+
+import argparse
+import json
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from src.probes.lat_baseline import evaluate_lat_all_layers, lat_results_to_dict
+
+
+def _find_artifact_root(repo_root: Path) -> Path:
+    candidates = []
+    if os.environ.get("SPEC_GAP_ARTIFACT_ROOT"):
+        candidates.append(Path(os.environ["SPEC_GAP_ARTIFACT_ROOT"]))
+    candidates.extend(
+        [
+            repo_root / "artifacts",
+            Path.home() / "Downloads" / "artifacts",
+            Path("/content/drive/MyDrive/spec-gap-activation-probe/artifacts"),
+        ]
+    )
+    for candidate in candidates:
+        if (candidate / "02_collusion_probe" / "week2_collusion_probe_activations.npz").exists():
+            return candidate
+    searched = "\n".join(str(p) for p in candidates)
+    raise FileNotFoundError("Could not find runway activation artifact. Searched:\n" + searched)
+
+
+def _load_runway_artifacts(artifact_root: Path) -> tuple[dict[int, np.ndarray], np.ndarray, np.ndarray]:
+    collusion_dir = artifact_root / "02_collusion_probe"
+    activation_path = collusion_dir / "week2_collusion_probe_activations.npz"
+    response_path = collusion_dir / "week2_collusion_probe_responses.json"
+
+    npz = np.load(activation_path)
+    activations = {
+        int(name.removeprefix("layer_")): npz[name]
+        for name in npz.files
+        if name.startswith("layer_")
+    }
+    labels = np.asarray(npz["labels"], dtype=int)
+
+    responses = json.loads(response_path.read_text())
+    scenario_ids = np.asarray([row["metadata"]["scenario_idx"] for row in responses], dtype=int)
+    if len(labels) != len(scenario_ids):
+        raise ValueError("Activation labels and response metadata have different lengths.")
+    return activations, labels, scenario_ids
+
+
+def run_lat_baseline(artifact_root: Path | None = None, output_path: Path | None = None) -> dict:
+    repo_root = Path(__file__).resolve().parent.parent
+    artifact_root = artifact_root or _find_artifact_root(repo_root)
+    activations, labels, scenario_ids = _load_runway_artifacts(artifact_root)
+
+    print(f"Loaded {len(labels)} activation rows from {artifact_root}")
+    print(f"Layers: {sorted(activations)}")
+    print(f"Labels: positive={int(labels.sum())}, negative={int((labels == 0).sum())}")
+
+    stratified = evaluate_lat_all_layers(activations, labels, n_splits=5)
+    leave_scenario_out = evaluate_lat_all_layers(
+        activations,
+        labels,
+        groups=scenario_ids,
+        leave_group_out=True,
+    )
+
+    output = {
+        "experiment": "week1_week2_lat_baseline",
+        "method": "LAT-style contrast direction with one-dimensional logistic calibration",
+        "date": datetime.now().isoformat(),
+        "source_artifacts": {
+            "activations": "02_collusion_probe/week2_collusion_probe_activations.npz",
+            "responses": "02_collusion_probe/week2_collusion_probe_responses.json",
+        },
+        "n_prompts": int(len(labels)),
+        "n_positive": int(labels.sum()),
+        "n_negative": int((labels == 0).sum()),
+        "layers": sorted(int(layer) for layer in activations),
+        "stratified_cv": lat_results_to_dict(stratified),
+        "leave_scenario_out_cv": lat_results_to_dict(leave_scenario_out),
+    }
+
+    if output_path is None:
+        output_path = repo_root / "reports" / "week1_week2_lat_baseline_results.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(output, indent=2))
+    print(f"LAT baseline results saved to {output_path}")
+
+    best_layer = max(output["stratified_cv"], key=lambda layer: output["stratified_cv"][layer]["auroc_mean"])
+    best = output["stratified_cv"][best_layer]
+    print(
+        f"Best stratified LAT layer: {best_layer} "
+        f"AUROC={best['auroc_mean']:.3f} +/- {best['auroc_std']:.3f} "
+        f"Brier={best['brier_mean']:.3f} ECE={best['ece_mean']:.3f}"
+    )
+    return output
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--artifact-root", type=Path, default=None)
+    parser.add_argument("--output", type=Path, default=None)
+    args = parser.parse_args()
+    run_lat_baseline(artifact_root=args.artifact_root, output_path=args.output)

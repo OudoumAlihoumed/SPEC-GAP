@@ -17,6 +17,13 @@ from src.probes.linear_probe import (
     train_and_evaluate,
     train_and_evaluate_leave_scenario_out,
 )
+from src.probes.lat_baseline import (
+    LATDirectionProbe,
+    evaluate_lat_all_layers,
+    lat_results_to_dict,
+    train_and_evaluate_lat,
+    train_and_evaluate_lat_leave_group_out,
+)
 
 
 @pytest.fixture(scope="module")
@@ -196,3 +203,35 @@ class TestResultsSerialization:
         assert "ece_mean" in d[20]
         assert "deception_direction_norm" in d[20]
         assert "diff_in_means_norm" in d[20]
+
+
+class TestLATBaseline:
+    def test_lat_direction_probe_scores(self, separable_data):
+        X, y = separable_data
+        model = LATDirectionProbe().fit(X, y)
+        scores = model.decision_function(X)
+        probs = model.predict_proba(X)[:, 1]
+        assert scores.shape == (len(y),)
+        assert probs.shape == (len(y),)
+        assert 0.0 <= probs.min() <= probs.max() <= 1.0
+        assert abs(np.linalg.norm(model.direction_) - 1.0) < 1e-5
+
+    def test_lat_separable_high_auroc(self, separable_data):
+        X, y = separable_data
+        result = train_and_evaluate_lat(X, y, n_splits=5)
+        assert result.auroc_mean > 0.9
+
+    def test_lat_leave_group_out(self, separable_data):
+        X, y = separable_data
+        groups = np.repeat(np.arange(25), 4)
+        result = train_and_evaluate_lat_leave_group_out(X, y, groups)
+        assert len(result.auroc_per_fold) == 25
+        assert result.auroc_mean > 0.7
+
+    def test_lat_all_layers_serializes(self, separable_data):
+        X, y = separable_data
+        result = evaluate_lat_all_layers({16: X, 20: X}, y)
+        d = lat_results_to_dict(result)
+        json.dumps(d)
+        assert 16 in d
+        assert "lat_direction_norm" in d[16]
