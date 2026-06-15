@@ -118,6 +118,8 @@ artifacts/
 
 `05_week1_runway_artifact_review.ipynb` and `06_week2_trajectory_schema_smoke.ipynb` are fellowship bridge notebooks. They do not create new headline results. The first consolidates and checks the existing runway artifacts; the second verifies that the existing LangGraph scaffold produces schema-valid trajectories for the next SPEC-GAP exploit-chain phase.
 
+When opened directly from GitHub in Colab, the bridge notebooks clone this repository into `/content/spec-gap-activation-probe` and mount Google Drive. `05_week1_runway_artifact_review.ipynb` expects the saved runway artifacts at `/content/drive/MyDrive/spec-gap-activation-probe/artifacts/` unless `SPEC_GAP_ARTIFACT_ROOT` is set to another artifact root.
+
 To use a different artifact location, set `SPEC_GAP_ARTIFACT_ROOT` before running the setup cell in a notebook.
 
 ## Key Artifacts
