@@ -72,9 +72,13 @@ Do not cite final numerical results from this repo until the deterministic Colab
    Demonstrates the LangGraph planner-worker-executor scaffold, trajectory JSONL logging, hop modes, trust modes, and injection hooks.
 
 5. `notebooks/05_week1_runway_artifact_review.ipynb`
+   [Open in Colab](https://colab.research.google.com/github/elenaajayi/spec-gap-activation-probe/blob/main/notebooks/05_week1_runway_artifact_review.ipynb)
+
    Reads the saved runway artifacts, summarizes responses, probe metrics, LSO behavior, calibration, and exemplar partitioning, and writes a readable response-review CSV for qualitative inspection.
 
 6. `notebooks/06_week2_trajectory_schema_smoke.ipynb`
+   [Open in Colab](https://colab.research.google.com/github/elenaajayi/spec-gap-activation-probe/blob/main/notebooks/06_week2_trajectory_schema_smoke.ipynb)
+
    Runs CPU-only clean and injected planner-worker-executor smoke trajectories in both 2-hop and 3-hop modes using the existing `src/pipeline/` scaffold. This verifies that the locked JSONL trajectory schema is usable before replacing stubs with real model and retrieval calls.
 
 ## Colab Artifact Flow
