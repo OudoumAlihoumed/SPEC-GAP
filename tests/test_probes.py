@@ -18,11 +18,15 @@ from src.probes.linear_probe import (
     train_and_evaluate_leave_scenario_out,
 )
 from src.probes.lat_baseline import (
+    ContrastPairLATProbe,
     LATDirectionProbe,
+    evaluate_contrast_pair_lat_all_layers,
     evaluate_lat_all_layers,
     lat_results_to_dict,
     train_and_evaluate_lat,
     train_and_evaluate_lat_leave_group_out,
+    train_and_evaluate_contrast_pair_lat,
+    train_and_evaluate_contrast_pair_lat_leave_group_out,
 )
 
 
@@ -72,6 +76,10 @@ class TestProbePipeline:
     def test_has_pca_when_requested(self):
         pipe = make_probe_pipeline(pca_components=10)
         assert "pca" in pipe.named_steps
+
+    def test_pca_uses_experiment_seed(self):
+        pipe = make_probe_pipeline(pca_components=10, random_state=17)
+        assert pipe.named_steps["pca"].random_state == 17
 
     def test_no_pca_by_default(self):
         pipe = make_probe_pipeline()
@@ -235,3 +243,61 @@ class TestLATBaseline:
         json.dumps(d)
         assert 16 in d
         assert "lat_direction_norm" in d[16]
+
+
+class TestContrastPairLAT:
+    @pytest.fixture
+    def paired_data(self):
+        rng = np.random.RandomState(7)
+        n_pairs = 50
+        d = 40
+        base = rng.randn(n_pairs, d).astype(np.float32)
+        signal = np.zeros(d, dtype=np.float32)
+        signal[:5] = 2.0
+        negative = base - signal / 2
+        positive = base + signal / 2
+        X = np.stack([negative, positive], axis=1).reshape(n_pairs * 2, d)
+        y = np.tile([0, 1], n_pairs)
+        pair_ids = np.repeat(np.arange(n_pairs), 2)
+        return X, y, pair_ids
+
+    def test_fit_scores_matched_pairs(self, paired_data):
+        X, y, pair_ids = paired_data
+        model = ContrastPairLATProbe().fit(X, y, pair_ids)
+        scores = model.decision_function(X)
+        assert scores[y == 1].mean() > scores[y == 0].mean()
+        assert np.linalg.norm(model.direction_) == pytest.approx(1.0)
+
+    def test_pair_preserving_cv(self, paired_data):
+        X, y, pair_ids = paired_data
+        result = train_and_evaluate_contrast_pair_lat(X, y, pair_ids)
+        assert len(result.auroc_per_fold) == 5
+        assert result.auroc_mean > 0.9
+
+    def test_all_layers_serializes(self, paired_data):
+        X, y, pair_ids = paired_data
+        result = evaluate_contrast_pair_lat_all_layers(
+            {16: X, 20: X},
+            y,
+            pair_ids,
+        )
+        payload = lat_results_to_dict(result)
+        json.dumps(payload)
+        assert set(payload) == {16, 20}
+
+    def test_leave_group_out_preserves_training_pairs(self, paired_data):
+        X, y, pair_ids = paired_data
+        scenario_ids = np.repeat(np.arange(10), 10)
+        result = train_and_evaluate_contrast_pair_lat_leave_group_out(
+            X,
+            y,
+            pair_ids,
+            scenario_ids,
+        )
+        assert len(result.auroc_per_fold) == 10
+        assert result.auroc_mean > 0.9
+
+    def test_rejects_unmatched_pair(self, paired_data):
+        X, y, pair_ids = paired_data
+        with pytest.raises(ValueError, match="exactly one negative"):
+            ContrastPairLATProbe().fit(X[:-1], y[:-1], pair_ids[:-1])
