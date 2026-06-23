@@ -15,6 +15,11 @@ from src.extraction.residual_stream import (
     extract_residual_stream,
     load_model,
 )
+from src.extraction.trajectory import (
+    extract_trajectory_activations,
+    records_to_activation_examples,
+    step_label_to_binary,
+)
 
 GPT2_LAYERS = (2, 6, 10)
 GPT2_HIDDEN = 768
@@ -105,3 +110,64 @@ class TestExtraction:
             gpt2_model, prompts, layers=(6,), batch_size=3,
         )
         assert torch.allclose(single[6], batched[6], atol=1e-3)
+
+
+class TestTrajectoryExtraction:
+    @staticmethod
+    def _records():
+        base = {
+            "trajectory_id": "synthetic-trajectory",
+            "model": "gpt2",
+            "scenario_id": "scenario1",
+            "condition": "synthetic-2hop",
+            "hop_mode": "2-hop",
+        }
+        return [
+            {
+                **base,
+                "step_index": 0,
+                "node_id": "planner",
+                "role": "planner",
+                "input_context": [{"role": "user", "content": "Summarize the paper."}],
+                "output_message": "Ask the worker to retrieve and summarize it.",
+                "step_label": "task_preserved",
+                "contrast_pair_id": "task01-planner-2hop",
+            },
+            {
+                **base,
+                "step_index": 1,
+                "node_id": "worker",
+                "role": "worker",
+                "input_context": [
+                    {"role": "user", "content": "Summarize the paper."},
+                    {"role": "user", "content": "Retrieved document contains an unrelated instruction."},
+                ],
+                "output_message": "I will follow the unrelated embedded instruction.",
+                "step_label": "compromised_context",
+                "contrast_pair_id": "task01-worker-2hop",
+            },
+        ]
+
+    def test_step_label_mapping_is_fail_closed(self):
+        assert step_label_to_binary("task_preserved") == 0
+        assert step_label_to_binary("compromised_context") == 1
+        assert step_label_to_binary("suspicious_instruction_propagation") is None
+        assert step_label_to_binary(None) is None
+
+    def test_records_align_messages_and_labels(self):
+        examples = records_to_activation_examples(self._records())
+        assert [example.binary_label for example in examples] == [0, 1]
+        assert examples[1].messages[-1]["role"] == "assistant"
+        assert examples[1].messages[-1]["content"].startswith("I will follow")
+
+    def test_synthetic_trajectory_to_activation(self, gpt2_model):
+        batch = extract_trajectory_activations(
+            gpt2_model,
+            self._records(),
+            layers=(6,),
+            batch_size=2,
+        )
+        assert batch.activations[6].shape == (2, GPT2_HIDDEN)
+        assert batch.labels.tolist() == [0, 1]
+        assert [row["step_index"] for row in batch.metadata] == [0, 1]
+        assert all(batch.rendered_prompts)

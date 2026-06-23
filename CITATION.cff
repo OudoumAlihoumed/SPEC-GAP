@@ -1,9 +1,10 @@
 cff-version: 1.2.0
 message: "If you use this repository, cite the SPEC-GAP project or the forthcoming paper."
-title: "SPEC-GAP Activation Probe"
+title: "SPEC-GAP: Systematic Probing of Exploit Chains and Governance in Multi-Agent Tool-Using Language Models"
 authors:
   - family-names: "Ajayi"
     given-names: "Elena"
 version: "0.1.0"
 date-released: "2026-06-08"
-url: "https://github.com/elenaajayi/spec-gap-activation-probe"
+url: "https://github.com/base-research-lab/spec-gap"
+license: MIT

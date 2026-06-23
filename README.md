@@ -1,204 +1,148 @@
-# SPEC-GAP Activation Probe
+# SPEC-GAP
 
-Systematic probing infrastructure for SPEC-GAP: **Systematic Probing of Exploit Chains and Governance in Multi-Agent Tool-Using Language Models**.
+**Systematic Probing of Exploit Chains and Governance in Multi-Agent Tool-Using Language Models**
 
-This repository contains the Phase -1 runway work for Workstream B: activation extraction, baseline linear probes, calibration/geometry analysis, and LangGraph scaffolding for the planner-worker-executor pipeline. It is intended to support the Week 5 handoff into the BASE sprint.
+SPEC-GAP studies whether white-box probes can detect adversarial influence as it propagates through a multi-agent system. The benchmark uses a planner-worker-executor pipeline in which an untrusted retrieved document can alter an agent's effective task and lead to an unsafe simulated tool action downstream.
 
-## Research Aim
+The central fellowship question is:
 
-SPEC-GAP asks whether whitebox probes trained on simpler deception or collusion settings transfer to agents operating inside multi-agent exploit chains, and where detection degrades as delegation depth increases.
+> Do probes trained on intentional collusion transfer to externally induced adversarial delegation, and how does detection change between 2-hop and 3-hop agent chains?
 
-The current runway work validates the measurement stack before SPEC-GAP trajectories exist:
+## Project outputs
 
-- extract residual stream activations from Llama 3.1 8B Instruct;
-- train Goldowsky-Dill-style linear probes on existing multi-agent collusion data;
-- analyze AUROC, calibration, and activation geometry;
-- scaffold the LangGraph planner-worker-executor pipeline for Scenario 1.
+SPEC-GAP is designed to produce two related artifacts:
 
-## Current Status
+| Artifact | Intended user | Contents |
+|---|---|---|
+| Black-box benchmark | Deployers and evaluators | Labeled trajectories, compromise points, tool outcomes, and trajectory-level safety metrics |
+| White-box probe suite | Model developers | Residual-stream activations, diagnostic linear probes, contrast-pair LAT, and trajectory-aware aggregation |
 
-Phase -1 runway, Week 5 handoff preparation.
+## Current phase
 
-Prepared:
+The pre-fellowship runway validated the measurement stack on NARCBench-Core using Llama 3.1 8B Instruct:
 
-- Week 1: activation extraction sanity check on a small truthfulness-style task.
-- Week 2: NARCBench-Core collusion probe notebook using Llama 3.1 8B Instruct.
-- Week 3: calibration, reliability, PCA, dimensionality, and exemplar partitioning analysis notebook.
-- Week 4: LangGraph planner-worker-executor scaffold with trajectory logging.
-- Week 5: repo cleanup and handoff documentation consolidated here.
+- 50 scenarios and 200 balanced colluder/honest prompts;
+- residual-stream extraction across layers 13–20 and 24;
+- Goldowsky-Dill-style logistic probes;
+- stratified and leave-one-scenario-out evaluation;
+- calibration, PCA, direction-alignment, and Exemplar Partitioning diagnostics.
 
-Pending:
+The runway found a modest, poorly calibrated collusion-role signal that was unstable under scenario-held-out evaluation. These are role-assignment results, not evidence that the model enacted deception. See [the preliminary results](reports/week3_preliminary_results.md) and [behavioral-sanity review](reports/runway_behavioral_sanity_review.md).
 
-- Run `notebooks/02_collusion_probe.ipynb` in Colab with generation `temperature=0.0`.
-- Run `notebooks/03_analysis.ipynb` on the generated Week 2 artifacts.
-- Regenerate `reports/week3_preliminary_results.md` from the actual rerun artifacts.
+The repository now contains the Phase 0 probe-side infrastructure:
 
-Do not cite final numerical results from this repo until the deterministic Colab rerun has been completed. Earlier exploratory notes are useful context, but the parameter change means they should not be treated as final.
+- deterministic Goldowsky-Dill and LAT baseline reruns;
+- matched contrast-pair LAT;
+- a LangGraph planner-worker-executor scaffold;
+- an additive JSONL trajectory and labeling schema;
+- trajectory-level safety metrics;
+- trajectory-to-activation ingestion;
+- Temporal Divergence over ordered per-step probe scores.
 
-## Repository Layout
+**No completed Scenario 1 trajectory dataset is currently included.** The next integration dependency is the first 3–5 trajectories from the pipeline workstream.
 
-```text
-.
-├── notebooks/                 # executable experiment milestones, ordered by prefix
-│   ├── 01_sanity_check.ipynb
-│   ├── 02_collusion_probe.ipynb
-│   ├── 03_analysis.ipynb
-│   └── 04_pipeline_scaffold.ipynb
-├── src/
-│   ├── extraction/             # TransformerLens residual-stream extraction
-│   ├── probes/                 # linear probe training and evaluation
-│   ├── analysis/               # calibration and geometry helpers
-│   ├── data/                   # local development collusion fixture
-│   └── pipeline/               # LangGraph scaffold and trajectory schema
-├── experiments/                # script entry points for local development
-├── reports/                    # human-readable writeups
-├── tests/                      # CPU-oriented unit tests
-├── data/                       # local data staging; generated contents are ignored
-└── results/                    # local result staging; generated contents are ignored
-```
+## Phase 0 scope
 
-## Experiment Order
+| Component | Fellowship MVP |
+|---|---|
+| Model | Llama 3.1 8B Instruct |
+| Scenario | Scenario 1: retrieved-document injection leading to simulated data exfiltration |
+| Depth conditions | 2-hop and 3-hop |
+| Diagnostic baselines | Goldowsky-Dill linear probe and LAT |
+| Multi-agent method | Temporal Divergence |
+| Dataset target | Approximately 20–30 trajectories |
+| Primary layer | Layer 20, with layers 16 and 24 as ablations |
 
-1. `notebooks/01_sanity_check.ipynb`
-   Validates that residual-stream extraction works on a smaller sanity-check task before running Llama-scale experiments.
+Scenario 2, an LLM-judge baseline, token-level analysis, additional scenarios, and cross-family model evaluation are post-MVP work.
 
-2. `notebooks/02_collusion_probe.ipynb`
-   Pulls NARCBench-Core committee scenarios, builds 200 balanced agent prompts, generates 64-token responses at `temperature=0.0`, extracts last-generated-token residual stream activations across layers 13-24, and trains a StandardScaler -> PCA(50) -> logistic-regression probe.
-
-3. `notebooks/03_analysis.ipynb`
-   Loads Week 2 artifacts and produces bootstrap AUROC intervals, reliability diagrams, calibration metrics, PCA role plots, effective dimensionality analysis, leave-one-scenario-out diagnostics, and exemplar partitioning summaries.
-
-4. `notebooks/04_pipeline_scaffold.ipynb`
-   Demonstrates the LangGraph planner-worker-executor scaffold, trajectory JSONL logging, hop modes, trust modes, and injection hooks.
-
-5. `notebooks/05_week1_runway_artifact_review.ipynb`
-   [Open in Colab](https://colab.research.google.com/github/elenaajayi/spec-gap-activation-probe/blob/main/notebooks/05_week1_runway_artifact_review.ipynb)
-
-   Reads the saved runway artifacts, summarizes responses, probe metrics, LSO behavior, calibration, and exemplar partitioning, and writes a readable response-review CSV for qualitative inspection.
-
-6. `notebooks/06_week2_trajectory_schema_smoke.ipynb`
-   [Open in Colab](https://colab.research.google.com/github/elenaajayi/spec-gap-activation-probe/blob/main/notebooks/06_week2_trajectory_schema_smoke.ipynb)
-
-   Runs CPU-only clean and injected planner-worker-executor smoke trajectories in both 2-hop and 3-hop modes using the existing `src/pipeline/` scaffold. This verifies that the locked JSONL trajectory schema is usable before replacing stubs with real model and retrieval calls.
-
-## Colab Artifact Flow
-
-All notebooks now use the same artifact root:
-
-```text
-/content/drive/MyDrive/spec-gap-activation-probe/artifacts/
-```
-
-Each notebook writes into its own numbered subdirectory:
-
-```text
-artifacts/
-├── 01_sanity_check/
-│   ├── sanity_check_results_cv.json
-│   └── sanity_check_results.json
-├── 02_collusion_probe/
-│   ├── week2_collusion_probe_results.json
-│   ├── week2_collusion_probe_activations.npz
-│   ├── week2_collusion_probe_responses.json
-│   ├── week2_ep_results.json
-│   ├── week2_ep_partitions_multilayer.png
-│   ├── week2_ep_partition_sizes.png
-│   └── manifest.json
-├── 03_analysis/
-│   ├── week3_preliminary_results.md
-│   └── week3_*.png
-└── 04_pipeline_scaffold/
-    └── trajectories/
-        └── *.jsonl
-```
-
-`03_analysis.ipynb` reads Week 2 outputs from `artifacts/02_collusion_probe/`, so run `02_collusion_probe.ipynb` first and execute its final "Save generated artifacts" cell. The EP files are optional; if you skip EP, Week 3 will still run on the required probe results and activations.
-
-`04_pipeline_scaffold.ipynb` is independent of Week 2/3. When opened from Colab, it clones the public GitHub repository without a token so `src/` imports work, then writes trajectory JSONL files to `artifacts/04_pipeline_scaffold/trajectories/`.
-
-`05_week1_runway_artifact_review.ipynb` and `06_week2_trajectory_schema_smoke.ipynb` are fellowship bridge notebooks. They do not create new headline results. The first consolidates and checks the existing runway artifacts; the second verifies that the existing LangGraph scaffold produces schema-valid trajectories for the next SPEC-GAP exploit-chain phase.
-
-When opened directly from GitHub in Colab, the Week 1 bridge notebook mounts Google Drive and reads saved runway artifacts from `/content/drive/MyDrive/spec-gap-activation-probe/artifacts/` unless `SPEC_GAP_ARTIFACT_ROOT` is set to another artifact root. The Week 2 bridge notebook additionally clones this repository into `/content/spec-gap-activation-probe` because it imports the local `src/pipeline/` scaffold. If the repository is private, add a Colab Secret named `GITHUB_TOKEN` with read-only repository contents access before running the Week 2 setup cell.
-
-To use a different artifact location, set `SPEC_GAP_ARTIFACT_ROOT` before running the setup cell in a notebook.
-
-## Key Artifacts
-
-The notebooks generate local artifacts such as:
-
-- `week2_collusion_probe_results.json`
-- `week2_collusion_probe_activations.npz`
-- `week2_collusion_probe_responses.json`
-- `week2_ep_results.json`
-- `week2_ep_partitions_multilayer.png`
-- `week2_ep_partition_sizes.png`
-- `reports/week3_preliminary_results.md`
-
-Generated model outputs, activations, JSON result files, and trajectory logs are intentionally ignored by git. They should be stored locally during development and later uploaded as an external artifact bundle when the team chooses the hosting path.
-
-## Running Locally
-
-Install dependencies:
+## Installation
 
 ```bash
+git clone https://github.com/base-research-lab/spec-gap.git
+cd spec-gap
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Run CPU tests:
+Run the CPU-oriented test suite:
 
 ```bash
-pytest
+python -m pytest
 ```
 
-The full Llama 3.1 8B Instruct notebooks require:
+The Llama experiments require Hugging Face access to `meta-llama/Llama-3.1-8B-Instruct` and a suitable GPU environment.
 
-- GPU runtime, preferably H100 or comparable;
-- Hugging Face access to `meta-llama/Llama-3.1-8B-Instruct`;
-- `HF_TOKEN_SANITY` available in the notebook environment.
+## Reproduce the runway analysis
 
-## Week 5 Handoff Notes
+The model-generated artifacts are stored outside Git. Set the artifact root to a directory containing `02_collusion_probe/week2_collusion_probe_activations.npz` and the corresponding response JSON:
 
-For Ife / Workstream A, start from `src/pipeline/` and `notebooks/04_pipeline_scaffold.ipynb`.
+```bash
+export SPEC_GAP_ARTIFACT_ROOT=/path/to/artifacts
+python experiments/week1_week2_baselines.py
+```
 
-The scaffold already defines:
+This writes a compact comparison to `reports/week1_week2_baseline_comparison.json`. The workflow evaluates:
 
-- `PipelineConfig` and `InjectionConfig` for hop mode, trust mode, timeout, max turns, and injection setup;
-- a planner -> worker -> executor graph, with optional `worker2` for 3-hop trajectories;
-- a locked JSONL trajectory schema in `src/pipeline/schema.py`;
-- a `TrajectoryLogger` that records every node step, message, tool call, call-graph edge, injection marker, and status;
-- stub retrieval and code-execution tools in `src/pipeline/tools.py`.
+- `StandardScaler -> PCA(50) -> logistic regression`;
+- the earlier class-centroid direction baseline;
+- contrast-pair LAT using pair-preserving cross-validation;
+- leave-one-scenario-out stress tests where supported.
 
-What to extend first:
+To prepare the partial manual review packet for the saved runway responses:
 
-1. Replace `llm_stub` with the agreed Llama 3.1 8B Instruct inference backend.
-2. Replace `retrieval_stub` with the Scenario 1 retrieval environment.
-3. Keep the trajectory schema field names stable; add optional fields only when needed.
-4. Generate clean trajectories first: at least 10 benign tasks with no injection.
-5. Then run Scenario 1 at both depths:
-   - 2-hop: planner -> worker -> executor;
-   - 3-hop: planner -> worker -> worker2 -> executor.
-6. Use 3-5 injection wordings while keeping the attack structure fixed.
+```bash
+python experiments/build_runway_behavior_review.py
+```
 
-Known gotchas:
+The packet is written under the ignored `results/runway_behavior_review/` directory. It is a review aid, not behavioral ground truth, because the original response artifact omitted the full prompts and option text.
 
-- Do not mix the earlier `temperature=0.7` exploratory numbers with the deterministic `temperature=0.0` rerun.
-- Layer 20 remains the committed primary layer, with 16 and 24 as ablations. The 13-24 sweep is exploratory.
-- Leave-one-scenario-out folds are tiny in the development substrate, so LSO should be described as a stress test rather than a stable transfer estimate.
-- If the rerun shows weak calibration again, emphasize AUROC and geometry rather than probability thresholds.
-- The local `src/data/collusion_scenarios.py` fixture is for lightweight development tests. The canonical Week 2 notebook uses upstream NARCBench-Core scenarios.
+## Work with Scenario 1 trajectories
 
-## Public-Repo Notes
+Trajectory files use JSON Lines: one ordered record per agent step and one file per trajectory. Before scaling collection, validate the first handoff against the [labeling protocol](docs/labeling_protocol.md) and [Week 3 acceptance checklist](docs/week3_trajectory_acceptance_checklist.md).
 
-This repo tracks code, notebooks, tests, and concise reports. It does not track raw model activations, generated responses, or bulky result artifacts.
+Summarize labeled trajectories:
 
-When the team is ready to release reproducibility artifacts, use an external bundle for model outputs, activation arrays, derived analysis outputs, and final figures/tables.
+```bash
+python experiments/summarize_trajectories.py /path/to/trajectories/
+```
+
+The summary reports:
+
+- exploit-chain success rate;
+- handoffs from injection to first compromise;
+- unsafe tool-invocation rate;
+- per-trajectory outcomes and denominators.
+
+Probe-side code can then convert eligible JSONL steps into rendered model contexts and aligned activation examples through `src/extraction/trajectory.py`. Temporal Divergence is implemented in `src/probes/temporal_divergence.py` and requires an ordered probe probability for every included agent step.
+
+## Repository structure
+
+```text
+spec-gap/
+├── docs/          # labeling and handoff protocols
+├── experiments/   # reproducible command-line workflows
+├── notebooks/     # runway and scaffold notebooks
+├── reports/       # compact results and methodological summaries
+├── src/
+│   ├── analysis/  # calibration, geometry, and trajectory metrics
+│   ├── data/      # lightweight development fixtures
+│   ├── extraction/# residual-stream and trajectory ingestion
+│   ├── pipeline/  # LangGraph scaffold, tools, schema, and logging
+│   └── probes/    # linear, LAT, and Temporal Divergence methods
+└── tests/         # CPU-oriented unit and integration tests
+```
+
+The numbered notebooks preserve the runway experiment history. New reproducible workflows should prefer the scripts under `experiments/` and reusable modules under `src/`.
+
+## Data and artifact policy
+
+Raw activations, model responses, trajectory JSONL files, and manual annotation packets are intentionally ignored by Git. The repository tracks code, schemas, tests, and compact derived reports. Any public dataset release should use versioned external storage with a manifest linking the data to its generating commit and model configuration.
 
 ## Citation
 
-Use `CITATION.cff` for repository citation metadata. Replace or supplement it with the final paper citation once the SPEC-GAP paper is available.
+Repository citation metadata is available in [CITATION.cff](CITATION.cff). Replace or supplement it with the final paper citation when available.
 
 ## License
 
-No open-source license has been selected yet. Choose one before public release if the code should be reusable by others.
+The repository code is released under the [MIT License](LICENSE). Datasets, model outputs, and other external artifacts may use separate licenses stated with their releases.

@@ -1,8 +1,9 @@
 [project]
-name = "spec-gap-activation-probe"
+name = "spec-gap"
 version = "0.1.0"
-description = "Activation extraction and probing for Llama 3.1 8B Instruct"
+description = "SPEC-GAP benchmark and probe infrastructure for adversarial delegation in multi-agent LLM systems"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "transformer-lens>=2.0",
