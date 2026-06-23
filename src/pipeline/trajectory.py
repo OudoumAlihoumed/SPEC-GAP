@@ -41,6 +41,12 @@ class TrajectoryLogger:
         scenario_id: str = None,
         condition: str = None,
         injection_wording_id: str = None,
+        contrast_pair_id: str = None,
+        failure_mode: str = None,
+        trajectory_label: str = None,
+        step_label: str = None,
+        behavioral_sanity: dict = None,
+        label_notes: str = None,
     ) -> TrajectoryRecord:
         record = TrajectoryRecord(
             trajectory_id=self.trajectory_id,
@@ -63,6 +69,12 @@ class TrajectoryLogger:
             scenario_id=scenario_id,
             condition=condition,
             injection_wording_id=injection_wording_id,
+            contrast_pair_id=contrast_pair_id,
+            failure_mode=failure_mode,
+            trajectory_label=trajectory_label,
+            step_label=step_label,
+            behavioral_sanity=behavioral_sanity,
+            label_notes=label_notes,
         )
         self.records.append(record)
         self.step_index += 1

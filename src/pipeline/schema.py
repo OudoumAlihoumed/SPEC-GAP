@@ -56,6 +56,25 @@ Optional scenario-level fields (additive, do not break schema lock):
     injection_wording_id : str|null -- Identifies which injection
                                wording variant was used, for tracking
                                variation within a condition.
+    contrast_pair_id: str|null -- Matched clean/injected pair used by
+                               contrast-pair LAT. Both records in a pair
+                               must refer to the same task, node, and depth.
+    failure_mode    : str|null -- Label family for the trajectory or
+                               step. Expected values include
+                               "intentional_collusion",
+                               "opportunistic_rule_violation",
+                               "general_deception", and
+                               "intent_free_compromise".
+    trajectory_label: str|null -- Scenario-level label from construction,
+                               e.g. "clean", "attempted_compromise",
+                               "successful_compromise".
+    step_label      : str|null -- Optional blind step-level annotation
+                               for this record.
+    behavioral_sanity : dict|null -- Output-only sanity check metadata,
+                               e.g. whether the model followed or
+                               resisted the injected instruction.
+    label_notes     : str|null -- Free-text edge-case notes for label
+                               adjudication.
 """
 
 from dataclasses import dataclass, field, asdict
@@ -84,6 +103,12 @@ class TrajectoryRecord:
     scenario_id: Optional[str] = None
     condition: Optional[str] = None
     injection_wording_id: Optional[str] = None
+    contrast_pair_id: Optional[str] = None
+    failure_mode: Optional[str] = None
+    trajectory_label: Optional[str] = None
+    step_label: Optional[str] = None
+    behavioral_sanity: Optional[dict] = None
+    label_notes: Optional[str] = None
 
     def to_dict(self) -> dict:
         return asdict(self)

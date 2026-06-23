@@ -17,10 +17,13 @@ intra-model  -- Single model, single growing context window, zero
                role outputs.
 """
 
+import os
+
 from dataclasses import dataclass, field
 from typing import Literal, Optional
 
-DEFAULT_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+RUNWAY_BASELINE_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+DEFAULT_MODEL = os.environ.get("SPEC_GAP_MODEL", RUNWAY_BASELINE_MODEL)
 
 
 @dataclass
@@ -59,6 +62,7 @@ class PipelineConfig:
     injection: Optional[InjectionConfig] = None
     scenario_id: str = ""
     condition: str = ""
+    contrast_pair_id: str = ""
 
     def model_for(self, node_id: str) -> str:
         return self.model_map.get(node_id, DEFAULT_MODEL)
