@@ -24,6 +24,7 @@ class TrajectoryActivationExample:
     trajectory_id: str
     step_index: int
     node_id: str
+    role: str
     model: str
     messages: list[dict]
     step_label: str | None
@@ -31,7 +32,27 @@ class TrajectoryActivationExample:
     scenario_id: str | None
     condition: str | None
     hop_mode: str
+    token_position: str
+    trajectory_label: str | None
+    failure_mode: str | None
+    injection_wording_id: str | None
     contrast_pair_id: str | None
+
+
+@dataclass(frozen=True)
+class TrajectoryActivationRequest:
+    """Model-free extraction request produced from one trajectory step."""
+
+    trajectory_id: str
+    step_index: int
+    node_id: str
+    role: str
+    model: str
+    rendered_prompt: str
+    token_position: str
+    step_label: str | None
+    binary_label: int | None
+    metadata: dict
 
 
 @dataclass(frozen=True)
@@ -86,6 +107,7 @@ def records_to_activation_examples(
             trajectory_id=str(record["trajectory_id"]),
             step_index=int(record["step_index"]),
             node_id=str(record["node_id"]),
+            role=str(record["role"]),
             model=str(record["model"]),
             messages=messages,
             step_label=step_label,
@@ -93,6 +115,10 @@ def records_to_activation_examples(
             scenario_id=record.get("scenario_id"),
             condition=record.get("condition"),
             hop_mode=str(record.get("hop_mode") or ""),
+            token_position=str(record.get("token_position") or "last"),
+            trajectory_label=record.get("trajectory_label"),
+            failure_mode=record.get("failure_mode"),
+            injection_wording_id=record.get("injection_wording_id"),
             contrast_pair_id=record.get("contrast_pair_id"),
         ))
     return examples
@@ -110,6 +136,62 @@ def render_messages(messages: list[dict], tokenizer) -> str:
     return "\n\n".join(
         f"{message['role'].upper()}: {message['content']}" for message in messages
     )
+
+
+class _PlainTextTokenizer:
+    chat_template = None
+
+
+def records_to_activation_requests(
+    records: list[dict],
+    *,
+    include_unlabeled: bool = False,
+    tokenizer=None,
+    renderer: Callable[[list[dict], object], str] = render_messages,
+) -> list[TrajectoryActivationRequest]:
+    """Build prompt strings and metadata without loading a model.
+
+    This is the handoff adapter for new trajectory files: JSONL records can be
+    validated and rendered into extraction-ready requests before Llama weights
+    or TransformerLens are loaded.
+    """
+
+    tokenizer = tokenizer or _PlainTextTokenizer()
+    requests = []
+    for example in records_to_activation_examples(
+        records,
+        include_unlabeled=include_unlabeled,
+    ):
+        metadata = {
+            "trajectory_id": example.trajectory_id,
+            "step_index": example.step_index,
+            "node_id": example.node_id,
+            "role": example.role,
+            "model": example.model,
+            "step_label": example.step_label,
+            "binary_label": example.binary_label,
+            "scenario_id": example.scenario_id,
+            "condition": example.condition,
+            "hop_mode": example.hop_mode,
+            "token_position": example.token_position,
+            "trajectory_label": example.trajectory_label,
+            "failure_mode": example.failure_mode,
+            "injection_wording_id": example.injection_wording_id,
+            "contrast_pair_id": example.contrast_pair_id,
+        }
+        requests.append(TrajectoryActivationRequest(
+            trajectory_id=example.trajectory_id,
+            step_index=example.step_index,
+            node_id=example.node_id,
+            role=example.role,
+            model=example.model,
+            rendered_prompt=renderer(example.messages, tokenizer),
+            token_position=example.token_position,
+            step_label=example.step_label,
+            binary_label=example.binary_label,
+            metadata=metadata,
+        ))
+    return requests
 
 
 def extract_trajectory_activations(
@@ -147,11 +229,16 @@ def extract_trajectory_activations(
             "trajectory_id": example.trajectory_id,
             "step_index": example.step_index,
             "node_id": example.node_id,
+            "role": example.role,
             "model": example.model,
             "step_label": example.step_label,
             "scenario_id": example.scenario_id,
             "condition": example.condition,
             "hop_mode": example.hop_mode,
+            "token_position": example.token_position,
+            "trajectory_label": example.trajectory_label,
+            "failure_mode": example.failure_mode,
+            "injection_wording_id": example.injection_wording_id,
             "contrast_pair_id": example.contrast_pair_id,
         }
         for example in examples

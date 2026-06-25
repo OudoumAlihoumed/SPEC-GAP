@@ -59,6 +59,21 @@ def load_trajectory_jsonl(path: str | Path) -> list[dict]:
     return records
 
 
+def load_trajectory_files(paths: Iterable[str | Path]) -> list[list[dict]]:
+    """Load multiple trajectory JSONL files."""
+
+    return [load_trajectory_jsonl(path) for path in paths]
+
+
+def load_trajectory_directory(directory: str | Path) -> list[list[dict]]:
+    """Load all JSONL trajectories in a directory, sorted by path."""
+
+    paths = sorted(Path(directory).glob("*.jsonl"))
+    if not paths:
+        raise ValueError(f"No .jsonl trajectories found in {directory}")
+    return load_trajectory_files(paths)
+
+
 def _validate_records(records: list[dict]) -> None:
     if not records:
         raise ValueError("A trajectory must contain at least one record.")
@@ -166,6 +181,47 @@ def summarize_dataset(trajectories: Iterable[list[dict]]) -> dict:
     if not summaries:
         raise ValueError("At least one trajectory is required.")
 
+    result = _aggregate_summaries(summaries)
+    result["by_hop_mode"] = summarize_summaries_by_field(summaries, "hop_mode")
+    result["by_condition"] = summarize_summaries_by_field(summaries, "condition")
+    result["by_trajectory"] = [summary.to_dict() for summary in summaries]
+    return result
+
+
+def summarize_dataset_by_hop_mode(trajectories: Iterable[list[dict]]) -> dict:
+    """Return grouped summaries for comparing 2-hop and 3-hop conditions."""
+
+    summaries = [summarize_trajectory(records) for records in trajectories]
+    return summarize_summaries_by_field(summaries, "hop_mode")
+
+
+def summarize_dataset_by_condition(trajectories: Iterable[list[dict]]) -> dict:
+    """Return grouped summaries by experimental condition label."""
+
+    summaries = [summarize_trajectory(records) for records in trajectories]
+    return summarize_summaries_by_field(summaries, "condition")
+
+
+def summarize_summaries_by_field(
+    summaries: Iterable[TrajectoryMetrics],
+    field_name: str,
+) -> dict:
+    """Group already-computed trajectory summaries by a dataclass field."""
+
+    groups: dict[str, list[TrajectoryMetrics]] = {}
+    for summary in summaries:
+        key = getattr(summary, field_name)
+        groups.setdefault(str(key), []).append(summary)
+    return {
+        key: _aggregate_summaries(group)
+        for key, group in sorted(groups.items())
+    }
+
+
+def _aggregate_summaries(summaries: list[TrajectoryMetrics]) -> dict:
+    if not summaries:
+        raise ValueError("At least one trajectory summary is required.")
+
     attempted = [summary for summary in summaries if summary.trajectory_label in ATTEMPT_LABELS]
     successes = [summary for summary in attempted if summary.exploit_succeeded]
     handoff_depths = [
@@ -195,5 +251,4 @@ def summarize_dataset(trajectories: Iterable[list[dict]]) -> dict:
             sum(summary.unsafe_tool_invocations > 0 for summary in summaries)
             / len(summaries)
         ),
-        "by_trajectory": [summary.to_dict() for summary in summaries],
     }
