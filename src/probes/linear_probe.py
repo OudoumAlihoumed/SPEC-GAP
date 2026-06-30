@@ -79,7 +79,10 @@ def make_probe_pipeline(
     if use_scaler:
         steps.append(("scaler", StandardScaler()))
     if pca_components is not None:
-        steps.append(("pca", PCA(n_components=pca_components)))
+        steps.append((
+            "pca",
+            PCA(n_components=pca_components, random_state=random_state),
+        ))
     steps.append((
         "clf",
         LogisticRegression(C=C, max_iter=max_iter, random_state=random_state, solver="lbfgs"),

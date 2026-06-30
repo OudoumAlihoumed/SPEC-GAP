@@ -157,6 +157,7 @@ def run_pipeline(
             ),
             "scenario_id": config.scenario_id or None,
             "condition": config.condition or None,
+            "contrast_pair_id": config.contrast_pair_id or None,
         },
         "_logger": logger,
     }

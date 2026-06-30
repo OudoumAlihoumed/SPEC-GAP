@@ -3,7 +3,9 @@ from transformer_lens import HookedTransformer
 from jaxtyping import Float
 from torch import Tensor
 
-COMMITTED_LAYERS = (16, 20, 24)
+PRIMARY_LAYER = 20
+ABLATION_LAYERS = (16, 24)
+COMMITTED_LAYERS = (PRIMARY_LAYER, *ABLATION_LAYERS)
 EXPLORATORY_LAYERS = tuple(range(13, 25))
 DEFAULT_LAYERS = COMMITTED_LAYERS
 MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"

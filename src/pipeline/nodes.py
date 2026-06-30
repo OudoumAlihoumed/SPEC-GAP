@@ -6,8 +6,10 @@ callable (llm_fn) so the sprint engineer can swap stubs for real
 model inference without changing the graph structure.
 
 The default stub generates canned responses. Replace llm_stub
-with a function that calls Llama 3.1 8B (or any model) via
-HuggingFace, vLLM, or your preferred backend.
+with a function that calls the selected open-weight model via
+HuggingFace, vLLM, or your preferred backend. Llama 3.1 8B Instruct
+is the locked Phase 0 model. `SPEC_GAP_MODEL` remains an extension point for
+later cross-model work.
 """
 
 from datetime import datetime, timezone
@@ -233,6 +235,7 @@ def make_node(node_id: str, llm_fn=None):
                 injection_wording_id=(
                     injection_cfg.get("wording_id") if injection_cfg else None
                 ),
+                contrast_pair_id=config.get("contrast_pair_id"),
             )
 
         # State update
