@@ -57,7 +57,7 @@ token span lands on the ARCHIVAL NOTE, and the executor never sees raw poison.
 
 9. README separates included-now from next and reflects the real code.
 
-## Label channels (needs Elena's sign-off)
+## Label channels
 
 The per-event `behavioral_compromise_label` and `reasoning_compromise_label`
 were already correct in notebook 07. The only conflation was in the top-level
