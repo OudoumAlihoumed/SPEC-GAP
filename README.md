@@ -24,7 +24,7 @@ This repository is the working codebase for that project. It contains the runway
 | Handoff validation and importer | Implemented |
 | Scenario 1 full trajectory dataset | Not included yet |
 | Temporal Divergence on real SPEC-GAP trajectories | Not run yet |
-| Depth-degradation result | Not available yet |
+| Depth-degradation analysis | Implemented; real Scenario 1 result not available yet |
 
 The most important constraint: this repo does not currently include the completed Scenario 1 dataset. It can validate and normalize early handoff trajectories, but the full 2-hop/3-hop trajectory collection is still an external dependency.
 
@@ -218,6 +218,30 @@ trajectories = load_trajectory_directory("path/to/trajectories")
 summary = summarize_dataset(trajectories)
 print(summary["by_hop_mode"])
 ```
+
+### Depth-degradation analysis
+
+`src/analysis/depth_degradation.py` compares precomputed probe predictions at
+2-hop and 3-hop depth. It reports AUROC, Brier score, ECE, Temporal Divergence,
+and bootstrap confidence intervals. The reported delta is always `3-hop minus
+2-hop`; a negative AUROC delta indicates worse discrimination at greater depth.
+
+Prediction JSONL rows must identify the matched pair, trajectory, depth, agent,
+layer, probe, model, label, score, seed, and a predeclared Temporal Divergence
+anchor. Clean and injected trajectories with the same `pair_id` are kept in one
+split by `src/analysis/splits.py`.
+
+Run the compute-independent analysis after probe scores have been exported:
+
+```bash
+python experiments/analyze_depth_degradation.py predictions.jsonl \
+  --experiment-id scenario1-strict-mvp-v1 \
+  --output-json results/depth_degradation.json \
+  --output-csv results/depth_degradation.csv
+```
+
+This command analyzes existing scores. It does not load a model, request GPU
+compute, generate trajectories, or call an LLM judge.
 
 ## Activation ingestion
 
