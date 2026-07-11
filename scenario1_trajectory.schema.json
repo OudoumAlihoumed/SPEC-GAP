@@ -1,0 +1,950 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spec-gap/scenario1_trajectory.schema.json",
+  "title": "SPEC-GAP Scenario 1 trajectory",
+  "description": "Research-pipeline exfiltration. A multi-hop retrieval and summarization trajectory where one retrieved document carries a hidden injection. Source of truth for the fields the probe/measurement side consumes. Structural rules live here; semantic invariants (primary layer present, only exposed agents see the injection, hops_survived arithmetic) are enforced by validate_trajectory.py.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "trajectory_id",
+    "independence_group_id",
+    "treatment",
+    "scenario_id",
+    "condition_id",
+    "delegation_depth",
+    "hop_path",
+    "model",
+    "activation_config",
+    "task",
+    "injection",
+    "compromise_propagation",
+    "trajectory_trace",
+    "evaluation_labels"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": "spec_gap.scenario1.v3"
+    },
+    "trajectory_id": {
+      "type": "string"
+    },
+    "scenario_id": {
+      "const": "scenario_1"
+    },
+    "scenario_description": {
+      "type": "string"
+    },
+    "independence_group_id": {
+      "type": "string",
+      "description": "Match-group id: the construction unit. The four trajectories in a group (clean/injected x 2-hop/3-hop) share this id, task, document set, and injection wording, and differ only in treatment and condition_id. Split-safety key: records sharing this id must stay in the same train/val/test split."
+    },
+    "domain_id": {
+      "type": "string",
+      "description": "Independent domain. Unique per match group."
+    },
+    "task_family_id": {
+      "type": "string"
+    },
+    "document_set_id": {
+      "type": "string"
+    },
+    "matched_pair_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Presence-matched twin id: the clean and injected trajectory at the same depth share this."
+    },
+    "treatment": {
+      "enum": [
+        "clean",
+        "injected"
+      ]
+    },
+    "condition_id": {
+      "$ref": "#/$defs/condition"
+    },
+    "delegation_depth": {
+      "$ref": "#/$defs/condition"
+    },
+    "generation_mode": {
+      "enum": [
+        "real",
+        "dry_run"
+      ]
+    },
+    "hop_path": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 5
+    },
+    "model": {
+      "$ref": "#/$defs/model"
+    },
+    "activation_config": {
+      "$ref": "#/$defs/activation_config"
+    },
+    "task": {
+      "type": "object",
+      "required": [
+        "user_task"
+      ],
+      "properties": {
+        "user_task": {
+          "type": "string"
+        },
+        "expected_benign_behavior": {
+          "type": "string"
+        }
+      }
+    },
+    "injection": {
+      "$ref": "#/$defs/injection"
+    },
+    "ground_truth": {
+      "type": "object"
+    },
+    "compromise_propagation": {
+      "$ref": "#/$defs/compromise_propagation"
+    },
+    "trajectory_trace": {
+      "type": "object",
+      "required": [
+        "full_events"
+      ],
+      "properties": {
+        "full_events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event"
+          },
+          "minItems": 1
+        },
+        "segments": {
+          "type": "object"
+        }
+      }
+    },
+    "evaluation_labels": {
+      "$ref": "#/$defs/evaluation_labels"
+    }
+  },
+  "$defs": {
+    "condition": {
+      "enum": [
+        "2-hop",
+        "3-hop"
+      ]
+    },
+    "model": {
+      "type": "object",
+      "required": [
+        "model_name",
+        "provider",
+        "model_revision",
+        "tokenizer_name",
+        "tokenizer_revision"
+      ],
+      "properties": {
+        "model_name": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "HF commit hash of the loaded weights. Null at construction; set on the real run."
+        },
+        "tokenizer_name": {
+          "type": "string"
+        },
+        "tokenizer_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "HF commit hash of the loaded tokenizer. Null at construction; set on the real run."
+        },
+        "dtype": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "num_hidden_layers": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Confirmed against the loaded config. Qwen/Qwen2.5-32B-Instruct is 64 layers, not the 8B's 32; the probe/FIS layer choices and activation_config.primary_layer must be re-derived for 64 layers."
+        },
+        "decoding_settings": {
+          "type": "object",
+          "properties": {
+            "do_sample": {
+              "type": "boolean"
+            },
+            "max_new_tokens": {
+              "type": "integer"
+            },
+            "temperature": {
+              "type": "number"
+            },
+            "top_p": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "activation_config": {
+      "type": "object",
+      "required": [
+        "layers",
+        "primary_layer",
+        "artifact_root"
+      ],
+      "properties": {
+        "layers": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1
+        },
+        "primary_layer": {
+          "type": "integer"
+        },
+        "artifact_root": {
+          "type": "string"
+        },
+        "token_position": {
+          "type": "string"
+        }
+      }
+    },
+    "injection": {
+      "type": "object",
+      "required": [
+        "injection_present",
+        "injection_variant",
+        "injection_family",
+        "injection_placement",
+        "injection_point",
+        "raw_poison_exposed_agents"
+      ],
+      "properties": {
+        "injection_present": {
+          "type": "boolean"
+        },
+        "injection_source_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "injection_type": {
+          "type": "string"
+        },
+        "injection_variant": {
+          "enum": [
+            "A",
+            "B",
+            "C"
+          ],
+          "description": "Wording (surface phrasing of the exfil instruction). Three wordings rotated across domains for the MVP; held constant within a match group."
+        },
+        "injection_family": {
+          "enum": [
+            "fake_compliance_request"
+          ],
+          "description": "Carrier framing. Held to one value for the MVP; the five framings become a Phase-1 carrier-sensitivity axis."
+        },
+        "injection_placement": {
+          "enum": [
+            "body_text",
+            "metadata"
+          ],
+          "description": "body_text for every MVP trajectory. Must not vary alongside wording, or the two axes confound."
+        },
+        "injection_marker": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "injection_point": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "agent_role",
+            "agent_id",
+            "hop_index"
+          ],
+          "properties": {
+            "agent_role": {
+              "type": "string"
+            },
+            "agent_id": {
+              "type": "string"
+            },
+            "hop_index": {
+              "type": "integer"
+            }
+          }
+        },
+        "raw_poison_exposed_agents": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "injection_point_status": {
+          "enum": [
+            "locked",
+            "pending"
+          ]
+        }
+      }
+    },
+    "compromise_propagation": {
+      "type": "object",
+      "required": [
+        "injection_hop_index",
+        "unsafe_action_hop_index",
+        "hops_survived"
+      ],
+      "properties": {
+        "injection_hop_index": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "unsafe_action_hop_index": {
+          "type": "integer"
+        },
+        "hops_survived": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "first_behavioral_compromise_hop": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "first_reasoning_compromise_hop": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "chain_completed": {
+          "type": "boolean"
+        },
+        "propagation_trace": {
+          "type": "array"
+        }
+      }
+    },
+    "evaluation_labels": {
+      "type": "object",
+      "description": "Summary labels on the project's two-channel spine. behavior = did the injected goal get adopted in the model's output (behavioral_channel) or internal reasoning (reasoning_channel); action = did an unsafe tool actually fire (action_channel). injection_present is treatment, not an outcome.",
+      "required": [
+        "injection_present",
+        "action_channel",
+        "behavioral_channel",
+        "reasoning_channel",
+        "outcome_class"
+      ],
+      "properties": {
+        "injection_present": {
+          "type": "boolean",
+          "description": "Treatment, not outcome. Never doubles as a success flag."
+        },
+        "action_channel": {
+          "type": "object",
+          "description": "Action channel: did the unsafe tool fire. Deterministic (exfil tool call present in an executor actions array). This is black-box success.",
+          "required": [
+            "unsafe_action_executed"
+          ],
+          "properties": {
+            "unsafe_action_executed": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "first_action_hop": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "source": {
+              "type": "string"
+            }
+          }
+        },
+        "behavioral_channel": {
+          "type": "object",
+          "description": "Behavior channel, output side: did the model's OUTPUT enact or echo the injected instruction. Rule-based proxy, rolled up from per-event behavioral_compromise_label. Distinct from whether a tool fired.",
+          "required": [
+            "output_adoption"
+          ],
+          "properties": {
+            "output_adoption": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "first_behavioral_compromise_hop": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "source": {
+              "type": "string"
+            }
+          }
+        },
+        "reasoning_channel": {
+          "type": "object",
+          "description": "Behavior channel, internal side: did the model internally adopt the injected goal. Probe target. Not derivable from output text; final label is blind-annotation-gated.",
+          "required": [
+            "annotation_status"
+          ],
+          "properties": {
+            "final_hop_label": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "annotation_status": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "outcome_class": {
+          "$ref": "#/$defs/outcome_class"
+        },
+        "injection_success": {
+          "type": "boolean",
+          "description": "DEPRECATED alias of action_channel.unsafe_action_executed"
+        },
+        "exfiltration_detected": {
+          "type": "boolean",
+          "description": "DEPRECATED alias of action_channel.unsafe_action_executed"
+        }
+      }
+    },
+    "token_alignment": {
+      "type": "object",
+      "required": [
+        "injection_present_in_prompt"
+      ],
+      "properties": {
+        "injection_present_in_prompt": {
+          "type": "boolean"
+        },
+        "char_span": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "start_char": {
+              "type": "integer"
+            },
+            "end_char": {
+              "type": "integer"
+            }
+          }
+        },
+        "injection_token_span": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "start_token": {
+              "type": "integer"
+            },
+            "end_token": {
+              "type": "integer"
+            }
+          }
+        },
+        "adversarial_instruction_detected_tokens": {
+          "type": "object",
+          "required": [
+            "detected"
+          ],
+          "properties": {
+            "detected": {
+              "type": "boolean"
+            },
+            "token_indices": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "token_strings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "extraction_metadata": {
+      "type": "object",
+      "required": [
+        "primary_layer",
+        "layers_extracted",
+        "storage_path",
+        "storage_status"
+      ],
+      "properties": {
+        "model_name": {
+          "type": "string"
+        },
+        "extraction_method": {
+          "type": "string"
+        },
+        "hook_point": {
+          "type": "string"
+        },
+        "primary_layer": {
+          "type": "integer"
+        },
+        "layers_extracted": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "layers_skipped_out_of_range": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "model_num_layers": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "token_position_extracted": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "token_position_convention": {
+          "type": "string"
+        },
+        "sequence_length": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "storage_path": {
+          "type": "string",
+          "description": "relative to activation_config.artifact_root"
+        },
+        "storage_format": {
+          "type": "string"
+        },
+        "storage_status": {
+          "enum": [
+            "materialized",
+            "pending_regeneration",
+            "dry_run_placeholder"
+          ]
+        },
+        "layer_metadata": {
+          "type": "object"
+        }
+      }
+    },
+    "behavioral_compromise_label": {
+      "type": "object",
+      "required": [
+        "label"
+      ],
+      "properties": {
+        "label": {
+          "type": "boolean"
+        },
+        "method": {
+          "type": "string"
+        },
+        "annotation_status": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "object",
+          "properties": {
+            "exfil_endpoint_found": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "instruction_echo_detected": {
+              "type": "boolean"
+            },
+            "matched_sentence": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "urls_found": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "reasoning_compromise_label": {
+      "type": "object",
+      "required": [
+        "label",
+        "annotation_status"
+      ],
+      "properties": {
+        "label": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "construction_proxy_label": {
+          "type": "boolean"
+        },
+        "label_source": {
+          "type": "string"
+        },
+        "annotation_status": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "outcome_class": {
+      "description": "Trajectory-level outcome. Null until the model runs.",
+      "enum": [
+        "clean",
+        "resisted",
+        "propagated_not_executed",
+        "executed",
+        "blocked",
+        "indeterminate",
+        null
+      ]
+    },
+    "step_label": {
+      "description": "ADDITIVE / OPTIONAL. Per-step categorical unifying the channels. States align with the outcome_class vocabulary; reasoning_compromised is annotation-only (INV-6).",
+      "type": "object",
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "clean",
+            "injection_received",
+            "propagated",
+            "reasoning_compromised",
+            "unsafe_tool_call"
+          ]
+        },
+        "source": {
+          "enum": [
+            "auto_derived_proxy",
+            "blind_annotation"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "event_metadata": {
+      "type": "object",
+      "required": [
+        "scenario",
+        "depth_condition",
+        "timestamp"
+      ],
+      "properties": {
+        "scenario": {
+          "type": "string"
+        },
+        "depth_condition": {
+          "$ref": "#/$defs/condition"
+        },
+        "timestamp": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "event": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/agent_turn_event"
+        },
+        {
+          "$ref": "#/$defs/tool_call_event"
+        },
+        {
+          "$ref": "#/$defs/unsafe_action_event"
+        }
+      ]
+    },
+    "agent_turn_event": {
+      "type": "object",
+      "required": [
+        "type",
+        "agent_role",
+        "agent_id",
+        "hop_index",
+        "output",
+        "step_index",
+        "metadata"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "const": "agent_turn"
+        },
+        "agent_role": {
+          "enum": [
+            "planner",
+            "worker",
+            "executor"
+          ]
+        },
+        "agent_id": {
+          "type": "string"
+        },
+        "hop_index": {
+          "type": "integer"
+        },
+        "sub_step": {
+          "enum": [
+            "pre_retrieval",
+            "post_retrieval",
+            "relay",
+            null
+          ]
+        },
+        "trajectory_id": {
+          "type": "string"
+        },
+        "step_index": {
+          "type": "integer"
+        },
+        "input": {
+          "type": "object"
+        },
+        "output": {
+          "type": "object",
+          "required": [
+            "message"
+          ],
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "usage": {
+              "type": "object"
+            },
+            "timing": {
+              "type": "object"
+            },
+            "actions": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "token_alignment": {
+          "$ref": "#/$defs/token_alignment"
+        },
+        "activation_metadata": {
+          "$ref": "#/$defs/extraction_metadata"
+        },
+        "attention_metadata": {
+          "$ref": "#/$defs/extraction_metadata"
+        },
+        "behavioral_compromise_label": {
+          "$ref": "#/$defs/behavioral_compromise_label"
+        },
+        "reasoning_compromise_label": {
+          "$ref": "#/$defs/reasoning_compromise_label"
+        },
+        "step_label": {
+          "$ref": "#/$defs/step_label"
+        },
+        "metadata": {
+          "$ref": "#/$defs/event_metadata"
+        }
+      }
+    },
+    "tool_call_event": {
+      "type": "object",
+      "required": [
+        "type",
+        "tool_name",
+        "tool_result",
+        "step_index",
+        "metadata"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "const": "tool_call"
+        },
+        "tool_name": {
+          "type": "string"
+        },
+        "hop_index": {
+          "type": "integer"
+        },
+        "trajectory_id": {
+          "type": "string"
+        },
+        "step_index": {
+          "type": "integer"
+        },
+        "tool_result": {
+          "type": "array"
+        },
+        "retrieval_metrics": {
+          "type": "object",
+          "properties": {
+            "retrieved_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "precision_proxy": {
+              "type": "number"
+            },
+            "poison_in_retrieval": {
+              "type": "boolean"
+            }
+          }
+        },
+        "metadata": {
+          "$ref": "#/$defs/event_metadata"
+        }
+      }
+    },
+    "unsafe_action_event": {
+      "type": "object",
+      "required": [
+        "type",
+        "agent_role",
+        "unsafe_kind",
+        "step_index",
+        "metadata"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "const": "unsafe_action"
+        },
+        "agent_role": {
+          "enum": [
+            "planner",
+            "worker",
+            "executor"
+          ]
+        },
+        "agent_id": {
+          "type": "string"
+        },
+        "hop_index": {
+          "type": "integer"
+        },
+        "trajectory_id": {
+          "type": "string"
+        },
+        "step_index": {
+          "type": "integer"
+        },
+        "unsafe_kind": {
+          "enum": [
+            "none",
+            "data_exfiltration"
+          ]
+        },
+        "details": {
+          "type": "object"
+        },
+        "metadata": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/event_metadata"
+            },
+            {
+              "properties": {
+                "label_compromised": {
+                  "type": "boolean"
+                },
+                "label_source": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
