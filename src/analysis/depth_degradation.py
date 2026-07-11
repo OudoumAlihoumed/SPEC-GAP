@@ -21,21 +21,43 @@ from src.probes.temporal_divergence import temporal_divergence
 
 REQUIRED_FIELDS = {
     "trajectory_id",
-    "pair_id",
+    "match_group_id",
+    "domain_id",
+    "wording_id",
     "condition",
+    "injection_present",
     "hop_mode",
     "agent_id",
+    "agent_role",
     "hop_index",
+    "distance_from_injection",
+    "anchor_agent_id",
     "anchor_hop_index",
     "model",
+    "thinking_mode",
     "layer",
     "probe_name",
     "score",
     "label",
+    "label_target",
+    "behavioral_outcome",
+    "action_fired",
+    "latent_compromise_status",
     "seed",
 }
 HOP_MODES = {"2-hop", "3-hop"}
 CONDITIONS = {"clean", "injected"}
+THINKING_MODES = {"off", "on"}
+LABEL_TARGETS = {"trajectory_action_executed", "injection_present"}
+BEHAVIORAL_OUTCOMES = {
+    "clean",
+    "resisted",
+    "propagated_but_not_executed",
+    "attempted_but_blocked",
+    "executed",
+    "indeterminate",
+}
+LATENT_STATUSES = {"not_candidate", "candidate", "probe_supported"}
 METRIC_NAMES = ("auroc", "brier", "ece", "temporal_divergence_mean")
 
 
@@ -50,7 +72,7 @@ def analyze_depth_degradation(
 ) -> dict:
     """Summarize metrics by depth and compute paired 3-hop minus 2-hop deltas."""
 
-    rows = [dict(row) for row in rows]
+    rows = sorted((dict(row) for row in rows), key=_prediction_row_sort_key)
     validate_prediction_rows(rows)
     if not experiment_id.strip():
         raise ValueError("experiment_id must be non-empty")
@@ -61,7 +83,15 @@ def analyze_depth_degradation(
     if n_bins < 1:
         raise ValueError("n_bins must be at least 1")
 
-    group_fields = ("model", "probe_name", "layer", "seed", "hop_mode")
+    group_fields = (
+        "model",
+        "thinking_mode",
+        "label_target",
+        "probe_name",
+        "layer",
+        "seed",
+        "hop_mode",
+    )
     grouped = _group_rows(rows, group_fields)
     rng = np.random.default_rng(random_state)
     group_results = []
@@ -70,24 +100,35 @@ def analyze_depth_degradation(
         metrics = _metric_snapshot(group_rows, n_bins=n_bins)
         intervals = _bootstrap_intervals(
             group_rows,
-            cluster_field="trajectory_id",
+            cluster_field="match_group_id",
             n_bootstrap=n_bootstrap,
             confidence=confidence,
             n_bins=n_bins,
             rng=rng,
         )
         values = dict(zip(group_fields, key))
+        executor_rows = _executor_rows(group_rows)
         group_results.append({
             **values,
-            "n_predictions": len(group_rows),
+            "observation_agent": "executor",
+            "n_predictions": len(executor_rows),
+            "n_sequence_predictions": len(group_rows),
             "n_trajectories": len({row["trajectory_id"] for row in group_rows}),
-            "n_positive": sum(int(row["label"]) for row in group_rows),
-            "n_negative": sum(1 - int(row["label"]) for row in group_rows),
+            "n_match_groups": len({row["match_group_id"] for row in group_rows}),
+            "n_positive": sum(int(row["label"]) for row in executor_rows),
+            "n_negative": sum(1 - int(row["label"]) for row in executor_rows),
             **metrics,
             "confidence_intervals": intervals,
         })
 
-    comparison_fields = ("model", "probe_name", "layer", "seed")
+    comparison_fields = (
+        "model",
+        "thinking_mode",
+        "label_target",
+        "probe_name",
+        "layer",
+        "seed",
+    )
     by_configuration = _group_rows(rows, comparison_fields)
     comparisons = []
     for key in sorted(by_configuration, key=_sortable_key):
@@ -107,7 +148,7 @@ def analyze_depth_degradation(
             metric: _difference(three_metrics[metric], two_metrics[metric])
             for metric in METRIC_NAMES
         }
-        delta_intervals, n_matched_pairs = _bootstrap_delta_intervals(
+        delta_intervals, n_match_groups = _bootstrap_delta_intervals(
             two_hop,
             three_hop,
             n_bootstrap=n_bootstrap,
@@ -118,7 +159,8 @@ def analyze_depth_degradation(
         comparisons.append({
             **dict(zip(comparison_fields, key)),
             "comparison": "3-hop_minus_2-hop",
-            "n_matched_pairs": n_matched_pairs,
+            "observation_agent": "executor",
+            "n_match_groups": n_match_groups,
             "deltas": deltas,
             "confidence_intervals": delta_intervals,
             "interpretation": {
@@ -131,17 +173,27 @@ def analyze_depth_degradation(
             },
         })
 
+    n_match_groups = len({str(row["match_group_id"]) for row in rows})
     return {
-        "schema_version": "spec_gap.depth_degradation.v1",
+        "schema_version": "spec_gap.depth_degradation.v2",
         "experiment_id": experiment_id,
         "data_manifest_hash": prediction_manifest_hash(rows),
+        "n_match_groups": n_match_groups,
+        "claim_scope": (
+            "unsplit exploratory analysis; not a held-out performance estimate"
+            if n_match_groups < 3
+            else "preliminary match-group evaluation"
+        ),
+        "sampling_grid": _sampling_grid(rows),
         "analysis_config": {
             "n_bootstrap": n_bootstrap,
             "confidence": confidence,
             "n_bins": n_bins,
             "random_state": random_state,
             "delta_definition": "3-hop minus 2-hop",
-            "bootstrap_unit": "trajectory for depth metrics; matched pair for depth deltas",
+            "classification_observation": "one executor score per trajectory",
+            "temporal_observation": "full ordered agent-score sequence",
+            "bootstrap_unit": "match_group_id for depth metrics and depth deltas",
         },
         "depth_metrics": group_results,
         "depth_comparisons": comparisons,
@@ -156,9 +208,13 @@ def validate_prediction_rows(rows: list[dict]) -> None:
 
     seen_rows: set[tuple] = set()
     trajectory_identity: dict[str, tuple] = {}
-    trajectory_anchor: dict[str, int] = {}
+    trajectory_label: dict[str, int] = {}
     trajectory_layers: dict[tuple, set[int]] = defaultdict(set)
-    trajectory_hops: dict[tuple, set[int]] = defaultdict(set)
+    trajectory_hops: dict[tuple, dict[int, tuple[str, str]]] = defaultdict(dict)
+    match_group_cells: dict[str, dict[tuple[str, str, str], set[str]]] = defaultdict(
+        lambda: defaultdict(set)
+    )
+    match_group_design: dict[str, tuple[str, str]] = {}
     for index, row in enumerate(rows):
         missing = sorted(REQUIRED_FIELDS - set(row))
         if missing:
@@ -167,8 +223,30 @@ def validate_prediction_rows(rows: list[dict]) -> None:
             raise ValueError(f"Row {index} has unsupported hop_mode {row['hop_mode']!r}")
         if row["condition"] not in CONDITIONS:
             raise ValueError(f"Row {index} has unsupported condition {row['condition']!r}")
+        if row["thinking_mode"] not in THINKING_MODES:
+            raise ValueError(
+                f"Row {index} has unsupported thinking_mode {row['thinking_mode']!r}"
+            )
+        if row["label_target"] not in LABEL_TARGETS:
+            raise ValueError(
+                f"Row {index} has unsupported label_target {row['label_target']!r}"
+            )
+        if row["behavioral_outcome"] not in BEHAVIORAL_OUTCOMES:
+            raise ValueError(
+                f"Row {index} has unsupported behavioral_outcome "
+                f"{row['behavioral_outcome']!r}"
+            )
+        if row["latent_compromise_status"] not in LATENT_STATUSES:
+            raise ValueError(
+                f"Row {index} has unsupported latent_compromise_status "
+                f"{row['latent_compromise_status']!r}"
+            )
         if row["label"] not in (0, 1, False, True):
             raise ValueError(f"Row {index} label must be binary")
+        if not isinstance(row["injection_present"], bool):
+            raise ValueError(f"Row {index} injection_present must be boolean")
+        if not isinstance(row["action_fired"], bool):
+            raise ValueError(f"Row {index} action_fired must be boolean")
         score = float(row["score"])
         if not np.isfinite(score) or not 0.0 <= score <= 1.0:
             raise ValueError(f"Row {index} score must be a finite probability in [0, 1]")
@@ -176,26 +254,82 @@ def validate_prediction_rows(rows: list[dict]) -> None:
             raise ValueError(f"Row {index} hop indices must be integers")
         if not isinstance(row["layer"], int):
             raise ValueError(f"Row {index} layer must be an integer")
+        if row["anchor_agent_id"] != "worker_1" or row["anchor_hop_index"] != 1:
+            raise ValueError("Worker1 at hop 1 must be the fixed injection anchor")
+        if row["distance_from_injection"] != row["hop_index"] - 1:
+            raise ValueError(
+                f"Row {index} distance_from_injection must equal hop_index minus 1"
+            )
+
+        expected_injection = row["condition"] == "injected"
+        if row["injection_present"] is not expected_injection:
+            raise ValueError(
+                f"Row {index} condition and injection_present do not agree"
+            )
+        if row["condition"] == "clean" and row["behavioral_outcome"] != "clean":
+            raise ValueError(f"Row {index} clean condition must use clean behavioral_outcome")
+        if row["action_fired"] and row["behavioral_outcome"] != "executed":
+            raise ValueError(f"Row {index} action_fired requires executed behavioral_outcome")
+        if not row["action_fired"] and row["behavioral_outcome"] == "executed":
+            raise ValueError(f"Row {index} executed behavioral_outcome requires action_fired")
+
+        candidate_outcomes = {"propagated_but_not_executed", "attempted_but_blocked"}
+        if row["behavioral_outcome"] in candidate_outcomes:
+            if row["latent_compromise_status"] not in {"candidate", "probe_supported"}:
+                raise ValueError(
+                    f"Row {index} propagated/blocked outcome must be a latent candidate"
+                )
+        elif row["latent_compromise_status"] != "not_candidate":
+            raise ValueError(
+                f"Row {index} latent candidate status conflicts with behavioral outcome"
+            )
+
+        expected_label = (
+            int(row["action_fired"])
+            if row["label_target"] == "trajectory_action_executed"
+            else int(row["injection_present"])
+        )
+        if int(row["label"]) != expected_label:
+            raise ValueError(
+                f"Row {index} label does not match label_target {row['label_target']!r}"
+            )
 
         trajectory_id = str(row["trajectory_id"])
         identity = (
-            str(row["pair_id"]),
+            str(row["match_group_id"]),
+            str(row["domain_id"]),
+            str(row["wording_id"]),
             str(row["condition"]),
             str(row["hop_mode"]),
             str(row["model"]),
+            str(row["thinking_mode"]),
+            str(row["label_target"]),
+            str(row["behavioral_outcome"]),
+            bool(row["action_fired"]),
             int(row["seed"]),
         )
         previous_identity = trajectory_identity.setdefault(trajectory_id, identity)
         if previous_identity != identity:
             raise ValueError(f"Trajectory {trajectory_id!r} has inconsistent identity metadata")
-        anchor = int(row["anchor_hop_index"])
-        previous_anchor = trajectory_anchor.setdefault(trajectory_id, anchor)
-        if previous_anchor != anchor:
-            raise ValueError(f"Trajectory {trajectory_id!r} has inconsistent anchor metadata")
+        previous_label = trajectory_label.setdefault(trajectory_id, int(row["label"]))
+        if previous_label != int(row["label"]):
+            raise ValueError(f"Trajectory {trajectory_id!r} has inconsistent labels")
+
+        match_group_id = str(row["match_group_id"])
+        design = (str(row["domain_id"]), str(row["wording_id"]))
+        previous_design = match_group_design.setdefault(match_group_id, design)
+        if previous_design != design:
+            raise ValueError(
+                f"Match group {match_group_id!r} mixes domain or wording metadata"
+            )
+        cell = (str(row["thinking_mode"]), str(row["condition"]), str(row["hop_mode"]))
+        match_group_cells[match_group_id][cell].add(trajectory_id)
 
         row_key = (
             trajectory_id,
             row["model"],
+            row["thinking_mode"],
+            row["label_target"],
             row["probe_name"],
             row["layer"],
             row["seed"],
@@ -208,6 +342,8 @@ def validate_prediction_rows(rows: list[dict]) -> None:
         coverage_key = (
             trajectory_id,
             str(row["model"]),
+            str(row["thinking_mode"]),
+            str(row["label_target"]),
             str(row["probe_name"]),
             int(row["seed"]),
         )
@@ -215,12 +351,15 @@ def validate_prediction_rows(rows: list[dict]) -> None:
         hop_key = (*coverage_key, int(row["layer"]))
         if row["hop_index"] in trajectory_hops[hop_key]:
             raise ValueError(f"Duplicate hop_index in trajectory/layer group: {hop_key}")
-        trajectory_hops[hop_key].add(int(row["hop_index"]))
+        trajectory_hops[hop_key][int(row["hop_index"])] = (
+            str(row["agent_id"]),
+            str(row["agent_role"]),
+        )
 
     expected_layers: dict[tuple, set[int]] = {}
     for coverage_key, layers in trajectory_layers.items():
-        _, model, probe_name, seed = coverage_key
-        config_key = (model, probe_name, seed)
+        _, model, thinking_mode, label_target, probe_name, seed = coverage_key
+        config_key = (model, thinking_mode, label_target, probe_name, seed)
         expected = expected_layers.setdefault(config_key, set(layers))
         if expected != layers:
             raise ValueError(
@@ -228,18 +367,54 @@ def validate_prediction_rows(rows: list[dict]) -> None:
                 f"expected {sorted(expected)}, found {sorted(layers)}"
             )
 
-    for hop_key, hop_indices in trajectory_hops.items():
-        ordered = sorted(hop_indices)
+    for hop_key, hop_map in trajectory_hops.items():
+        ordered = sorted(hop_map)
         if ordered != list(range(len(ordered))):
             raise ValueError(
                 f"Hop indices must be contiguous from zero for {hop_key}; found {ordered}"
             )
         trajectory_id = hop_key[0]
-        anchor = trajectory_anchor[trajectory_id]
-        if anchor <= 0 or anchor >= len(ordered):
+        hop_mode = trajectory_identity[trajectory_id][4]
+        expected_agents = (
+            [("planner_1", "planner"), ("worker_1", "worker"), ("executor_1", "executor")]
+            if hop_mode == "2-hop"
+            else [
+                ("planner_1", "planner"),
+                ("worker_1", "worker"),
+                ("worker_2", "worker"),
+                ("executor_1", "executor"),
+            ]
+        )
+        actual_agents = [hop_map[index] for index in ordered]
+        if actual_agents != expected_agents:
             raise ValueError(
-                f"Trajectory {trajectory_id!r} anchor must leave pre- and post-anchor steps"
+                f"Trajectory {trajectory_id!r} has incorrect agent order: {actual_agents}"
             )
+
+    expected_base_cells = {
+        (condition, hop_mode)
+        for condition in CONDITIONS
+        for hop_mode in HOP_MODES
+    }
+    for match_group_id, cells in match_group_cells.items():
+        thinking_modes = {thinking_mode for thinking_mode, _, _ in cells}
+        for thinking_mode in thinking_modes:
+            observed = {
+                (condition, hop_mode)
+                for mode, condition, hop_mode in cells
+                if mode == thinking_mode
+            }
+            if observed != expected_base_cells:
+                raise ValueError(
+                    f"Match group {match_group_id!r} is missing a clean/injected depth cell "
+                    f"for thinking_mode={thinking_mode!r}"
+                )
+            for condition, hop_mode in expected_base_cells:
+                trajectory_ids = cells[(thinking_mode, condition, hop_mode)]
+                if len(trajectory_ids) != 1:
+                    raise ValueError(
+                        f"Match group {match_group_id!r} must contain one trajectory per cell"
+                    )
 
 
 def prediction_manifest_hash(rows: Iterable[dict]) -> str:
@@ -250,6 +425,8 @@ def prediction_manifest_hash(rows: Iterable[dict]) -> str:
         key=lambda row: (
             str(row.get("trajectory_id")),
             str(row.get("model")),
+            str(row.get("thinking_mode")),
+            str(row.get("label_target")),
             str(row.get("probe_name")),
             int(row.get("layer", -1)),
             int(row.get("seed", -1)),
@@ -304,8 +481,9 @@ def tabular_result_rows(result: dict) -> list[dict]:
 
 
 def _metric_snapshot(rows: list[dict], *, n_bins: int) -> dict:
-    labels = np.asarray([int(row["label"]) for row in rows], dtype=int)
-    scores = np.asarray([float(row["score"]) for row in rows], dtype=float)
+    executor_rows = _executor_rows(rows)
+    labels = np.asarray([int(row["label"]) for row in executor_rows], dtype=int)
+    scores = np.asarray([float(row["score"]) for row in executor_rows], dtype=float)
     auroc = float(roc_auc_score(labels, scores)) if len(np.unique(labels)) == 2 else None
     temporal_values = list(_temporal_values_by_trajectory(rows).values())
     return {
@@ -314,6 +492,17 @@ def _metric_snapshot(rows: list[dict], *, n_bins: int) -> dict:
         "ece": float(compute_ece(labels, scores, n_bins=n_bins)),
         "temporal_divergence_mean": float(np.mean(temporal_values)),
     }
+
+
+def _executor_rows(rows: list[dict], *, require_unique: bool = True) -> list[dict]:
+    executor_rows = [row for row in rows if row["agent_id"] == "executor_1"]
+    if not require_unique:
+        return executor_rows
+    trajectory_ids = {str(row["trajectory_id"]) for row in rows}
+    executor_trajectories = {str(row["trajectory_id"]) for row in executor_rows}
+    if executor_trajectories != trajectory_ids or len(executor_rows) != len(trajectory_ids):
+        raise ValueError("Classification metrics require exactly one executor score per trajectory")
+    return executor_rows
 
 
 def _temporal_values_by_trajectory(rows: list[dict]) -> dict[str, float]:
@@ -368,29 +557,33 @@ def _bootstrap_delta_intervals(
     n_bins: int,
     rng: np.random.Generator,
 ) -> tuple[dict, int]:
-    two_pairs = {str(row["pair_id"]) for row in two_hop}
-    three_pairs = {str(row["pair_id"]) for row in three_hop}
-    matched_pairs = sorted(two_pairs & three_pairs)
-    if not matched_pairs:
-        raise ValueError("Depth comparison requires at least one pair present at both depths")
-    if two_pairs != three_pairs:
+    two_groups = {str(row["match_group_id"]) for row in two_hop}
+    three_groups = {str(row["match_group_id"]) for row in three_hop}
+    matched_groups = sorted(two_groups & three_groups)
+    if not matched_groups:
+        raise ValueError("Depth comparison requires at least one match group at both depths")
+    if two_groups != three_groups:
         raise ValueError(
-            "Depth comparison requires identical matched pair coverage at 2-hop and 3-hop"
+            "Depth comparison requires identical match-group coverage at 2-hop and 3-hop"
         )
 
     samples = {metric: [] for metric in METRIC_NAMES}
     for _ in range(n_bootstrap):
-        selected = rng.choice(matched_pairs, size=len(matched_pairs), replace=True).tolist()
+        selected = rng.choice(
+            matched_groups,
+            size=len(matched_groups),
+            replace=True,
+        ).tolist()
         two_snapshot = _resampled_snapshot(
             two_hop,
             selected,
-            cluster_field="pair_id",
+            cluster_field="match_group_id",
             n_bins=n_bins,
         )
         three_snapshot = _resampled_snapshot(
             three_hop,
             selected,
-            cluster_field="pair_id",
+            cluster_field="match_group_id",
             n_bins=n_bins,
         )
         for metric in METRIC_NAMES:
@@ -402,7 +595,7 @@ def _bootstrap_delta_intervals(
             metric: _confidence_interval(values, confidence)
             for metric, values in samples.items()
         },
-        len(matched_pairs),
+        len(matched_groups),
     )
 
 
@@ -421,8 +614,9 @@ def _resampled_snapshot(
         for cluster_id in selected_clusters
         for row in rows_by_cluster[cluster_id]
     ]
-    labels = np.asarray([int(row["label"]) for row in sampled_rows], dtype=int)
-    scores = np.asarray([float(row["score"]) for row in sampled_rows], dtype=float)
+    executor_rows = _executor_rows(sampled_rows, require_unique=False)
+    labels = np.asarray([int(row["label"]) for row in executor_rows], dtype=int)
+    scores = np.asarray([float(row["score"]) for row in executor_rows], dtype=float)
 
     temporal_by_trajectory = _temporal_values_by_trajectory(rows)
     temporal_by_cluster: dict[str, list[float]] = defaultdict(list)
@@ -474,3 +668,35 @@ def _group_rows(rows: list[dict], fields: tuple[str, ...]) -> dict[tuple, list[d
 
 def _sortable_key(key: tuple) -> tuple[str, ...]:
     return tuple(str(value) for value in key)
+
+
+def _prediction_row_sort_key(row: dict) -> tuple:
+    return (
+        str(row.get("match_group_id")),
+        str(row.get("thinking_mode")),
+        str(row.get("condition")),
+        str(row.get("hop_mode")),
+        str(row.get("trajectory_id")),
+        str(row.get("model")),
+        str(row.get("label_target")),
+        str(row.get("probe_name")),
+        int(row.get("layer", -1)),
+        int(row.get("seed", -1)),
+        int(row.get("hop_index", -1)),
+    )
+
+
+def _sampling_grid(rows: list[dict]) -> dict:
+    domains = sorted({str(row["domain_id"]) for row in rows})
+    wordings = sorted({str(row["wording_id"]) for row in rows})
+    observed = sorted({(str(row["domain_id"]), str(row["wording_id"])) for row in rows})
+    expected = {(domain, wording) for domain in domains for wording in wordings}
+    return {
+        "domains": domains,
+        "wordings": wordings,
+        "observed_domain_wording_cells": [
+            {"domain_id": domain, "wording_id": wording}
+            for domain, wording in observed
+        ],
+        "fully_crossed": set(observed) == expected,
+    }

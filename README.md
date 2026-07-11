@@ -158,7 +158,7 @@ Normalize a consolidated handoff JSON file:
 from src.pipeline.acceptance import validate_trajectory_records
 from src.pipeline.handoff import load_handoff_json, normalize_handoff_json
 
-payload = load_handoff_json("path/to/scenario1_depth2_demo.json")
+payload = load_handoff_json("path/to/scenario1_depth2_sample.json")
 records = normalize_handoff_json(payload)
 report = validate_trajectory_records(records)
 print(report.to_dict())
@@ -170,7 +170,7 @@ Normalize a raw handoff JSONL event stream:
 from src.pipeline.acceptance import validate_trajectory_records
 from src.pipeline.handoff import load_handoff_jsonl, normalize_handoff_events
 
-events = load_handoff_jsonl("path/to/scenario1_depth2_demo.jsonl")
+events = load_handoff_jsonl("path/to/scenario1_depth2_sample.jsonl")
 records = normalize_handoff_events(events)
 report = validate_trajectory_records(records)
 print(report.to_dict())
@@ -223,13 +223,26 @@ print(summary["by_hop_mode"])
 
 `src/analysis/depth_degradation.py` compares precomputed probe predictions at
 2-hop and 3-hop depth. It reports AUROC, Brier score, ECE, Temporal Divergence,
-and bootstrap confidence intervals. The reported delta is always `3-hop minus
-2-hop`; a negative AUROC delta indicates worse discrimination at greater depth.
+and match-group bootstrap confidence intervals. The reported delta is always
+`3-hop minus 2-hop`; a negative AUROC delta indicates worse discrimination at
+greater depth.
 
-Prediction JSONL rows must identify the matched pair, trajectory, depth, agent,
-layer, probe, model, label, score, seed, and a predeclared Temporal Divergence
-anchor. Clean and injected trajectories with the same `pair_id` are kept in one
-split by `src/analysis/splits.py`.
+AUROC, Brier, and ECE use one executor score per trajectory so the two depths
+are compared at the same point in the chain. Temporal Divergence uses the full
+ordered planner/Worker1/Worker2/executor score sequence.
+
+Prediction JSONL rows must include `match_group_id`, clean/injected condition,
+depth, domain, wording, agent and Worker1 anchor metadata, model, Qwen thinking
+mode, layer, probe, score, label, `label_target`, behavioral outcome,
+action-fired status, latent-candidate status, and seed. The four related
+clean/injected x 2-hop/3-hop trajectories stay in one split. Thinking-off and
+thinking-on runs also stay with the same match group but are reported
+separately.
+
+`label_target` makes the ground truth explicit. The current analysis supports
+`trajectory_action_executed` and `injection_present`; it never silently mixes
+the two. `latent_compromise_status: candidate` is an analysis cohort, not a
+positive mechanistic label.
 
 Run the compute-independent analysis after probe scores have been exported:
 
@@ -242,6 +255,12 @@ python experiments/analyze_depth_degradation.py predictions.jsonl \
 
 This command analyzes existing scores. It does not load a model, request GPU
 compute, generate trajectories, or call an LLM judge.
+
+When train/validation/test splits are not appropriate, use
+`src.analysis.splits.build_unsplit_manifest`. It keeps every complete match
+group together in one `all` partition and makes no held-out evaluation claim.
+Use `build_match_group_split_manifest` only when there are enough complete
+groups for non-empty train, validation, and test splits.
 
 ## Activation ingestion
 
