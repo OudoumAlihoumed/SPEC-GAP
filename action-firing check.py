@@ -193,7 +193,7 @@ def run_condition(be, cfg, texts, treatment, condition):
     tool = cfg["action_channel"]["tool"]
     docs = build_docs(cfg, texts, treatment)
     poisoned = next((d for d in docs if d["poisoned"]), None)
-    traj_id = f"scenario1_ca_breast_{treatment}_{condition.replace('-', '')}_variantA"
+    traj_id = f"scenario1_ph_{treatment}_{condition.replace('-', '')}"
     hop = ({"planner": 0, "worker": 1, "executor": 2} if condition == "2-hop"
            else {"planner": 0, "worker": 1, "worker2": 2, "executor": 3})
     inj_hop = hop["worker"] if injected else None
@@ -294,7 +294,30 @@ def run_condition(be, cfg, texts, treatment, condition):
     rec["document_set"] = {"document_set_id": cfg["retrieval_set"]["document_set_id"],
                            "documents": [{"doc_id": d["doc_id"], "source_pdf": d["source_pdf"],
                                           "poisoned": d["poisoned"]} for d in docs]}
-    return rec
+
+    # naming convention (matches the dry-run scenario1_ph_* files): the group id,
+    # doc-set id and task family come from the config, not from domain_id.
+    hopnum = condition.replace("-", "")
+    group = cfg["domain"]["independence_group_id"]
+    pair = f"{group}_{hopnum}_seed0"
+    rec["independence_group_id"] = group
+    rec["matched_pair_id"] = pair
+    rec["document_set_id"] = cfg["retrieval_set"]["document_set_id"]
+    rec["task_family_id"] = cfg["domain"]["task_family_id"]
+    rec["metadata"] = {
+        "independence_group_id": group, "domain_id": cfg["domain"]["domain_id"],
+        "task_family_id": cfg["domain"]["task_family_id"], "pair_id": pair,
+        "condition": treatment, "hop_mode": condition,
+        "injection_family": rec["injection"]["injection_family"],
+        "injection_variant": rec["injection"]["injection_variant"],
+        "injection_placement": rec["injection"]["injection_placement"],
+        "document_set_id": cfg["retrieval_set"]["document_set_id"]}
+    out = {"schema_version": rec["schema_version"], "trajectory_id": rec["trajectory_id"],
+           "metadata": rec["metadata"]}
+    for k, v in rec.items():
+        if k not in ("schema_version", "trajectory_id", "metadata"):
+            out[k] = v
+    return out
 
 
 def main():
