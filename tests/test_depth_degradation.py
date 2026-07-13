@@ -241,3 +241,92 @@ def test_rejects_action_label_created_from_latent_candidate():
             row["label"] = 1
     with pytest.raises(ValueError, match="label does not match label_target"):
         _analyze(rows)
+
+
+def _mark_trajectory_indeterminate(rows, trajectory_id):
+    for row in rows:
+        if row["trajectory_id"] != trajectory_id:
+            continue
+        row["behavioral_outcome"] = "indeterminate"
+        row["action_fired"] = None
+        row["latent_compromise_status"] = "not_candidate"
+        if row["label_target"] == "trajectory_action_executed":
+            row["label"] = None
+
+
+def test_indeterminate_action_outcomes_are_excluded_from_classification_only():
+    rows = _prediction_rows()
+    targets = {
+        row["trajectory_id"]
+        for row in rows
+        if row["match_group_id"].endswith("-0") and row["condition"] == "injected"
+    }
+    for trajectory_id in targets:
+        _mark_trajectory_indeterminate(rows, trajectory_id)
+
+    result = _analyze(rows)
+
+    assert all(group["n_predictions"] == 11 for group in result["depth_metrics"])
+    assert all(group["n_excluded_unlabeled"] == 1 for group in result["depth_metrics"])
+    assert all(group["n_indeterminate"] == 1 for group in result["depth_metrics"])
+    assert result["behavioral_outcome_counts"]["indeterminate"] == 2
+    assert all(
+        group["temporal_divergence_mean"] is not None
+        for group in result["depth_metrics"]
+    )
+
+
+def test_indeterminate_action_outcome_rejects_binary_action_label():
+    rows = _prediction_rows()
+    target = rows[0]["trajectory_id"]
+    _mark_trajectory_indeterminate(rows, target)
+    for row in rows:
+        if row["trajectory_id"] == target:
+            row["label"] = 0
+
+    with pytest.raises(ValueError, match="label does not match label_target"):
+        _analyze(rows)
+
+
+def test_indeterminate_outcome_rejects_false_action_status():
+    rows = _prediction_rows()
+    target = rows[0]["trajectory_id"]
+    _mark_trajectory_indeterminate(rows, target)
+    for row in rows:
+        if row["trajectory_id"] == target:
+            row["action_fired"] = False
+
+    with pytest.raises(ValueError, match="requires action_fired=null"):
+        _analyze(rows)
+
+
+def test_indeterminate_outcome_keeps_known_injection_construction_label():
+    rows = _prediction_rows(label_target="injection_present")
+    target = next(row["trajectory_id"] for row in rows if row["condition"] == "injected")
+    _mark_trajectory_indeterminate(rows, target)
+
+    result = _analyze(rows)
+
+    assert all(group["n_excluded_unlabeled"] == 0 for group in result["depth_metrics"])
+
+
+def test_all_indeterminate_action_outcomes_report_null_classification_metrics():
+    rows = _prediction_rows()
+    for trajectory_id in {row["trajectory_id"] for row in rows}:
+        _mark_trajectory_indeterminate(rows, trajectory_id)
+
+    result = _analyze(rows)
+
+    for group in result["depth_metrics"]:
+        assert group["n_predictions"] == 0
+        assert group["n_excluded_unlabeled"] == group["n_trajectories"]
+        assert group["auroc"] is None
+        assert group["brier"] is None
+        assert group["ece"] is None
+        assert group["temporal_divergence_mean"] is not None
+
+
+def test_top_level_outcome_counts_do_not_double_count_layers():
+    result = _analyze(_prediction_rows(layers=(16, 32)))
+
+    assert sum(result["behavioral_outcome_counts"].values()) == 24
