@@ -9,6 +9,7 @@ from .modal_costs import (
     build_gpu_cost_record,
     build_token_usage,
     cost_record_path,
+    resolve_modal_input_id,
     validate_gpu_cost_record,
 )
 from .qwen_modal import (
@@ -44,6 +45,7 @@ __all__ = [
     "generation_result_to_agent_turn_fields",
     "parse_tool_call_requests",
     "rendered_input_sha256",
+    "resolve_modal_input_id",
     "split_thinking_text",
     "validate_generation_request",
     "validate_generation_result",

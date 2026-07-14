@@ -28,6 +28,7 @@ from src.infrastructure.qwen_modal import (
 from src.infrastructure.modal_costs import (
     build_gpu_cost_record,
     build_token_usage,
+    resolve_modal_input_id,
 )
 
 
@@ -183,7 +184,10 @@ class Qwen3Runner:
     def generate_agent_turn(self, payload: dict[str, Any]) -> dict[str, Any]:
         started_at = datetime.now(timezone.utc).isoformat()
         started_monotonic = time.perf_counter()
-        modal_input_id = modal.current_input_id()
+        modal_input_id = resolve_modal_input_id(
+            modal.current_input_id(),
+            modal.current_function_call_id(),
+        )
         request = validate_generation_request(payload)
         torch = self.torch
         settings = request["generation_settings"]
