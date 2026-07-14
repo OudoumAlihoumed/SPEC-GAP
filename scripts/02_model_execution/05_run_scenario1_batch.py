@@ -44,10 +44,13 @@ def run_scenario1_batch(
     )
     completed: list[tuple[dict, dict]] = []
     pending = []
+    legacy_existing = []
     for item in plan:
         record = load_completed_batch_item(item)
         if record is None:
             pending.append(item)
+            if Path(item["output_path"]).exists():
+                legacy_existing.append(item["trajectory_id"])
         else:
             completed.append((item, record))
 
@@ -64,6 +67,7 @@ def run_scenario1_batch(
         "total_matrix_trajectories": len(plan),
         "completed_trajectories": len(completed),
         "pending_trajectories": len(pending),
+        "legacy_existing_trajectories": legacy_existing,
         "selected_new_trajectories": len(selected),
         "selected_model_turns": model_turns,
         "thinking_modes": modes,

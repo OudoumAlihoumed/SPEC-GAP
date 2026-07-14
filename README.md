@@ -224,11 +224,13 @@ modal run \
   --confirm-paid-run RUN_H200_BATCH
 ```
 
-The batch validates existing live files and skips them. It checkpoints every
-paid model turn and writes each completed trajectory before moving to the next
-one. Use `--max-new-trajectories 1` for another bounded run. Keeping the matrix
-inside one Modal app lets later calls reuse the loaded Qwen container instead
-of paying the 32B cold-start cost once per trajectory.
+The batch validates existing live files and skips only records that already use
+the current multi-position activation format. Older single-position smoke
+records are treated as pending and replaced by consistent final records. It
+checkpoints every paid model turn and writes each completed trajectory before
+moving to the next one. Use `--max-new-trajectories 1` for another bounded run.
+Keeping the matrix inside one Modal app lets later calls reuse the loaded Qwen
+container instead of paying the 32B cold-start cost once per trajectory.
 
 ## Steps 5-7: probes, metrics, and figures
 
