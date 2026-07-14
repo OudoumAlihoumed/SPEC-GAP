@@ -17,6 +17,7 @@ from .modal_costs import validate_gpu_cost_record
 
 
 MODEL_ID = "Qwen/Qwen3-32B"
+MODEL_REVISION = "9216db5781bf21249d130ec9da846c4624c16137"
 MODEL_LAYER_COUNT = 64
 THINKING_MODES = {"on": True, "off": False}
 ALLOWED_AGENT_ROLES = {"planner", "worker", "worker2", "executor"}
@@ -232,7 +233,7 @@ def validate_generation_request(payload: Any) -> dict[str, Any]:
         "thinking_mode": thinking_mode,
         "enable_thinking": THINKING_MODES[thinking_mode],
         "model_id": model_id,
-        "model_revision": str(payload.get("model_revision") or "main"),
+        "model_revision": str(payload.get("model_revision") or MODEL_REVISION),
         "messages": _validate_messages(payload.get("messages")),
         "tools": tools,
         "raw_poison_exposed": raw_poison_exposed,

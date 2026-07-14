@@ -1,0 +1,138 @@
+# Running Qwen3-32B on Modal
+
+This guide covers Step 3 of the ordered SPEC-GAP pipeline. The Modal backend
+owns one model turn at a time: generation, exact input/output capture,
+residual-stream extraction, and cost logging. It does not construct the
+Scenario 1 dataset or decide whether a simulated action executed.
+
+## Shared resources
+
+Use the `agileai` Modal workspace. The app creates or reuses:
+
+- app: `spec-gap-qwen3-32b`;
+- model volume: `spec-gap-qwen3-32b-model`;
+- activation volume: `spec-gap-scenario1-artifacts`.
+
+The active model contract is:
+
+```text
+model: Qwen/Qwen3-32B
+revision: 9216db5781bf21249d130ec9da846c4624c16137
+GPU: 1 x H200 for a paid model call
+maximum active containers: 1
+```
+
+The revision is pinned in code and was resolved when the shared model cache was
+created. Do not silently replace it with a newer `main` revision during the
+thinking-mode comparison.
+
+## 1. Confirm the workspace
+
+```bash
+modal profile current
+```
+
+The result should be `agileai`. Team members use their own Modal accounts and
+workspace membership. They do not exchange passwords or tokens.
+
+## 2. Validate without remote compute
+
+```bash
+modal run scripts/02_model_execution/03_modal_qwen_runner.py \
+  --request-path tests/fixtures/qwen_agent_turn_request.json \
+  --action validate
+```
+
+This checks the request contract and starts no remote function or GPU. The
+fixture is infrastructure-only and must not be added to the Scenario 1
+manifest.
+
+## 3. Cache the model without a GPU
+
+```bash
+modal run scripts/02_model_execution/03_modal_qwen_runner.py \
+  --request-path tests/fixtures/qwen_agent_turn_request.json \
+  --action download \
+  --model-revision 9216db5781bf21249d130ec9da846c4624c16137
+```
+
+This uses remote CPU, memory, network, and Volume storage. It does not start an
+H200. The shared workspace already has this revision cached, so rerunning this
+command should only be necessary if the Volume is removed.
+
+## 4. Run one paid model turn
+
+Use a real request produced from a Scenario 1 match group, not the test fixture:
+
+```bash
+modal run scripts/02_model_execution/03_modal_qwen_runner.py \
+  --request-path path/to/real_agent_turn_request.json \
+  --action run \
+  --confirm-paid-run RUN_H200 \
+  --output-path path/to/model_turn_output.json
+```
+
+Both `--action run` and `--confirm-paid-run RUN_H200` are required. A result is
+not a complete trajectory: the next agent request must be built from the saved
+downstream message, and the safe simulated executor must separately record the
+action result.
+
+## Thinking comparison
+
+The controlled comparison changes only `enable_thinking`:
+
+```text
+do_sample=true
+temperature=0.6
+top_p=0.95
+top_k=20
+min_p=0.0
+seed=0
+```
+
+Thinking content is saved for analysis but is not forwarded downstream. Only
+the visible final response and valid requested tool calls may reach the next
+agent.
+
+## Tool requests and action results
+
+The runner recognizes explicit Qwen `<tool_call>...</tool_call>` blocks. Every
+parsed call has `status: requested`. Plain endpoint text is not a tool call, and
+a requested call is not an executed action.
+
+Only the safe simulated executor may create an action record with an explicit
+result such as `executed` or `blocked`. This boundary controls the black-box
+outcome label.
+
+## Activation and cost artifacts
+
+Each paid turn records:
+
+- exact rendered input, input token IDs, and prompt hash;
+- raw generation, generated token IDs, thinking text, and visible final text;
+- model and tokenizer revisions;
+- requested activation layers and saved artifact path;
+- input, generated, thinking, and final-output token counts;
+- measured H200 method time and an estimated per-turn GPU cost.
+
+The cost ledger is stored under:
+
+```text
+costs/<trajectory_id>/<thinking_mode>/step_<step_index>/<modal_input_id>.json
+```
+
+The estimate does not replace Modal billing. Reconcile it with:
+
+```bash
+modal billing report --for today --show-resources
+modal billing report --for today --show-resources --json
+```
+
+Billing reports may arrive a few minutes after a run.
+
+## Current boundary
+
+The one-turn backend and model cache are ready. The sequential live
+planner-worker-worker2-executor orchestrator and safe simulated executor must
+be completed before launching the full 56-turn two-mode run. This prevents
+isolated model calls from being mistaken for complete trajectories.

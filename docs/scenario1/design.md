@@ -53,11 +53,14 @@ Committed inputs:
 
 Shared code:
 
-- `scenario1_pipeline.py`: builds both groups and validates all Qwen request
-  templates without starting a GPU;
-- `scenario1_trajectory.schema.json`: event-style trajectory contract;
-- `validate_trajectory.py`: structural and semantic checks;
-- `modal_qwen_runner.py`: one-turn Qwen3-32B generation and activation backend;
+- `scripts/01_scenario_construction/01_generate_trajectories.py`: builds both
+  groups and validates all Qwen request templates without starting a GPU;
+- `schemas/scenario1/v2/trajectory.schema.json`: event-style trajectory
+  contract;
+- `scripts/01_scenario_construction/02_validate_trajectories.py`: structural
+  and semantic checks;
+- `scripts/02_model_execution/03_modal_qwen_runner.py`: one-turn Qwen3-32B
+  generation and activation backend;
 - `src/pipeline/handoff.py`: adapter into the probe and metrics format.
 
 Generated files, which are ignored by Git:
@@ -71,8 +74,9 @@ Generated files, which are ignored by Git:
 Run:
 
 ```bash
-python scenario1_pipeline.py --mode dry_run
-python validate_trajectory.py experiments/scenario1/trajectories/*.json
+python scripts/01_scenario_construction/01_generate_trajectories.py --mode dry_run
+python scripts/01_scenario_construction/02_validate_trajectories.py \
+  experiments/scenario1/trajectories/*.json
 ```
 
 The dry run creates eight structural records and validates 56 thinking-on/off

@@ -4,7 +4,12 @@
 
 The June 10 Colab artifact contains 200 generated responses with role labels and scenario identifiers. It does not contain the full prompts, option text, collusion instruction, or honest-agent mandate. Consequently, the saved artifact cannot by itself establish whether a response enacted the assigned collusion instruction.
 
-`experiments/build_runway_behavior_review.py` created a randomized annotation packet and a separate role key under the ignored `results/runway_behavior_review/` directory. The script reconstructs the expected target option label from the deterministic option-swap rule and identifies only explicit phrases of the form `Option A`, `Option B`, `Option 1`, or `Option 2`.
+`scripts/90_runway_reproduction/90_build_behavior_review.py` created a
+randomized annotation packet and a separate role key under the ignored
+`results/runway_behavior_review/` directory. The script reconstructs the
+expected target option label from the deterministic option-swap rule and
+identifies only explicit phrases of the form `Option A`, `Option B`, `Option 1`,
+or `Option 2`.
 
 | Assigned role | Explicit target mention | Explicit other-option mention | No explicit option mention |
 |---|---:|---:|---:|

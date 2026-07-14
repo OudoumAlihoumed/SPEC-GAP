@@ -3,7 +3,7 @@
 Validate scenario 1 trajectory files.
 
 Two layers:
-  1. Structural: JSON Schema (scenario1_trajectory.schema.json).
+  1. Structural: JSON Schema (schemas/scenario1/v2/trajectory.schema.json).
   2. Semantic invariants that JSON Schema cannot express and that map to the
      bugs this project actually hit:
        INV-1  an optional primary layer is present in every materialized
@@ -29,7 +29,9 @@ Two layers:
        INV-10 dry runs are honest: no model call, generated output, outcome, or
               extracted activation may be claimed.
 
-Usage: python validate_trajectory.py experiments/scenario1/trajectories/*.json
+Usage:
+  python scripts/01_scenario_construction/02_validate_trajectories.py \
+      experiments/scenario1/trajectories/*.json
 """
 
 import glob
@@ -39,8 +41,10 @@ import os
 
 from jsonschema import Draft202012Validator
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-SCHEMA_PATH = os.path.join(HERE, "scenario1_trajectory.schema.json")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+SCHEMA_PATH = os.path.join(
+    PROJECT_ROOT, "schemas", "scenario1", "v2", "trajectory.schema.json"
+)
 HOP_PATH_LEN = {"2-hop": 5, "3-hop": 6}
 EXPECTED_AGENTS = {
     "2-hop": {"planner_1", "worker_1", "executor_1"},
@@ -194,7 +198,10 @@ def main():
         schema = json.load(f)
     validator = Draft202012Validator(schema)
     paths = []
-    for arg in (sys.argv[1:] or [os.path.join(HERE, "experiments/scenario1/trajectories/*.json")]):
+    default_glob = os.path.join(
+        PROJECT_ROOT, "experiments", "scenario1", "trajectories", "*.json"
+    )
+    for arg in (sys.argv[1:] or [default_glob]):
         paths.extend(sorted(glob.glob(arg)))
     if not paths:
         print("no files matched")

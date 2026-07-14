@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://spec-gap/scenario1_trajectory.schema.json",
+  "$id": "https://spec-gap/schemas/scenario1/v2/trajectory.schema.json",
   "title": "SPEC-GAP Scenario 1 trajectory",
-  "description": "Research-pipeline exfiltration. A multi-hop retrieval and summarization trajectory where one retrieved document carries a hidden injection. Source of truth for the fields the probe/measurement side consumes. Structural rules live here; semantic invariants (primary layer present, only exposed agents see the injection, hops_survived arithmetic) are enforced by validate_trajectory.py.",
+  "description": "Research-pipeline exfiltration. A multi-hop retrieval and summarization trajectory where one retrieved document carries a hidden injection. Source of truth for the fields the probe and measurement side consumes. Structural rules live here; semantic invariants are enforced by src/scenario1/validator.py through the numbered validation wrapper.",
   "type": "object",
   "required": [
     "schema_version",

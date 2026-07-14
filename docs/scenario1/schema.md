@@ -1,12 +1,13 @@
 # Scenario 1 trajectory schema guide
 
-The formal event contract is `scenario1_trajectory.schema.json`, version
+The formal event contract is `schemas/scenario1/v2/trajectory.schema.json`, version
 `spec_gap.scenario1.v2`.
 
 Validate generated records with:
 
 ```bash
-python validate_trajectory.py experiments/scenario1/trajectories/*.json
+python scripts/01_scenario_construction/02_validate_trajectories.py \
+  experiments/scenario1/trajectories/*.json
 ```
 
 ## One trajectory

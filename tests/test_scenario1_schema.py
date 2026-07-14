@@ -10,8 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 from jsonschema import Draft202012Validator
 
-import scenario1_pipeline as gen
-import validate_trajectory as V
+from src.scenario1 import generator as gen
+from src.scenario1 import validator as V
 from src.infrastructure.qwen_modal import CONTROLLED_GENERATION_SETTINGS, MODEL_LAYER_COUNT
 
 

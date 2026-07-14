@@ -5,66 +5,30 @@ a LAT-style representation-direction baseline across layers. It does not extract
 new activations or run model inference.
 
 Usage:
-    python experiments/week1_week2_lat_baseline.py
-    SPEC_GAP_ARTIFACT_ROOT=/path/to/artifacts python experiments/week1_week2_lat_baseline.py
+    python scripts/90_runway_reproduction/94_run_lat_baseline.py
+    SPEC_GAP_ARTIFACT_ROOT=/path/to/artifacts \
+      python scripts/90_runway_reproduction/94_run_lat_baseline.py
 """
 
 import argparse
 import json
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
+from src.analysis.runway_artifacts import (  # noqa: E402
+    find_artifact_root,
+    load_runway_artifacts,
+)
 from src.probes.lat_baseline import evaluate_lat_all_layers, lat_results_to_dict
 
 
-def _find_artifact_root(repo_root: Path) -> Path:
-    candidates = []
-    if os.environ.get("SPEC_GAP_ARTIFACT_ROOT"):
-        candidates.append(Path(os.environ["SPEC_GAP_ARTIFACT_ROOT"]))
-    candidates.extend(
-        [
-            repo_root / "artifacts",
-            Path.home() / "Downloads" / "artifacts",
-            Path("/content/drive/MyDrive/spec-gap-activation-probe/artifacts"),
-        ]
-    )
-    for candidate in candidates:
-        if (candidate / "02_collusion_probe" / "week2_collusion_probe_activations.npz").exists():
-            return candidate
-    searched = "\n".join(str(p) for p in candidates)
-    raise FileNotFoundError("Could not find runway activation artifact. Searched:\n" + searched)
-
-
-def _load_runway_artifacts(artifact_root: Path) -> tuple[dict[int, np.ndarray], np.ndarray, np.ndarray]:
-    collusion_dir = artifact_root / "02_collusion_probe"
-    activation_path = collusion_dir / "week2_collusion_probe_activations.npz"
-    response_path = collusion_dir / "week2_collusion_probe_responses.json"
-
-    npz = np.load(activation_path)
-    activations = {
-        int(name.removeprefix("layer_")): npz[name]
-        for name in npz.files
-        if name.startswith("layer_")
-    }
-    labels = np.asarray(npz["labels"], dtype=int)
-
-    responses = json.loads(response_path.read_text())
-    scenario_ids = np.asarray([row["metadata"]["scenario_idx"] for row in responses], dtype=int)
-    if len(labels) != len(scenario_ids):
-        raise ValueError("Activation labels and response metadata have different lengths.")
-    return activations, labels, scenario_ids
-
-
 def run_lat_baseline(artifact_root: Path | None = None, output_path: Path | None = None) -> dict:
-    repo_root = Path(__file__).resolve().parent.parent
-    artifact_root = artifact_root or _find_artifact_root(repo_root)
-    activations, labels, scenario_ids = _load_runway_artifacts(artifact_root)
+    repo_root = Path(__file__).resolve().parents[2]
+    artifact_root = artifact_root or find_artifact_root(repo_root)
+    activations, labels, scenario_ids = load_runway_artifacts(artifact_root)
 
     print(f"Loaded {len(labels)} activation rows from {artifact_root}")
     print(f"Layers: {sorted(activations)}")

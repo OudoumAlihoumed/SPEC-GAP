@@ -6,9 +6,10 @@ It proves that the inputs, topology, schema, manifest, and Modal request
 contracts agree. It does not generate model responses, outcome labels, token
 IDs, or activation files.
 
-Run:
-    python scenario1_pipeline.py --mode dry_run
-    python validate_trajectory.py experiments/scenario1/trajectories/*.json
+Run from the repository root:
+    python scripts/01_scenario_construction/01_generate_trajectories.py --mode dry_run
+    python scripts/01_scenario_construction/02_validate_trajectories.py \
+        experiments/scenario1/trajectories/*.json
 """
 
 from __future__ import annotations
@@ -24,12 +25,13 @@ from src.infrastructure.qwen_modal import (
     CONTROLLED_GENERATION_SETTINGS,
     MODEL_ID,
     MODEL_LAYER_COUNT,
+    MODEL_REVISION,
     validate_generation_request,
 )
 
 
-HERE = Path(__file__).resolve().parent
-INPUTS = HERE / "experiments" / "scenario1" / "inputs"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+INPUTS = PROJECT_ROOT / "experiments" / "scenario1" / "inputs"
 REGISTRY_PATH = INPUTS / "registry.json"
 CLIMATE_REGISTRY_PATH = INPUTS / "domain_climate_science.json"
 DEFAULT_REGISTRY_PATHS = (REGISTRY_PATH, CLIMATE_REGISTRY_PATH)
@@ -132,9 +134,9 @@ def _normalize_climate_registry(raw: dict[str, Any], path: Path) -> dict[str, An
         },
         "provenance": {
             "created_by": raw["created_by"],
-            "generator": "scenario1_pipeline.py",
+            "generator": "scripts/01_scenario_construction/01_generate_trajectories.py",
             "source_branch": "onyinye/trajectory-generation",
-            "source_registry": str(path.relative_to(HERE)),
+            "source_registry": str(path.relative_to(PROJECT_ROOT)),
         },
     }
 
@@ -148,7 +150,9 @@ def normalize_registry(raw: dict[str, Any], path: Path) -> dict[str, Any]:
         reg.setdefault("document_set_id", f"{reg['independence_group_id']}__documents")
         reg.setdefault("conditions", copy.deepcopy(list(CONDITIONS)))
         reg.setdefault("provenance", {})
-        reg["provenance"].setdefault("source_registry", str(path.relative_to(HERE)))
+        reg["provenance"].setdefault(
+            "source_registry", str(path.relative_to(PROJECT_ROOT))
+        )
 
     activation = reg.setdefault("activation_config", {})
     activation["requested_layers"] = list(range(MODEL_LAYER_COUNT))
@@ -554,9 +558,9 @@ def build_record(
         "model": {
             "model_name": MODEL_ID,
             "provider": "modal",
-            "model_revision": None,
+            "model_revision": MODEL_REVISION,
             "tokenizer_name": MODEL_ID,
-            "tokenizer_revision": None,
+            "tokenizer_revision": MODEL_REVISION,
             "dtype": "bfloat16",
             "seed": reg["seed"],
             "num_hidden_layers": MODEL_LAYER_COUNT,
@@ -653,7 +657,7 @@ def build_generation_request(
         "hop_index": event["hop_index"],
         "thinking_mode": thinking_mode,
         "model_id": MODEL_ID,
-        "model_revision": "main",
+        "model_revision": MODEL_REVISION,
         "messages": [
             {"role": "system", "content": event_input["system_prompt"]},
             {"role": "user", "content": user_content},
@@ -705,7 +709,7 @@ def build_manifest(
         "schema_version": "spec_gap.scenario1.v2",
         "generation_mode": "dry_run",
         "model_called": False,
-        "generator": "scenario1_pipeline.py",
+        "generator": "scripts/01_scenario_construction/01_generate_trajectories.py",
         "contributors": sorted({
             reg["provenance"]["created_by"] for reg in registries
         }),

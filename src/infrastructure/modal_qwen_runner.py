@@ -19,6 +19,7 @@ import modal
 
 from src.infrastructure.qwen_modal import (
     MODEL_ID,
+    MODEL_REVISION,
     activation_artifact_path,
     build_generation_result,
     split_thinking_text,
@@ -65,7 +66,7 @@ artifact_volume = modal.Volume.from_name(ARTIFACT_VOLUME_NAME, create_if_missing
     memory=32768,
     timeout=14400,
 )
-def download_model(revision: str = "main") -> dict[str, str]:
+def download_model(revision: str = MODEL_REVISION) -> dict[str, str]:
     """Download and pin the public model without using a GPU."""
 
     from huggingface_hub import HfApi, snapshot_download
@@ -367,7 +368,7 @@ def main(
     request_path: str,
     action: str = "validate",
     output_path: str = "",
-    model_revision: str = "main",
+    model_revision: str = MODEL_REVISION,
     confirm_paid_run: str = "",
 ) -> None:
     """Validate by default; remote download and H200 execution are explicit."""

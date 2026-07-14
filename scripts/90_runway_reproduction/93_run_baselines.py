@@ -6,9 +6,9 @@ probe and the repository's current LAT-style contrast-direction baseline under
 the same stratified and leave-one-scenario-out splits.
 
 Usage:
-    python experiments/week1_week2_baselines.py
-    python experiments/week1_week2_baselines.py --layers 16 20 24
-    python experiments/week1_week2_baselines.py --artifact-root /path/to/artifacts
+    python scripts/90_runway_reproduction/93_run_baselines.py
+    python scripts/90_runway_reproduction/93_run_baselines.py --layers 16 20 24
+    python scripts/90_runway_reproduction/93_run_baselines.py --artifact-root /path/to/artifacts
 """
 
 from __future__ import annotations
@@ -19,11 +19,11 @@ import json
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from experiments.week1_week2_lat_baseline import (  # noqa: E402
-    _find_artifact_root,
-    _load_runway_artifacts,
+from src.analysis.runway_artifacts import (  # noqa: E402
+    find_artifact_root,
+    load_runway_artifacts,
 )
 from src.probes.lat_baseline import (  # noqa: E402
     evaluate_contrast_pair_lat_all_layers,
@@ -64,9 +64,9 @@ def run_baselines(
     output_path: Path | None = None,
     layers: list[int] | None = None,
 ) -> dict:
-    repo_root = Path(__file__).resolve().parent.parent
-    artifact_root = artifact_root or _find_artifact_root(repo_root)
-    activations, labels, scenario_ids = _load_runway_artifacts(artifact_root)
+    repo_root = Path(__file__).resolve().parents[2]
+    artifact_root = artifact_root or find_artifact_root(repo_root)
+    activations, labels, scenario_ids = load_runway_artifacts(artifact_root)
     contrast_pair_ids = _build_runway_pair_ids(artifact_root)
 
     if layers:

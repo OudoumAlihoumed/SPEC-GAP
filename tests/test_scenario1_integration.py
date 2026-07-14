@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import scenario1_pipeline as scenario
+from src.scenario1 import generator as scenario
 from src.infrastructure.qwen_modal import generation_result_to_agent_turn_fields
 from src.pipeline.handoff import normalize_handoff_json
 

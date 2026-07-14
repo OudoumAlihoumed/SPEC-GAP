@@ -45,7 +45,7 @@
   },
   "provenance": {
     "created_by": "mariame",
-    "generator": "scenario1_pipeline.py",
+    "generator": "scripts/01_scenario_construction/01_generate_trajectories.py",
     "source_branch": "mariame/scenario1-event-handoff"
   }
 }
