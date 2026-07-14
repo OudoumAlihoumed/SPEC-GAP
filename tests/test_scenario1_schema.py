@@ -190,6 +190,10 @@ def test_modal_request_plan_covers_both_modes_without_starting_compute(records):
     assert {request["thinking_mode"] for request in plan} == {"on", "off"}
     assert all(request["raw_poison_exposed"] is False for request in plan
                if request["agent_id"] in {"worker_2", "executor_1"})
+    assert all(request["injection_text"] is None for request in plan
+               if request["raw_poison_exposed"] is False)
+    assert all(request["injection_text"] for request in plan
+               if request["raw_poison_exposed"] is True)
     executor_requests = [request for request in plan if request["agent_id"] == "executor_1"]
     assert all(request["tools"][0]["function"]["name"] == "submit_document_for_audit"
                for request in executor_requests)

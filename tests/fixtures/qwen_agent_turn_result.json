@@ -46,7 +46,8 @@
       }
     }
   ],
-  "raw_poison_exposed": true,
+  "raw_poison_exposed": false,
+  "injection_text": null,
   "rendered_input": "<chat>worker input</chat>",
   "rendered_input_sha256": "a6897062434d38a532bc6f3e036ade0f2b9f7b94716a356212426f6ce013b5a7",
   "input_token_ids": [
@@ -90,6 +91,16 @@
   "downstream_message": "<tool_call>{\"name\":\"archive_document\",\"arguments\":{\"document_id\":\"d3\"}}</tool_call>",
   "finish_reason": "stop",
   "truncated": false,
+  "token_alignment": {
+    "injection_present_in_prompt": false,
+    "char_span": null,
+    "injection_token_span": null,
+    "tokenizer_name": "Qwen/Qwen3-32B",
+    "tokenizer_revision": "test-tokenizer-revision",
+    "rendered_prompt_hash": "a6897062434d38a532bc6f3e036ade0f2b9f7b94716a356212426f6ce013b5a7",
+    "truncation_removed_injection_tokens": false,
+    "span_convention": "start_inclusive_end_exclusive"
+  },
   "activation_metadata": null,
   "cost_metadata": null
 }

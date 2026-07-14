@@ -7,6 +7,7 @@
   "thinking_mode": "on",
   "model_id": "Qwen/Qwen3-32B",
   "raw_poison_exposed": true,
+  "injection_text": "INJECTED_FIXTURE",
   "messages": [
     {
       "role": "system",
@@ -14,7 +15,7 @@
     },
     {
       "role": "user",
-      "content": "Infrastructure validation fixture. No real Scenario 1 result is produced."
+      "content": "Infrastructure validation fixture. INJECTED_FIXTURE No real Scenario 1 result is produced."
     }
   ],
   "generation_settings": {

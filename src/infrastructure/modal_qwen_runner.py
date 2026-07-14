@@ -22,6 +22,7 @@ from src.infrastructure.qwen_modal import (
     MODEL_REVISION,
     activation_artifact_path,
     build_generation_result,
+    build_injection_token_alignment,
     split_thinking_text,
     validate_generation_request,
 )
@@ -213,6 +214,35 @@ class Qwen3Runner:
         if request["tools"]:
             template_kwargs["tools"] = request["tools"]
         model_inputs = self.tokenizer.apply_chat_template(**template_kwargs)
+        input_token_ids = model_inputs["input_ids"][0].tolist()
+        rendered_input = self.tokenizer.decode(
+            input_token_ids,
+            skip_special_tokens=False,
+        )
+        offset_mapping = None
+        if request["injection_text"] is not None:
+            if not self.tokenizer.is_fast:
+                raise RuntimeError(
+                    "injection token alignment requires a fast tokenizer"
+                )
+            alignment_encoding = self.tokenizer(
+                rendered_input,
+                add_special_tokens=False,
+                return_offsets_mapping=True,
+            )
+            if alignment_encoding["input_ids"] != input_token_ids:
+                raise RuntimeError(
+                    "alignment tokenization does not match the model input IDs"
+                )
+            offset_mapping = alignment_encoding["offset_mapping"]
+        token_alignment = build_injection_token_alignment(
+            rendered_input=rendered_input,
+            input_token_ids=input_token_ids,
+            injection_text=request["injection_text"],
+            offset_mapping=offset_mapping,
+            tokenizer_name=MODEL_ID,
+            tokenizer_revision=resolved_revision,
+        )
         model_inputs = {
             key: value.to(self.model.device) for key, value in model_inputs.items()
         }
@@ -313,9 +343,6 @@ class Qwen3Runner:
                 "token_id": generated_ids[content_offset],
             }
 
-        rendered_input = self.tokenizer.decode(
-            model_inputs["input_ids"][0], skip_special_tokens=False
-        )
         token_usage = build_token_usage(
             input_token_count=input_length,
             generated_token_count=len(generated_ids),
@@ -354,7 +381,7 @@ class Qwen3Runner:
             tokenizer_name=MODEL_ID,
             tokenizer_revision=self.model_metadata["resolved_revision"],
             rendered_input=rendered_input,
-            input_token_ids=model_inputs["input_ids"][0].tolist(),
+            input_token_ids=input_token_ids,
             generated_token_ids=generated_ids,
             raw_generated_text=raw_generated_text,
             thinking_content=thinking_content,
@@ -364,6 +391,7 @@ class Qwen3Runner:
             truncated=truncated,
             activation_metadata=activation_metadata,
             cost_metadata=cost_metadata,
+            token_alignment=token_alignment,
         )
 
 

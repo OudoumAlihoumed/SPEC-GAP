@@ -151,3 +151,7 @@ A paid trajectory additionally requires
 `--action run --confirm-paid-run RUN_H200_TRAJECTORY`. Run one complete
 trajectory and validate its saved v2 JSON before launching the full 56-turn
 two-mode batch.
+
+The raw-poison Worker1 result includes the injection's exact character and
+token spans in the rendered Qwen prompt. The saved tokenizer revision and
+prompt hash make that alignment reproducible for later activation analysis.

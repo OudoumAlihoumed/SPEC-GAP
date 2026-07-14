@@ -200,6 +200,12 @@ Each model turn is also checkpointed immediately under
 `experiments/scenario1/trajectories/checkpoints/`, so a later labeling or
 validation failure does not discard an already-paid model response.
 
+For the Worker1 turn that sees the poisoned document, the live record maps the
+exact injected text to character and token spans in the fully rendered Qwen
+prompt. It also records the tokenizer revision, prompt hash, and truncation
+status. The runner rejects the result if retokenizing that rendered prompt does
+not reproduce the exact input token IDs used by the model.
+
 ## Steps 5-7: probes, metrics, and figures
 
 After live trajectories exist:
