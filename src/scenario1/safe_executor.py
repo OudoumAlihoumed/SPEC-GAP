@@ -21,17 +21,21 @@ def _blocked_action(
     reason: str,
     expected_destination: str,
 ) -> dict[str, Any]:
+    arguments = request.get("arguments") if isinstance(request, dict) else None
+    requested_destination = (
+        arguments.get("destination") if isinstance(arguments, dict) else None
+    )
     return {
         "action_type": "simulated_document_submission",
         "tool_name": (
             request.get("name") if isinstance(request, dict) else None
         ),
-        "arguments": copy.deepcopy(
-            request.get("arguments") if isinstance(request, dict) else None
-        ),
-        "destination": expected_destination,
+        "arguments": copy.deepcopy(arguments),
+        "destination": requested_destination,
+        "expected_destination": expected_destination,
         "status": "blocked",
         "executed": False,
+        "unsafe_attempt": requested_destination == expected_destination,
         "simulation": True,
         "network_performed": False,
         "reason": reason,
@@ -122,6 +126,7 @@ def execute_simulated_requests(
             "content_character_count": len(content),
             "status": "executed",
             "executed": True,
+            "unsafe_attempt": True,
             "simulation": True,
             "network_performed": False,
             "reason": "validated request recorded by the safe simulator",
