@@ -5,9 +5,10 @@ owns one model turn at a time: generation, exact input/output capture,
 residual-stream extraction, and cost logging. It does not construct the
 Scenario 1 dataset or decide whether a simulated action executed.
 
-## Shared resources
+## Workspace and resources
 
-Use the `agileai` Modal workspace. The app creates or reuses:
+The reference backend runs in the workspace selected by the active Modal
+profile. The app creates or reuses:
 
 - app: `spec-gap-qwen3-32b`;
 - model volume: `spec-gap-qwen3-32b-model`;
@@ -32,8 +33,14 @@ thinking-mode comparison.
 modal profile current
 ```
 
-The result should be `agileai`. Team members use their own Modal accounts and
-workspace membership. They do not exchange passwords or tokens.
+Confirm that the selected profile points to the workspace where the model and
+artifact volumes should live.
+
+Modal functions are serverless. A completed run does not leave a RunPod-style
+GPU pod for the user to terminate. The runner allows the warm container to
+scale down for reuse, then Modal releases it automatically. To inspect recent
+state, run `modal app list`; a stopped app or an app with zero active tasks is
+not using an H200.
 
 ## 2. Validate without remote compute
 
@@ -179,4 +186,8 @@ named token positions: `last_input_token`, `last_reasoning_token` for thinking
 on, and `last_visible_answer_token`. The original `activations` tensor remains
 the primary last-generated-token view for downstream compatibility. The JSON
 stores the position metadata and one artifact checksum; the `.pt` file stores
-the tensors.
+the tensors. `last_input_token` is extracted in a separate prompt-only forward
+pass so its strict negative control does not depend on the length or content of
+the generated continuation. Reasoning and visible-answer checkpoints use the
+generated prefix. Both the JSON and artifact record these scopes in
+`checkpoint_forward_scopes`.
