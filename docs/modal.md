@@ -152,6 +152,31 @@ A paid trajectory additionally requires
 trajectory and validate its saved v2 JSON before launching the full 56-turn
 two-mode batch.
 
+Use the resumable batch entry point after that first trajectory passes:
+
+```bash
+modal run \
+  scripts/02_model_execution/05_run_scenario1_batch.py::run_scenario1_batch \
+  --action validate
+
+modal run \
+  scripts/02_model_execution/05_run_scenario1_batch.py::run_scenario1_batch \
+  --action run \
+  --confirm-paid-run RUN_H200_BATCH
+```
+
+The batch skips existing valid trajectories, checkpoints every model turn, and
+keeps the remaining sequential calls inside one Modal app. This avoids loading
+Qwen3-32B again for every trajectory. Add `--max-new-trajectories 1` to bound a
+paid run while checking a new environment.
+
 The raw-poison Worker1 result includes the injection's exact character and
 token spans in the rendered Qwen prompt. The saved tokenizer revision and
 prompt hash make that alignment reproducible for later activation analysis.
+
+The activation artifact for each turn contains all 64 layers at up to three
+named token positions: `last_input_token`, `last_reasoning_token` for thinking
+on, and `last_visible_answer_token`. The original `activations` tensor remains
+the primary last-generated-token view for downstream compatibility. The JSON
+stores the position metadata and one artifact checksum; the `.pt` file stores
+the tensors.

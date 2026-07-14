@@ -21,6 +21,7 @@ from src.infrastructure.qwen_modal import (
     MODEL_ID,
     MODEL_REVISION,
     activation_artifact_path,
+    build_activation_checkpoint_plan,
     build_generation_result,
     build_injection_token_alignment,
     split_thinking_text,
@@ -133,26 +134,21 @@ class Qwen3Runner:
                 f"expected 64 Qwen3-32B layers, got {self.model.config.num_hidden_layers}"
             )
 
-    def _last_non_special_offset(self, generated_ids: list[int]) -> int:
-        special = set(self.tokenizer.all_special_ids)
-        for offset in range(len(generated_ids) - 1, -1, -1):
-            if generated_ids[offset] not in special:
-                return offset
-        return max(len(generated_ids) - 1, 0)
-
-    def _extract_last_token_activations(
+    def _extract_position_activations(
         self,
         full_token_ids,
         layers: list[int],
+        checkpoints: list[dict[str, Any]],
     ):
         torch = self.torch
         captured = {}
         handles = []
+        positions = [checkpoint["sequence_index"] for checkpoint in checkpoints]
 
         def make_hook(layer_index: int):
             def hook(_module, _inputs, output):
                 hidden = output[0] if isinstance(output, tuple) else output
-                captured[layer_index] = hidden[0, -1, :].detach().to(
+                captured[layer_index] = hidden[0, positions, :].detach().to(
                     dtype=torch.bfloat16,
                     device="cpu",
                 )
@@ -179,7 +175,13 @@ class Qwen3Runner:
         missing = sorted(set(layers) - set(captured))
         if missing:
             raise RuntimeError(f"activation hooks did not fire for layers {missing}")
-        return torch.stack([captured[layer] for layer in layers], dim=0)
+        stacked = torch.stack(
+            [captured[layer] for layer in layers], dim=0
+        ).transpose(0, 1).contiguous()
+        return {
+            checkpoint["name"]: stacked[index]
+            for index, checkpoint in enumerate(checkpoints)
+        }
 
     @modal.method()
     def generate_agent_turn(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -271,6 +273,7 @@ class Qwen3Runner:
         )
         parsed = split_thinking_text(raw_generated_text)
         close_token_id = self.tokenizer.convert_tokens_to_ids("</think>")
+        close_index = None
         if request["enable_thinking"] and close_token_id in generated_ids:
             close_index = len(generated_ids) - 1 - generated_ids[::-1].index(
                 close_token_id
@@ -312,12 +315,27 @@ class Qwen3Runner:
 
         activation_metadata = None
         if request["extract_activations"]:
-            content_offset = self._last_non_special_offset(generated_ids)
-            activation_sequence = sequences[:, : input_length + content_offset + 1]
-            activation_tensor = self._extract_last_token_activations(
+            special_token_ids = set(self.tokenizer.all_special_ids)
+            if isinstance(close_token_id, int):
+                special_token_ids.add(close_token_id)
+            checkpoint_plan = build_activation_checkpoint_plan(
+                input_token_ids=input_token_ids,
+                generated_token_ids=generated_ids,
+                enable_thinking=request["enable_thinking"],
+                thinking_close_offset=close_index,
+                special_token_ids=special_token_ids,
+            )
+            checkpoints = checkpoint_plan["checkpoints"]
+            primary_name = checkpoint_plan["primary_checkpoint"]
+            primary_sequence_index = checkpoint_plan["primary_sequence_index"]
+            activation_sequence = sequences[:, : primary_sequence_index + 1]
+            position_activations = self._extract_position_activations(
                 activation_sequence,
                 request["activation_layers"],
+                checkpoints,
             )
+            activation_tensor = position_activations[primary_name]
+            by_name = {item["name"]: item for item in checkpoints}
             relative_path = activation_artifact_path(request)
             absolute_path = ARTIFACT_MOUNT / relative_path
             absolute_path.parent.mkdir(parents=True, exist_ok=True)
@@ -326,7 +344,13 @@ class Qwen3Runner:
                     "activations": activation_tensor,
                     "layers": request["activation_layers"],
                     "token_position": request["activation_token_position"],
-                    "token_id": generated_ids[content_offset],
+                    "token_id": by_name[primary_name]["token_id"],
+                    "artifact_format_version": checkpoint_plan[
+                        "artifact_format_version"
+                    ],
+                    "primary_checkpoint": primary_name,
+                    "position_activations": position_activations,
+                    "checkpoint_positions": checkpoints,
                 },
                 absolute_path,
             )
@@ -340,7 +364,17 @@ class Qwen3Runner:
                 "dtype": str(activation_tensor.dtype),
                 "layers": request["activation_layers"],
                 "token_position": request["activation_token_position"],
-                "token_id": generated_ids[content_offset],
+                "token_id": by_name[primary_name]["token_id"],
+                "artifact_format_version": checkpoint_plan[
+                    "artifact_format_version"
+                ],
+                "primary_checkpoint": primary_name,
+                "checkpoint_positions": checkpoints,
+                "checkpoint_shapes": {
+                    name: list(tensor.shape)
+                    for name, tensor in position_activations.items()
+                },
+                "sequence_length": int(activation_sequence.shape[-1]),
             }
 
         token_usage = build_token_usage(
