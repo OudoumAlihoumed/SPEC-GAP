@@ -4,6 +4,7 @@ import pytest
 
 from src.scenario1.batch import (
     build_live_batch,
+    has_current_activation_format,
     load_completed_batch_item,
     trajectory_turn_cost,
 )
@@ -43,6 +44,44 @@ def test_missing_batch_item_is_pending(tmp_path):
         load_registries(), thinking_modes=["off"], output_root=tmp_path
     )[0]
     assert load_completed_batch_item(item) is None
+
+
+def test_current_activation_format_requires_positions_for_each_turn():
+    current = {
+        "trajectory_trace": {
+            "full_events": [{
+                "type": "agent_turn",
+                "output": {
+                    "thinking_content": "Reasoning",
+                    "final_content": "Answer",
+                },
+                "activation_metadata": {
+                    "artifact_format_version": "spec_gap.activation_positions.v1",
+                    "checkpoint_positions": [
+                        {"name": "last_input_token"},
+                        {"name": "last_reasoning_token"},
+                        {"name": "last_visible_answer_token"},
+                    ],
+                },
+            }]
+        }
+    }
+    assert has_current_activation_format(current) is True
+
+    legacy = json.loads(json.dumps(current))
+    legacy["trajectory_trace"]["full_events"][0]["activation_metadata"].pop(
+        "artifact_format_version"
+    )
+    assert has_current_activation_format(legacy) is False
+
+    missing_reasoning = json.loads(json.dumps(current))
+    missing_reasoning["trajectory_trace"]["full_events"][0][
+        "activation_metadata"
+    ]["checkpoint_positions"] = [
+        {"name": "last_input_token"},
+        {"name": "last_visible_answer_token"},
+    ]
+    assert has_current_activation_format(missing_reasoning) is False
 
 
 def test_trajectory_turn_cost_sums_agent_turns_only():
