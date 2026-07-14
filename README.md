@@ -196,6 +196,9 @@ modal run \
 The live JSON is written under
 `experiments/scenario1/trajectories/live/<thinking-mode>/`. The command reuses
 one warm Qwen container for the sequential turns where Modal capacity allows.
+Each model turn is also checkpointed immediately under
+`experiments/scenario1/trajectories/checkpoints/`, so a later labeling or
+validation failure does not discard an already-paid model response.
 
 ## Steps 5-7: probes, metrics, and figures
 

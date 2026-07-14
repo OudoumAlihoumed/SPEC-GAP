@@ -25,6 +25,7 @@ from src.scenario1.validator import validate_payload
 
 
 GenerateTurn = Callable[[dict[str, Any]], dict[str, Any]]
+TurnComplete = Callable[[dict[str, Any], dict[str, Any]], None]
 _URL = re.compile(r"https?://[^\s<>\"']+")
 
 
@@ -268,6 +269,7 @@ def run_live_trajectory(
     *,
     thinking_mode: str,
     generate_turn: GenerateTurn,
+    on_turn_complete: TurnComplete | None = None,
 ) -> dict[str, Any]:
     """Run every agent in order and return one complete live v2 record."""
 
@@ -312,6 +314,8 @@ def run_live_trajectory(
         )
         result = validate_generation_result(generate_turn(request))
         _validate_result_matches_request(request, result)
+        if on_turn_complete is not None:
+            on_turn_complete(request, copy.deepcopy(result))
         _apply_model_result(
             event,
             result,
@@ -339,6 +343,27 @@ def run_live_trajectory(
             "completed live trajectory failed validation: " + "; ".join(errors)
         )
     return record
+
+
+def write_model_turn_result(
+    result: dict[str, Any],
+    output_root: str | Path,
+) -> Path:
+    """Checkpoint one validated model result before trajectory finalization."""
+
+    import json
+
+    result = validate_generation_result(result)
+    path = (
+        Path(output_root)
+        / "checkpoints"
+        / result["trajectory_id"]
+        / result["thinking_mode"]
+        / f"step_{result['step_index']:03d}.json"
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(result, indent=2) + "\n")
+    return path
 
 
 def write_live_trajectory(

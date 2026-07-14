@@ -19,7 +19,11 @@ from src.scenario1.generator import (
     build_request_plan,
     load_registry,
 )
-from src.scenario1.orchestrator import run_live_trajectory, write_live_trajectory
+from src.scenario1.orchestrator import (
+    run_live_trajectory,
+    write_live_trajectory,
+    write_model_turn_result,
+)
 
 
 @app.local_entrypoint()
@@ -73,6 +77,9 @@ def run_scenario1_trajectory(
         structural,
         thinking_mode=thinking_mode,
         generate_turn=runner.generate_agent_turn.remote,
+        on_turn_complete=lambda _request, result: write_model_turn_result(
+            result, output_root
+        ),
     )
     path = write_live_trajectory(live, output_root)
     turn_costs = [
