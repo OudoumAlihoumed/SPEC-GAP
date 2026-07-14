@@ -1,1 +1,1 @@
-"""Scenario 1 construction and validation implementation."""
+"""Scenario 1 construction, live orchestration, and validation."""

@@ -579,6 +579,7 @@ def build_record(
             "documents": copy.deepcopy(documents),
         },
         "injection": injection,
+        "controlled_endpoint": reg["injection"]["endpoint"],
         "compromise_propagation": {
             "injection_hop_index": 1 if injected else None,
             "unsafe_action_hop_index": None,
