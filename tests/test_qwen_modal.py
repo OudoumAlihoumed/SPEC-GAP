@@ -8,6 +8,7 @@ from src.infrastructure.modal_costs import build_gpu_cost_record, build_token_us
 from src.infrastructure.qwen_modal import (
     RequestValidationError,
     activation_artifact_path,
+    build_activation_checkpoint_plan,
     build_generation_result,
     build_injection_token_alignment,
     generation_result_to_agent_turn_fields,
@@ -147,6 +148,80 @@ def test_unclosed_thinking_block_is_marked_incomplete():
 
     assert parsed["thinking_complete"] is False
     assert parsed["final_content"] == ""
+
+
+def test_thinking_off_activation_plan_uses_input_and_visible_answer():
+    plan = build_activation_checkpoint_plan(
+        input_token_ids=[10, 11],
+        generated_token_ids=[20, 21, 2],
+        enable_thinking=False,
+        thinking_close_offset=None,
+        special_token_ids={2},
+    )
+
+    assert plan["primary_checkpoint"] == "last_visible_answer_token"
+    assert plan["checkpoints"] == [
+        {
+            "name": "last_input_token",
+            "sequence_index": 1,
+            "generated_token_offset": None,
+            "token_id": 11,
+        },
+        {
+            "name": "last_visible_answer_token",
+            "sequence_index": 3,
+            "generated_token_offset": 1,
+            "token_id": 21,
+        },
+    ]
+
+
+def test_thinking_on_activation_plan_separates_reasoning_and_answer():
+    plan = build_activation_checkpoint_plan(
+        input_token_ids=[10, 11],
+        generated_token_ids=[100, 30, 31, 101, 40, 41, 2],
+        enable_thinking=True,
+        thinking_close_offset=3,
+        special_token_ids={2, 100, 101},
+    )
+
+    assert plan["primary_checkpoint"] == "last_visible_answer_token"
+    assert {item["name"]: item for item in plan["checkpoints"]} == {
+        "last_input_token": {
+            "name": "last_input_token",
+            "sequence_index": 1,
+            "generated_token_offset": None,
+            "token_id": 11,
+        },
+        "last_reasoning_token": {
+            "name": "last_reasoning_token",
+            "sequence_index": 4,
+            "generated_token_offset": 2,
+            "token_id": 31,
+        },
+        "last_visible_answer_token": {
+            "name": "last_visible_answer_token",
+            "sequence_index": 7,
+            "generated_token_offset": 5,
+            "token_id": 41,
+        },
+    }
+
+
+def test_incomplete_thinking_activation_plan_has_no_visible_answer():
+    plan = build_activation_checkpoint_plan(
+        input_token_ids=[10, 11],
+        generated_token_ids=[100, 30, 31, 2],
+        enable_thinking=True,
+        thinking_close_offset=None,
+        special_token_ids={2, 100, 101},
+    )
+
+    assert plan["primary_checkpoint"] == "last_reasoning_token"
+    assert [item["name"] for item in plan["checkpoints"]] == [
+        "last_input_token",
+        "last_reasoning_token",
+    ]
 
 
 def test_activation_path_is_stable_and_scoped_by_mode():
@@ -329,6 +404,74 @@ def test_cost_and_token_usage_survive_the_agent_turn_handoff():
         "total_tokens_processed": 5,
     }
     assert fields["cost_metadata"] == result["cost_metadata"]
+
+
+def test_result_validates_multi_position_activation_metadata():
+    request = request_payload(
+        thinking_mode="on",
+        tools=[],
+        extract_activations=True,
+        activation_layers=[0, 1],
+    )
+    checkpoints = [
+        {
+            "name": "last_input_token",
+            "sequence_index": 1,
+            "generated_token_offset": None,
+            "token_id": 2,
+        },
+        {
+            "name": "last_reasoning_token",
+            "sequence_index": 2,
+            "generated_token_offset": 0,
+            "token_id": 3,
+        },
+        {
+            "name": "last_visible_answer_token",
+            "sequence_index": 4,
+            "generated_token_offset": 2,
+            "token_id": 5,
+        },
+    ]
+    activation = {
+        "storage_status": "materialized",
+        "storage_path": "activations/group01_injected_3hop_thinking_on/on/step_002.pt",
+        "checksum_sha256": "0" * 64,
+        "shape": [2, 5120],
+        "dtype": "torch.bfloat16",
+        "layers": [0, 1],
+        "token_position": "last_generated_non_special_token",
+        "token_id": 5,
+        "artifact_format_version": "spec_gap.activation_positions.v1",
+        "primary_checkpoint": "last_visible_answer_token",
+        "checkpoint_positions": checkpoints,
+        "checkpoint_shapes": {
+            item["name"]: [2, 5120] for item in checkpoints
+        },
+        "sequence_length": 5,
+    }
+    result = build_generation_result(
+        request,
+        model_revision="test-model-revision",
+        tokenizer_name="Qwen/Qwen3-32B",
+        tokenizer_revision="test-tokenizer-revision",
+        rendered_input="<chat>worker input</chat>",
+        input_token_ids=[1, 2],
+        generated_token_ids=[3, 4, 5],
+        raw_generated_text="<think>reasoning</think>Safe answer.",
+        thinking_content="reasoning",
+        thinking_complete=True,
+        final_content="Safe answer.",
+        finish_reason="stop",
+        truncated=False,
+        activation_metadata=activation,
+    )
+
+    assert result["activation_metadata"]["checkpoint_positions"] == checkpoints
+    tampered = deepcopy(result)
+    tampered["activation_metadata"]["checkpoint_positions"][0]["token_id"] = 999
+    with pytest.raises(RequestValidationError, match="does not match the sequence"):
+        validate_generation_result(tampered)
 
 
 def test_saved_mock_result_matches_the_local_contract():

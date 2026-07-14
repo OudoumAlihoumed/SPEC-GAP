@@ -653,6 +653,43 @@
             "dry_run_placeholder"
           ]
         },
+        "artifact_format_version": {
+          "type": ["string", "null"]
+        },
+        "primary_checkpoint": {
+          "type": ["string", "null"]
+        },
+        "checkpoint_positions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "sequence_index", "token_id"],
+            "properties": {
+              "name": {
+                "enum": [
+                  "last_input_token",
+                  "last_reasoning_token",
+                  "last_visible_answer_token"
+                ]
+              },
+              "sequence_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "generated_token_offset": {
+                "type": ["integer", "null"],
+                "minimum": 0
+              },
+              "token_id": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "checkpoint_shapes": {
+          "type": "object"
+        },
         "layer_metadata": {
           "type": "object"
         }

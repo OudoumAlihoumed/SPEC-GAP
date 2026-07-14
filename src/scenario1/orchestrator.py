@@ -80,9 +80,18 @@ def _v2_activation_metadata(
         "model_num_layers": MODEL_LAYER_COUNT,
         "token_position_extracted": None,
         "token_position_convention": activation["token_position"],
+        "sequence_length": activation.get("sequence_length"),
         "storage_path": activation["storage_path"],
         "storage_format": "pytorch",
         "storage_status": activation["storage_status"],
+        "artifact_format_version": activation.get("artifact_format_version"),
+        "primary_checkpoint": activation.get("primary_checkpoint"),
+        "checkpoint_positions": copy.deepcopy(
+            activation.get("checkpoint_positions", [])
+        ),
+        "checkpoint_shapes": copy.deepcopy(
+            activation.get("checkpoint_shapes", {})
+        ),
         "layer_metadata": {
             "shape": copy.deepcopy(activation.get("shape")),
             "dtype": activation.get("dtype"),

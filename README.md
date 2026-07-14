@@ -206,6 +206,30 @@ prompt. It also records the tokenizer revision, prompt hash, and truncation
 status. The runner rejects the result if retokenizing that rendered prompt does
 not reproduce the exact input token IDs used by the model.
 
+After one trajectory passes, validate the resumable full-matrix plan without
+starting a GPU:
+
+```bash
+modal run \
+  scripts/02_model_execution/05_run_scenario1_batch.py::run_scenario1_batch \
+  --action validate
+```
+
+Run or resume the remaining matrix in one Modal app:
+
+```bash
+modal run \
+  scripts/02_model_execution/05_run_scenario1_batch.py::run_scenario1_batch \
+  --action run \
+  --confirm-paid-run RUN_H200_BATCH
+```
+
+The batch validates existing live files and skips them. It checkpoints every
+paid model turn and writes each completed trajectory before moving to the next
+one. Use `--max-new-trajectories 1` for another bounded run. Keeping the matrix
+inside one Modal app lets later calls reuse the loaded Qwen container instead
+of paying the 32B cold-start cost once per trajectory.
+
 ## Steps 5-7: probes, metrics, and figures
 
 After live trajectories exist:
@@ -326,6 +350,13 @@ estimated H200 cost record.
 
 The first scan requests all 64 residual-stream layers. No primary layer is
 locked before the scan shows adequate signal.
+
+Each final model turn saves three controlled activation checkpoints when they
+exist: the last input token before generation, the last reasoning token for a
+thinking-on response, and the last visible-answer token. These tensors share
+one `.pt` artifact. The trajectory JSON records each checkpoint name, token ID,
+sequence index, shape, artifact path, and checksum. It does not place the
+floating-point tensors directly in JSON.
 
 ## Data and artifact policy
 

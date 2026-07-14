@@ -76,6 +76,12 @@ Qwen3-32B has 64 layers. The initial scan requests all layers, numbered 0 to
 63. `primary_layer` is optional and remains null until the data supports a
 specific analysis layer.
 
+For each live turn, the binary activation artifact may contain three named
+checkpoints: the last prompt token, the last reasoning token when thinking is
+enabled, and the last visible-answer token. The event JSON stores the token
+indices, token IDs, shapes, checksum, and artifact path rather than embedding
+the floating-point tensors.
+
 Dry-run metadata is honest:
 
 ```json

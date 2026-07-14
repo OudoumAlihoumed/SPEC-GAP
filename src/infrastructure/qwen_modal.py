@@ -22,6 +22,12 @@ MODEL_LAYER_COUNT = 64
 THINKING_MODES = {"on": True, "off": False}
 ALLOWED_AGENT_ROLES = {"planner", "worker", "worker2", "executor"}
 RAW_POISON_AGENT_ID = "worker_1"
+ACTIVATION_ARTIFACT_FORMAT = "spec_gap.activation_positions.v1"
+ACTIVATION_CHECKPOINT_NAMES = {
+    "last_input_token",
+    "last_reasoning_token",
+    "last_visible_answer_token",
+}
 
 # The thinking-mode ablation changes only enable_thinking. Qwen's recommended
 # mode-specific settings can be evaluated separately as a sensitivity check.
@@ -289,6 +295,105 @@ def split_thinking_text(text: str) -> dict[str, Any]:
         "thinking_content": None,
         "final_content": text.strip(),
         "thinking_complete": None,
+    }
+
+
+def build_activation_checkpoint_plan(
+    *,
+    input_token_ids: list[int],
+    generated_token_ids: list[int],
+    enable_thinking: bool,
+    thinking_close_offset: int | None,
+    special_token_ids: list[int] | set[int],
+) -> dict[str, Any]:
+    """Select comparable token positions without storing every token state."""
+
+    input_ids = _validate_token_ids(input_token_ids, "input_token_ids")
+    generated_ids = _validate_token_ids(
+        generated_token_ids, "generated_token_ids"
+    )
+    if not isinstance(enable_thinking, bool):
+        raise RequestValidationError("enable_thinking must be a boolean")
+    if thinking_close_offset is not None and (
+        not isinstance(thinking_close_offset, int)
+        or isinstance(thinking_close_offset, bool)
+        or not 0 <= thinking_close_offset < len(generated_ids)
+    ):
+        raise RequestValidationError("thinking_close_offset is out of range")
+    if not enable_thinking and thinking_close_offset is not None:
+        raise RequestValidationError(
+            "thinking-off generations cannot define thinking_close_offset"
+        )
+    special = set(special_token_ids)
+    if any(not isinstance(token_id, int) for token_id in special):
+        raise RequestValidationError("special_token_ids must contain integers")
+
+    def last_non_special_offset(
+        token_ids: list[int], *, start_offset: int = 0
+    ) -> int | None:
+        for local_offset in range(len(token_ids) - 1, -1, -1):
+            if token_ids[local_offset] not in special:
+                return start_offset + local_offset
+        return None
+
+    checkpoints = [{
+        "name": "last_input_token",
+        "sequence_index": len(input_ids) - 1,
+        "generated_token_offset": None,
+        "token_id": input_ids[-1],
+    }]
+    if enable_thinking:
+        reasoning_end = (
+            thinking_close_offset
+            if thinking_close_offset is not None
+            else len(generated_ids)
+        )
+        reasoning_offset = last_non_special_offset(generated_ids[:reasoning_end])
+        if reasoning_offset is not None:
+            checkpoints.append({
+                "name": "last_reasoning_token",
+                "sequence_index": len(input_ids) + reasoning_offset,
+                "generated_token_offset": reasoning_offset,
+                "token_id": generated_ids[reasoning_offset],
+            })
+        visible_offset = None
+        if thinking_close_offset is not None:
+            visible_start = thinking_close_offset + 1
+            visible_offset = last_non_special_offset(
+                generated_ids[visible_start:], start_offset=visible_start
+            )
+    else:
+        visible_offset = last_non_special_offset(generated_ids)
+
+    if visible_offset is not None:
+        checkpoints.append({
+            "name": "last_visible_answer_token",
+            "sequence_index": len(input_ids) + visible_offset,
+            "generated_token_offset": visible_offset,
+            "token_id": generated_ids[visible_offset],
+        })
+
+    primary_offset = last_non_special_offset(generated_ids)
+    if primary_offset is None:
+        primary_offset = len(generated_ids) - 1
+    primary_sequence_index = len(input_ids) + primary_offset
+    primary_checkpoint = next(
+        (
+            checkpoint["name"]
+            for checkpoint in checkpoints
+            if checkpoint["sequence_index"] == primary_sequence_index
+        ),
+        None,
+    )
+    if primary_checkpoint is None:
+        raise RequestValidationError(
+            "last generated token does not match an activation checkpoint"
+        )
+    return {
+        "artifact_format_version": ACTIVATION_ARTIFACT_FORMAT,
+        "primary_checkpoint": primary_checkpoint,
+        "primary_sequence_index": primary_sequence_index,
+        "checkpoints": checkpoints,
     }
 
 
@@ -609,6 +714,133 @@ def _validate_result_token_alignment(
     return copy.deepcopy(alignment)
 
 
+def _validate_activation_checkpoints(
+    activation: dict[str, Any],
+    result: dict[str, Any],
+) -> None:
+    """Validate the optional multi-position activation artifact contract."""
+
+    format_version = activation.get("artifact_format_version")
+    checkpoints = activation.get("checkpoint_positions")
+    if format_version is None and checkpoints is None:
+        return
+    if format_version != ACTIVATION_ARTIFACT_FORMAT:
+        raise RequestValidationError(
+            f"activation artifact_format_version must be {ACTIVATION_ARTIFACT_FORMAT!r}"
+        )
+    if not isinstance(checkpoints, list) or not checkpoints:
+        raise RequestValidationError(
+            "activation checkpoint_positions must be a non-empty list"
+        )
+    if any(not isinstance(checkpoint, dict) for checkpoint in checkpoints):
+        raise RequestValidationError(
+            "activation checkpoint_positions must contain objects"
+        )
+    names = [checkpoint.get("name") for checkpoint in checkpoints]
+    if len(names) != len(set(names)) or any(
+        name not in ACTIVATION_CHECKPOINT_NAMES for name in names
+    ):
+        raise RequestValidationError(
+            "activation checkpoint names must be unique controlled positions"
+        )
+    if "last_input_token" not in names:
+        raise RequestValidationError(
+            "activation checkpoints must include last_input_token"
+        )
+    if result["thinking_mode"] == "off" and "last_reasoning_token" in names:
+        raise RequestValidationError(
+            "thinking-off activations cannot include last_reasoning_token"
+        )
+    if result["thinking_mode"] == "off" and "last_visible_answer_token" not in names:
+        raise RequestValidationError(
+            "thinking-off activations must include last_visible_answer_token"
+        )
+    if result["thinking_mode"] == "on" and result["thinking_content"]:
+        if "last_reasoning_token" not in names:
+            raise RequestValidationError(
+                "thinking-on activations must include last_reasoning_token"
+            )
+    if result["final_content"] and "last_visible_answer_token" not in names:
+        raise RequestValidationError(
+            "visible output requires a last_visible_answer_token checkpoint"
+        )
+
+    all_token_ids = result["input_token_ids"] + result["generated_token_ids"]
+    input_length = len(result["input_token_ids"])
+    checkpoint_shapes = activation.get("checkpoint_shapes")
+    if (
+        not isinstance(checkpoint_shapes, dict)
+        or set(checkpoint_shapes) != set(names)
+    ):
+        raise RequestValidationError(
+            "activation checkpoint_shapes must cover every checkpoint"
+        )
+    for checkpoint in checkpoints:
+        name = checkpoint["name"]
+        index = checkpoint.get("sequence_index")
+        offset = checkpoint.get("generated_token_offset")
+        token_id = checkpoint.get("token_id")
+        if (
+            not isinstance(index, int)
+            or isinstance(index, bool)
+            or not 0 <= index < len(all_token_ids)
+        ):
+            raise RequestValidationError(
+                f"activation checkpoint {name} has an invalid sequence_index"
+            )
+        if token_id != all_token_ids[index]:
+            raise RequestValidationError(
+                f"activation checkpoint {name} token_id does not match the sequence"
+            )
+        expected_offset = None if index < input_length else index - input_length
+        if offset != expected_offset:
+            raise RequestValidationError(
+                f"activation checkpoint {name} generated_token_offset is inconsistent"
+            )
+        shape = checkpoint_shapes[name]
+        if (
+            not isinstance(shape, list)
+            or len(shape) != 2
+            or shape[0] != len(activation["layers"])
+            or any(not isinstance(size, int) or size < 1 for size in shape)
+        ):
+            raise RequestValidationError(
+                f"activation checkpoint {name} has an invalid shape"
+            )
+
+    input_checkpoint = next(
+        checkpoint
+        for checkpoint in checkpoints
+        if checkpoint["name"] == "last_input_token"
+    )
+    if (
+        input_checkpoint["sequence_index"] != input_length - 1
+        or input_checkpoint["token_id"] != result["input_token_ids"][-1]
+    ):
+        raise RequestValidationError(
+            "last_input_token checkpoint must identify the final prompt token"
+        )
+    primary = activation.get("primary_checkpoint")
+    by_name = {checkpoint["name"]: checkpoint for checkpoint in checkpoints}
+    if primary not in by_name:
+        raise RequestValidationError(
+            "activation primary_checkpoint must name a saved checkpoint"
+        )
+    if activation.get("token_id") != by_name[primary]["token_id"]:
+        raise RequestValidationError(
+            "activation primary token_id must match primary_checkpoint"
+        )
+    sequence_length = activation.get("sequence_length")
+    if (
+        not isinstance(sequence_length, int)
+        or isinstance(sequence_length, bool)
+        or sequence_length != max(item["sequence_index"] for item in checkpoints) + 1
+    ):
+        raise RequestValidationError(
+            "activation sequence_length must end at the primary checkpoint"
+        )
+
+
 def validate_generation_result(payload: Any) -> dict[str, Any]:
     """Validate a saved model-turn result without loading Modal or Qwen."""
 
@@ -740,6 +972,7 @@ def validate_generation_result(payload: Any) -> dict[str, Any]:
             raise RequestValidationError(
                 "activation token_position must match the generation request"
             )
+        _validate_activation_checkpoints(activation, result)
     cost = result.get("cost_metadata")
     if cost is not None:
         try:
