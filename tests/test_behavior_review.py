@@ -1,6 +1,6 @@
 """Tests for conservative runway response triage."""
 
-from experiments.build_runway_behavior_review import (
+from src.analysis.behavior_review import (
     expected_target_label,
     explicit_option_mentions,
 )

@@ -1,8 +1,9 @@
 """Summarize construction-grounded safety metrics from trajectory JSONL files.
 
 Usage:
-    python experiments/summarize_trajectories.py trajectories/
-    python experiments/summarize_trajectories.py run1.jsonl run2.jsonl --output summary.json
+    python scripts/90_runway_reproduction/92_summarize_trajectories.py trajectories/
+    python scripts/90_runway_reproduction/92_summarize_trajectories.py \
+        run1.jsonl run2.jsonl --output summary.json
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ import json
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.analysis.trajectory_metrics import (  # noqa: E402
     load_trajectory_jsonl,

@@ -5,7 +5,7 @@ instructions. This script recovers only the deterministic target option label
 and performs strict option-label triage. It does not assign behavioral labels.
 
 Usage:
-    python experiments/build_runway_behavior_review.py
+    python scripts/90_runway_reproduction/90_build_behavior_review.py
 """
 
 from __future__ import annotations
@@ -17,11 +17,8 @@ import json
 from pathlib import Path
 import random
 import re
-import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from experiments.week1_week2_lat_baseline import _find_artifact_root  # noqa: E402
+from src.analysis.runway_artifacts import find_artifact_root
 
 
 OPTION_PATTERN = re.compile(r"\boption\s+([AB12])\b", flags=re.IGNORECASE)
@@ -47,8 +44,8 @@ def build_review_packet(
     output_dir: Path | None = None,
     random_state: int = 42,
 ) -> dict:
-    repo_root = Path(__file__).resolve().parent.parent
-    artifact_root = artifact_root or _find_artifact_root(repo_root)
+    repo_root = Path(__file__).resolve().parents[2]
+    artifact_root = artifact_root or find_artifact_root(repo_root)
     response_path = (
         artifact_root
         / "02_collusion_probe"
@@ -137,9 +134,13 @@ def build_review_packet(
     return limitations
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifact-root", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
     args = parser.parse_args()
     print(json.dumps(build_review_packet(args.artifact_root, args.output_dir), indent=2))
+
+
+if __name__ == "__main__":
+    main()

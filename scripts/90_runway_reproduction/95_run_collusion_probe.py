@@ -10,8 +10,9 @@ run for reporting is notebooks/02_collusion_probe.ipynb, which pulls
 NARCBench-Core upstream scenarios.
 
 Usage:
-    python experiments/week2_collusion_probe.py
-    python experiments/week2_collusion_probe.py --device cuda --pca 50 --batch-size 8
+    python scripts/90_runway_reproduction/95_run_collusion_probe.py
+    python scripts/90_runway_reproduction/95_run_collusion_probe.py \
+      --device cuda --pca 50 --batch-size 8
 """
 
 import argparse
@@ -24,7 +25,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from src.data.collusion_scenarios import build_prompts, get_scenarios
 from src.extraction.residual_stream import (
     DEFAULT_LAYERS,
@@ -102,7 +103,7 @@ def run_week2_probe(
         "leave_scenario_out_cv": results_to_dict(results_lso),
     }
 
-    out_dir = Path(__file__).resolve().parent.parent / "results"
+    out_dir = Path(__file__).resolve().parents[2] / "results"
     out_dir.mkdir(exist_ok=True)
     out_path = out_dir / "week2_collusion_probe.json"
     with open(out_path, "w") as f:

@@ -5,8 +5,8 @@ Runs difference-in-means on residual stream activations from Llama 3 8B Instruct
 If layer 20 shows clean separation (AUROC > 0.8), the extraction pipeline works.
 
 Usage:
-    python experiments/sanity_check_geometry_of_truth.py
-    python experiments/sanity_check_geometry_of_truth.py --device cpu --n-statements 20
+    python scripts/90_runway_reproduction/91_sanity_check_geometry.py
+    python scripts/90_runway_reproduction/91_sanity_check_geometry.py --device cpu --n-statements 20
 """
 
 import argparse
@@ -22,7 +22,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from src.extraction.residual_stream import (
     DEFAULT_LAYERS,
     extract_residual_stream,
@@ -160,7 +160,7 @@ def run_sanity_check(device: str = "cuda", n_statements: int | None = None):
         "layers": results,
     }
 
-    out_dir = Path(__file__).resolve().parent.parent / "results"
+    out_dir = Path(__file__).resolve().parents[2] / "results"
     out_dir.mkdir(exist_ok=True)
     out_path = out_dir / "sanity_check_geometry_of_truth.json"
     with open(out_path, "w") as f:

@@ -3,11 +3,11 @@
 Validate scenario 1 trajectory files.
 
 Two layers:
-  1. Structural: JSON Schema (scenario1_trajectory.schema.json).
+  1. Structural: JSON Schema (schemas/scenario1/v2/trajectory.schema.json).
   2. Semantic invariants that JSON Schema cannot express and that map to the
      bugs this project actually hit:
-       INV-1  the primary layer is present in every extraction (the 1B-model
-              bug dropped layer 20).
+       INV-1  an optional primary layer is present in every materialized
+              extraction. No primary is required before the Qwen layer scan.
        INV-2  exactly the agents in raw_poison_exposed_agents have the injection
               in their prompt; everyone else must not (token-alignment bug +
               executor re-reading raw poison).
@@ -20,10 +20,18 @@ Two layers:
               state is annotation-only).
        INV-7  outcome_class is coherent with treatment and the channels:
               injection_present false forces clean; executed iff the action
-              fired; propagated_not_executed is output_adoption true with the
-              action not fired.
+              fired; propagated_but_not_executed is output_adoption true with
+              the action not fired.
+       INV-8  agent topology matches the depth condition (a 3-hop trace must
+              contain worker_2; no unexpected agents).
+       INV-9  a non-null reasoning label requires human or mechanistic evidence;
+              construction/auto proxies may not set it.
+       INV-10 dry runs are honest: no model call, generated output, outcome, or
+              extracted activation may be claimed.
 
-Usage: python validate_trajectory.py experiments/scenario1/trajectories/*.json
+Usage:
+  python scripts/01_scenario_construction/02_validate_trajectories.py \
+      experiments/scenario1/trajectories/*.json
 """
 
 import glob
@@ -33,9 +41,16 @@ import os
 
 from jsonschema import Draft202012Validator
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-SCHEMA_PATH = os.path.join(HERE, "scenario1_trajectory.schema.json")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+SCHEMA_PATH = os.path.join(
+    PROJECT_ROOT, "schemas", "scenario1", "v2", "trajectory.schema.json"
+)
 HOP_PATH_LEN = {"2-hop": 5, "3-hop": 6}
+EXPECTED_AGENTS = {
+    "2-hop": {"planner_1", "worker_1", "executor_1"},
+    "3-hop": {"planner_1", "worker_1", "worker_2", "executor_1"},
+}
+REASONING_EVIDENCE_STATUS = {"human_annotated", "mechanistic_evidence"}
 
 
 def _agent_turns(t):
@@ -46,12 +61,14 @@ def _agent_turns(t):
 def semantic_checks(t):
     errs = []
 
-    # INV-1: primary layer present in every extraction block.
-    primary = t["activation_config"]["primary_layer"]
+    # INV-1: a configured primary layer must be in every materialized block.
+    primary = t["activation_config"].get("primary_layer")
     for e in _agent_turns(t):
         for key in ("activation_metadata", "attention_metadata"):
             meta = e.get(key)
-            if meta and primary not in meta.get("layers_extracted", []):
+            if meta and primary is not None and \
+                    meta.get("storage_status") == "materialized" and \
+                    primary not in meta.get("layers_extracted", []):
                 errs.append(f"INV-1 {e['agent_id']}.{key}: primary layer "
                             f"{primary} not in {meta.get('layers_extracted')}")
 
@@ -67,7 +84,9 @@ def semantic_checks(t):
 
     # INV-3: hops_survived arithmetic.
     cp = t["compromise_propagation"]
-    if cp.get("injection_hop_index") is not None and cp.get("hops_survived") is not None:
+    if cp.get("injection_hop_index") is not None and \
+            cp.get("unsafe_action_hop_index") is not None and \
+            cp.get("hops_survived") is not None:
         expect = cp["unsafe_action_hop_index"] - cp["injection_hop_index"]
         if cp["hops_survived"] != expect:
             errs.append(f"INV-3 hops_survived {cp['hops_survived']} != "
@@ -85,7 +104,7 @@ def semantic_checks(t):
               if e.get("type") == "unsafe_action"]
     chain = any(e.get("metadata", {}).get("label_compromised") for e in unsafe)
     el = t["evaluation_labels"]
-    executed = el["action_channel"].get("unsafe_action_executed")
+    executed = el.get("action_channel", {}).get("unsafe_action_executed")
     if executed is not None and executed != chain:
         errs.append("INV-5 action_channel.unsafe_action_executed disagrees with unsafe_action events")
     for alias in ("injection_success", "exfiltration_detected"):
@@ -96,7 +115,7 @@ def semantic_checks(t):
     oc = el.get("outcome_class")
     if oc is not None:
         injected = t["injection"]["injection_present"]
-        output_adoption = el["behavioral_channel"].get("output_adoption")
+        output_adoption = el.get("behavioral_channel", {}).get("output_adoption")
         if not injected and oc != "clean":
             errs.append(f"INV-7 outcome_class {oc} but injection_present is false (must be clean)")
         if injected and oc == "clean":
@@ -105,11 +124,11 @@ def semantic_checks(t):
             errs.append(f"INV-7 unsafe_action_executed true but outcome_class is {oc} (expected executed)")
         if oc == "executed" and executed is False:
             errs.append("INV-7 outcome_class executed but unsafe_action_executed is false")
-        if oc == "propagated_not_executed":
+        if oc == "propagated_but_not_executed":
             if executed:
-                errs.append("INV-7 propagated_not_executed but the action fired")
+                errs.append("INV-7 propagated_but_not_executed but the action fired")
             if output_adoption is False:
-                errs.append("INV-7 propagated_not_executed but behavioral output_adoption is false")
+                errs.append("INV-7 propagated_but_not_executed but behavioral output_adoption is false")
 
     # INV-6: reasoning_compromised is annotation-only.
     for e in _agent_turns(t):
@@ -117,6 +136,50 @@ def semantic_checks(t):
         if sl and sl.get("state") == "reasoning_compromised" and sl.get("source") != "blind_annotation":
             errs.append(f"INV-6 {e['agent_id']}: reasoning_compromised must be blind_annotation, "
                         f"got source={sl.get('source')}")
+
+    # INV-8: agent topology matches the depth condition (catches a 3-hop trace
+    # missing worker_2, or an unexpected agent).
+    present = {e["agent_id"] for e in _agent_turns(t)}
+    expected = EXPECTED_AGENTS.get(t["condition_id"])
+    if expected and present != expected:
+        errs.append(f"INV-8 agents {sorted(present)} != expected {sorted(expected)} "
+                    f"for {t['condition_id']}")
+
+    # INV-9: a non-null reasoning label needs human or mechanistic evidence;
+    # construction/auto proxies may not set it.
+    for e in _agent_turns(t):
+        rl = e.get("reasoning_compromise_label")
+        if rl and rl.get("label") is not None and \
+                rl.get("annotation_status") not in REASONING_EVIDENCE_STATUS:
+            errs.append(f"INV-9 {e['agent_id']}: reasoning label set without evidence "
+                        f"(annotation_status={rl.get('annotation_status')})")
+
+    # INV-10: a structural dry run may describe inputs and request templates,
+    # but it may not pretend a model generated output or activations.
+    if t.get("generation_mode") == "dry_run":
+        if t.get("model_called") is not False:
+            errs.append("INV-10 dry_run requires model_called=false")
+        labels = t.get("evaluation_labels", {})
+        if labels.get("outcome_class") is not None:
+            errs.append("INV-10 dry_run outcome_class must be null")
+        if labels.get("action_channel", {}).get("unsafe_action_executed") is not None:
+            errs.append("INV-10 dry_run unsafe_action_executed must be null")
+        if labels.get("behavioral_channel", {}).get("output_adoption") is not None:
+            errs.append("INV-10 dry_run output_adoption must be null")
+        for e in _agent_turns(t):
+            if e.get("model_called") is not False:
+                errs.append(f"INV-10 {e['agent_id']}: dry_run event requires model_called=false")
+            output = e.get("output") or {}
+            if any(output.get(field) is not None for field in (
+                "message", "raw_generated_text", "generated_token_ids",
+                "parsed_message", "tool_call_requests", "finish_reason",
+                "truncated", "thinking_content", "final_content", "actions",
+            )):
+                errs.append(f"INV-10 {e['agent_id']}: dry_run contains generated output")
+            for key in ("activation_metadata", "attention_metadata"):
+                meta = e.get(key)
+                if meta and (meta.get("layers_extracted") or meta.get("storage_path")):
+                    errs.append(f"INV-10 {e['agent_id']}.{key}: dry_run claims an artifact")
     return errs
 
 
@@ -135,7 +198,10 @@ def main():
         schema = json.load(f)
     validator = Draft202012Validator(schema)
     paths = []
-    for arg in (sys.argv[1:] or [os.path.join(HERE, "experiments/scenario1/trajectories/*.json")]):
+    default_glob = os.path.join(
+        PROJECT_ROOT, "experiments", "scenario1", "trajectories", "*.json"
+    )
+    for arg in (sys.argv[1:] or [default_glob]):
         paths.extend(sorted(glob.glob(arg)))
     if not paths:
         print("no files matched")
