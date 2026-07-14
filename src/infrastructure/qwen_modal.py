@@ -601,6 +601,7 @@ def generation_result_to_agent_turn_fields(payload: Any) -> dict[str, Any]:
             "generated_token_ids": list(result["generated_token_ids"]),
             "thinking_content": result["thinking_content"],
             "thinking_complete": result["thinking_complete"],
+            "final_content": result["final_content"],
             "parsed_message": copy.deepcopy(result["parsed_message"]),
             "tool_call_requests": copy.deepcopy(result["tool_call_requests"]),
             "tool_call_parse_errors": copy.deepcopy(

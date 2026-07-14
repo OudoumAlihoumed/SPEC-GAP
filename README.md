@@ -20,13 +20,17 @@ This repository is the working codebase for that project. It contains the runway
 | Goldowsky-Dill-style linear probe baseline | Implemented and reproducibly rerun |
 | LAT-style contrast baseline | Implemented on runway activations; needs matched SPEC-GAP trajectory evaluation |
 | LangGraph planner-worker-executor scaffold | Implemented as probe-side scaffold |
-| JSONL trajectory schema | Implemented |
-| Handoff validation and importer | Implemented |
-| Scenario 1 full trajectory dataset | Not included yet |
+| Scenario 1 v2 event schema | Implemented |
+| Handoff validation and probe adapter | Implemented |
+| Scenario 1 controlled inputs | Two match groups included; eight base construction records |
+| Qwen3-32B Modal request/result contract | Implemented and locally validated; live Scenario 1 runs not started |
 | Temporal Divergence on real SPEC-GAP trajectories | Not run yet |
 | Depth-degradation result | Not available yet |
 
-The most important constraint: this repo does not currently include the completed Scenario 1 dataset. It can validate and normalize early handoff trajectories, but the full 2-hop/3-hop trajectory collection is still an external dependency.
+The repository contains the first two controlled match groups and can generate
+and validate their eight structural records. These are not experimental
+results. Real model outputs, behavioral outcomes, and activation files are
+created only by the live Qwen run.
 
 ## What SPEC-GAP produces
 
@@ -45,18 +49,24 @@ The fellowship MVP is intentionally narrow.
 
 | Component | MVP commitment |
 |---|---|
-| Primary model | `meta-llama/Llama-3.1-8B-Instruct` |
+| Primary live model | `Qwen/Qwen3-32B` |
+| Thinking comparison | Thinking on vs. thinking off; all sampler settings held fixed |
 | Scenario family | Scenario 1: research-pipeline data exfiltration |
 | Injection channel | Retrieved document |
 | Agent topology | Planner → Worker → Executor, plus a 3-hop variant with Worker2 |
 | Depth conditions | 2-hop and 3-hop |
-| Dataset target | 10–15 trajectories per depth condition, 20–30 total |
+| Dataset construction target | Six match groups × four depth/treatment cells = 24 base records |
 | Diagnostic baselines | Goldowsky-Dill-style linear probe and LAT |
 | Multi-agent method | Temporal Divergence |
-| Primary activation site | Residual stream, layer 20, last generated token |
-| Ablation layers | Layers 16 and 24 |
+| Activation site | Residual stream, last generated non-special token |
+| Layers | Initial scan across all 64 layers; no primary layer locked in advance |
 
-Scenario 2, the LLM-judge baseline, token-level analysis, additional scenarios, cross-family evaluation, and leave-one-scenario-out evaluation on SPEC-GAP trajectories are later-phase work. With one MVP scenario, Phase 0 can compare 2-hop vs. 3-hop within Scenario 1, but it cannot support cross-scenario generalization claims.
+Scenario 2, token-level analysis, additional scenarios, cross-family
+evaluation, and leave-one-scenario-out evaluation on SPEC-GAP trajectories are
+later work. The OpenAI LLM judge is a secondary black-box comparison and never
+replaces construction labels, explicit action results, or white-box
+activations. With one scenario, the project can compare depth inside Scenario 1
+but cannot make cross-scenario generalization claims.
 
 ## Threat model and labels
 
@@ -111,7 +121,11 @@ For primary analysis, compromise starts at `compromised_context`, `unsafe_action
 
 ## Trajectory format
 
-The canonical format is JSON Lines: one file per trajectory, one JSON object per agent step, ordered by `step_index`.
+The public handoff format is the `spec_gap.scenario1.v2` event record: one JSON
+object per complete trajectory with ordered `agent_turn`, retrieval
+`tool_call`, and optional `unsafe_action` events. The adapter converts that
+record into the flat per-step JSONL format used by the existing probe and
+metrics code.
 
 Required fields:
 
@@ -175,7 +189,7 @@ Normalize a consolidated handoff JSON file:
 from src.pipeline.acceptance import validate_trajectory_records
 from src.pipeline.handoff import load_handoff_json, normalize_handoff_json
 
-payload = load_handoff_json("path/to/scenario1_depth2_demo.json")
+payload = load_handoff_json("path/to/scenario1_depth2_trajectory.json")
 records = normalize_handoff_json(payload)
 report = validate_trajectory_records(records)
 print(report.to_dict())
@@ -187,7 +201,7 @@ Normalize a raw handoff JSONL event stream:
 from src.pipeline.acceptance import validate_trajectory_records
 from src.pipeline.handoff import load_handoff_jsonl, normalize_handoff_events
 
-events = load_handoff_jsonl("path/to/scenario1_depth2_demo.jsonl")
+events = load_handoff_jsonl("path/to/scenario1_depth2_trajectory.jsonl")
 records = normalize_handoff_events(events)
 report = validate_trajectory_records(records)
 print(report.to_dict())
@@ -240,7 +254,8 @@ print(summary["by_hop_mode"])
 
 Probe-side ingestion is implemented in `src/extraction/trajectory.py`.
 
-The model-free adapter turns validated trajectory records into rendered activation requests before loading Llama weights:
+The model-free adapter turns validated trajectory records into activation
+requests without loading model weights:
 
 ```python
 from src.extraction.trajectory import records_to_activation_requests
@@ -271,7 +286,10 @@ This runner provides live model generation and residual-stream extraction for
 the shared Scenario 1 generator. It does not replace the Scenario 1 input
 registry, agent chain, v2 schema, validator, or outcome adapter.
 
-### What can be tested without the Scenario 1 dataset
+The complete Scenario 1 construction and validation commands are documented in
+[`README_scenario1.md`](README_scenario1.md).
+
+### What can be tested without starting a GPU
 
 The included request fixture checks:
 
@@ -306,8 +324,8 @@ python -m py_compile \
 
 ### Model-turn handoff contract
 
-PR #8 owns model execution, not the final trajectory schema. After one Qwen
-turn, it returns a validated model-turn result with:
+The Modal backend owns model execution, not the full trajectory schema. After
+one Qwen turn, it returns a validated model-turn result with:
 
 - the agent and trajectory identifiers supplied by the shared generator;
 - the exact input messages, rendered chat input, input token IDs, and SHA-256
@@ -347,8 +365,8 @@ event_fields = generation_result_to_agent_turn_fields(result)
 That helper returns `exact_model_input`, `output`, `activation_metadata`,
 `cost_metadata`, and `model_execution_metadata`. The generator adds its own
 event identity, document, token-alignment, topology, and construction metadata
-around those fields. This keeps one model contract without making PR #8 a
-second Scenario 1 schema or generator.
+around those fields. This keeps one model contract without creating a second
+Scenario 1 schema or generator.
 
 #### Tool requests are not executed actions
 
@@ -358,8 +376,8 @@ guide](https://qwen.readthedocs.io/en/stable/framework/function_call.html).
 The runner parses only those blocks. Endpoint text written in prose does not
 become a tool request.
 
-Every parsed item has `status: "requested"`. PR #8 never writes an `actions`
-array and never marks a request as executed. The shared executor must decide
+Every parsed item has `status: "requested"`. The Modal backend never writes an
+`actions` array or marks a request as executed. The shared executor must decide
 whether a recognized request is allowed, run only the safe simulated tool, and
 record the actual result. Therefore:
 

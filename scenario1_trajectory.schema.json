@@ -12,10 +12,13 @@
     "scenario_id",
     "condition_id",
     "delegation_depth",
+    "generation_mode",
+    "model_called",
     "hop_path",
     "model",
     "activation_config",
     "task",
+    "document_set",
     "injection",
     "compromise_propagation",
     "trajectory_trace",
@@ -74,6 +77,10 @@
         "dry_run"
       ]
     },
+    "model_called": {
+      "type": "boolean",
+      "description": "False for structural dry runs and true only after a real model call."
+    },
     "hop_path": {
       "type": "array",
       "items": {
@@ -98,6 +105,33 @@
         },
         "expected_benign_behavior": {
           "type": "string"
+        }
+      }
+    },
+    "document_set": {
+      "type": "object",
+      "required": [
+        "document_set_id",
+        "documents"
+      ],
+      "properties": {
+        "document_set_id": {
+          "type": "string"
+        },
+        "documents": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["doc_id", "role", "text"],
+            "properties": {
+              "doc_id": {"type": "string"},
+              "title": {"type": "string"},
+              "role": {"enum": ["benign", "injection_carrier"]},
+              "text": {"type": "string"}
+            }
+          }
         }
       }
     },
@@ -189,7 +223,10 @@
             "integer",
             "null"
           ],
-          "description": "Confirmed against the loaded config. Qwen/Qwen2.5-32B-Instruct is 64 layers, not the 8B's 32; the probe/FIS layer choices and activation_config.primary_layer must be re-derived for 64 layers."
+          "description": "Confirmed against the loaded Qwen3-32B config. No primary probe layer is locked before the layer scan."
+        },
+        "thinking_mode": {
+          "enum": ["on", "off", null]
         },
         "decoding_settings": {
           "type": "object",
@@ -205,6 +242,15 @@
             },
             "top_p": {
               "type": "number"
+            },
+            "top_k": {
+              "type": "integer"
+            },
+            "min_p": {
+              "type": "number"
+            },
+            "seed": {
+              "type": "integer"
             }
           }
         }
@@ -214,7 +260,6 @@
       "type": "object",
       "required": [
         "layers",
-        "primary_layer",
         "artifact_root"
       ],
       "properties": {
@@ -226,7 +271,8 @@
           "minItems": 1
         },
         "primary_layer": {
-          "type": "integer"
+          "type": ["integer", "null"],
+          "description": "Optional analysis choice. Null until the layer scan provides enough signal."
         },
         "artifact_root": {
           "type": "string"
@@ -337,7 +383,7 @@
           ]
         },
         "unsafe_action_hop_index": {
-          "type": "integer"
+          "type": ["integer", "null"]
         },
         "hops_survived": {
           "type": [
@@ -358,7 +404,7 @@
           ]
         },
         "chain_completed": {
-          "type": "boolean"
+          "type": ["boolean", "null"]
         },
         "propagation_trace": {
           "type": "array"
@@ -435,6 +481,9 @@
             "annotation_status"
           ],
           "properties": {
+            "label": {
+              "type": ["boolean", "null"]
+            },
             "final_hop_label": {
               "type": [
                 "boolean",
@@ -450,7 +499,10 @@
           }
         },
         "outcome_class": {
-          "$ref": "#/$defs/outcome_class"
+          "oneOf": [
+            {"$ref": "#/$defs/outcome_class"},
+            {"type": "null"}
+          ]
         },
         "injection_success": {
           "type": "boolean",
@@ -527,7 +579,7 @@
     "extraction_metadata": {
       "type": "object",
       "required": [
-        "primary_layer",
+        "requested_layers",
         "layers_extracted",
         "storage_path",
         "storage_status"
@@ -543,7 +595,13 @@
           "type": "string"
         },
         "primary_layer": {
-          "type": "integer"
+          "type": ["integer", "null"]
+        },
+        "requested_layers": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
         },
         "layers_extracted": {
           "type": "array",
@@ -607,7 +665,7 @@
       ],
       "properties": {
         "label": {
-          "type": "boolean"
+          "type": ["boolean", "null"]
         },
         "method": {
           "type": "string"
@@ -700,7 +758,8 @@
         "source": {
           "enum": [
             "auto_derived_proxy",
-            "blind_annotation"
+            "blind_annotation",
+            "construction_metadata"
           ]
         },
         "note": {
@@ -751,7 +810,14 @@
         "agent_role",
         "agent_id",
         "hop_index",
+        "input",
         "output",
+        "generation_mode",
+        "model_called",
+        "token_alignment",
+        "activation_metadata",
+        "behavioral_compromise_label",
+        "reasoning_compromise_label",
         "step_index",
         "metadata"
       ],
@@ -793,11 +859,51 @@
         "output": {
           "type": "object",
           "required": [
-            "message"
+            "message",
+            "raw_generated_text",
+            "generated_token_ids",
+            "parsed_message",
+            "tool_call_requests",
+            "finish_reason",
+            "truncated",
+            "thinking_content",
+            "thinking_complete",
+            "final_content"
           ],
           "properties": {
             "message": {
-              "type": "string"
+              "type": ["string", "null"]
+            },
+            "raw_generated_text": {
+              "type": ["string", "null"]
+            },
+            "generated_token_ids": {
+              "type": ["array", "null"],
+              "items": {"type": "integer"}
+            },
+            "parsed_message": {
+              "type": ["object", "null"]
+            },
+            "tool_call_requests": {
+              "type": ["array", "null"]
+            },
+            "tool_call_parse_errors": {
+              "type": ["array", "null"]
+            },
+            "finish_reason": {
+              "type": ["string", "null"]
+            },
+            "truncated": {
+              "type": ["boolean", "null"]
+            },
+            "thinking_content": {
+              "type": ["string", "null"]
+            },
+            "thinking_complete": {
+              "type": ["boolean", "null"]
+            },
+            "final_content": {
+              "type": ["string", "null"]
             },
             "usage": {
               "type": "object"
@@ -806,7 +912,7 @@
               "type": "object"
             },
             "actions": {
-              "type": "array",
+              "type": ["array", "null"],
               "items": {
                 "type": "object"
               }
@@ -815,6 +921,18 @@
         },
         "token_alignment": {
           "$ref": "#/$defs/token_alignment"
+        },
+        "generation_mode": {
+          "enum": ["real", "dry_run"]
+        },
+        "model_called": {
+          "type": "boolean"
+        },
+        "model_execution_metadata": {
+          "type": "object"
+        },
+        "cost_metadata": {
+          "type": ["object", "null"]
         },
         "activation_metadata": {
           "$ref": "#/$defs/extraction_metadata"

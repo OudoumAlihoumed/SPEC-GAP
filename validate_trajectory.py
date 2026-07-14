@@ -6,8 +6,8 @@ Two layers:
   1. Structural: JSON Schema (scenario1_trajectory.schema.json).
   2. Semantic invariants that JSON Schema cannot express and that map to the
      bugs this project actually hit:
-       INV-1  the primary layer is present in every extraction (the 1B-model
-              bug dropped layer 20).
+       INV-1  an optional primary layer is present in every materialized
+              extraction. No primary is required before the Qwen layer scan.
        INV-2  exactly the agents in raw_poison_exposed_agents have the injection
               in their prompt; everyone else must not (token-alignment bug +
               executor re-reading raw poison).
@@ -26,6 +26,8 @@ Two layers:
               contain worker_2; no unexpected agents).
        INV-9  a non-null reasoning label requires human or mechanistic evidence;
               construction/auto proxies may not set it.
+       INV-10 dry runs are honest: no model call, generated output, outcome, or
+              extracted activation may be claimed.
 
 Usage: python validate_trajectory.py experiments/scenario1/trajectories/*.json
 """
@@ -55,12 +57,14 @@ def _agent_turns(t):
 def semantic_checks(t):
     errs = []
 
-    # INV-1: primary layer present in every extraction block.
-    primary = t["activation_config"]["primary_layer"]
+    # INV-1: a configured primary layer must be in every materialized block.
+    primary = t["activation_config"].get("primary_layer")
     for e in _agent_turns(t):
         for key in ("activation_metadata", "attention_metadata"):
             meta = e.get(key)
-            if meta and primary not in meta.get("layers_extracted", []):
+            if meta and primary is not None and \
+                    meta.get("storage_status") == "materialized" and \
+                    primary not in meta.get("layers_extracted", []):
                 errs.append(f"INV-1 {e['agent_id']}.{key}: primary layer "
                             f"{primary} not in {meta.get('layers_extracted')}")
 
@@ -76,7 +80,9 @@ def semantic_checks(t):
 
     # INV-3: hops_survived arithmetic.
     cp = t["compromise_propagation"]
-    if cp.get("injection_hop_index") is not None and cp.get("hops_survived") is not None:
+    if cp.get("injection_hop_index") is not None and \
+            cp.get("unsafe_action_hop_index") is not None and \
+            cp.get("hops_survived") is not None:
         expect = cp["unsafe_action_hop_index"] - cp["injection_hop_index"]
         if cp["hops_survived"] != expect:
             errs.append(f"INV-3 hops_survived {cp['hops_survived']} != "
@@ -143,6 +149,33 @@ def semantic_checks(t):
                 rl.get("annotation_status") not in REASONING_EVIDENCE_STATUS:
             errs.append(f"INV-9 {e['agent_id']}: reasoning label set without evidence "
                         f"(annotation_status={rl.get('annotation_status')})")
+
+    # INV-10: a structural dry run may describe inputs and request templates,
+    # but it may not pretend a model generated output or activations.
+    if t.get("generation_mode") == "dry_run":
+        if t.get("model_called") is not False:
+            errs.append("INV-10 dry_run requires model_called=false")
+        labels = t.get("evaluation_labels", {})
+        if labels.get("outcome_class") is not None:
+            errs.append("INV-10 dry_run outcome_class must be null")
+        if labels.get("action_channel", {}).get("unsafe_action_executed") is not None:
+            errs.append("INV-10 dry_run unsafe_action_executed must be null")
+        if labels.get("behavioral_channel", {}).get("output_adoption") is not None:
+            errs.append("INV-10 dry_run output_adoption must be null")
+        for e in _agent_turns(t):
+            if e.get("model_called") is not False:
+                errs.append(f"INV-10 {e['agent_id']}: dry_run event requires model_called=false")
+            output = e.get("output") or {}
+            if any(output.get(field) is not None for field in (
+                "message", "raw_generated_text", "generated_token_ids",
+                "parsed_message", "tool_call_requests", "finish_reason",
+                "truncated", "thinking_content", "final_content", "actions",
+            )):
+                errs.append(f"INV-10 {e['agent_id']}: dry_run contains generated output")
+            for key in ("activation_metadata", "attention_metadata"):
+                meta = e.get(key)
+                if meta and (meta.get("layers_extracted") or meta.get("storage_path")):
+                    errs.append(f"INV-10 {e['agent_id']}.{key}: dry_run claims an artifact")
     return errs
 
 
