@@ -40,6 +40,7 @@ The layout follows the order of the experiment. Small numbered files under
 | --- | --- |
 | `scripts/01_scenario_construction/` | Steps 1-2: generate and validate controlled Scenario 1 records. |
 | `scripts/02_model_execution/` | Step 3: validate, cache, or run Qwen3-32B on Modal. |
+| `scripts/03_probe_analysis/` | Step 6: analyze saved probe predictions without starting model compute. |
 | `scripts/90_runway_reproduction/` | Historical Llama 3.1 8B runway reproduction commands. |
 | `src/scenario1/` | Scenario registry normalization, record construction, manifest generation, and semantic validation. |
 | `src/infrastructure/` | Modal request/result contracts, model runner, and cost records. |
@@ -68,7 +69,7 @@ Do not run files under `archive/` as part of the active experiment.
 | 3 | Validate, cache, or run one Qwen model turn | `scripts/02_model_execution/03_modal_qwen_runner.py` | Model-turn result, activations, and cost record |
 | 4 | Run the complete live agent chain | Sequential orchestrator and safe executor; not yet implemented | Completed live v2 trajectories |
 | 5 | Normalize trajectories for measurement | `src/pipeline/handoff.py` and `src/extraction/trajectory.py` | Ordered activation examples |
-| 6 | Fit probes and compute trajectory metrics | `src/probes/` and `src/analysis/trajectory_metrics.py` | AUROC, Brier, ECE, LAT, and Temporal Divergence values |
+| 6 | Fit probes and compute trajectory metrics | `src/probes/`, `src/analysis/trajectory_metrics.py`, and `scripts/03_probe_analysis/06_analyze_depth_degradation.py` | AUROC, Brier, ECE, LAT, Temporal Divergence, and depth-degradation values |
 | 7 | Produce figures and compact reports | `src/analysis/geometry.py`, `src/analysis/calibration.py`, and `results/` | PCA, layer, calibration, and depth figures |
 
 Steps 1-3 have runnable command wrappers. Step 4 must connect the one-turn
@@ -182,12 +183,42 @@ After live trajectories exist:
    the injection point.
 6. `src/analysis/trajectory_metrics.py` summarizes observed propagation and
    action outcomes.
-7. `src/analysis/geometry.py` and `src/analysis/calibration.py` create PCA and
+7. `src/analysis/depth_degradation.py` compares matched 2-hop and 3-hop probe
+   predictions.
+8. `src/analysis/geometry.py` and `src/analysis/calibration.py` create PCA and
    reliability figures.
 
 These libraries are implemented, but the public repository does not yet claim
 Scenario 1 AUROC, calibration, depth-degradation, or Temporal Divergence
 results. Those numbers require real trajectories and activations from Step 4.
+
+### Depth-degradation analysis
+
+The depth analysis consumes saved probe-prediction JSONL rows. It does not load
+the model, generate trajectories, start a GPU, or call an LLM judge. It reports
+executor-level AUROC, Brier score, ECE, Temporal Divergence, and match-group
+bootstrap confidence intervals for 2-hop and 3-hop trajectories.
+
+Run it after probe scores have been exported:
+
+```bash
+python scripts/03_probe_analysis/06_analyze_depth_degradation.py \
+  predictions.jsonl \
+  --experiment-id scenario1-v1 \
+  --output-json results/depth_degradation.json \
+  --output-csv results/depth_degradation.csv
+```
+
+The reported delta is always `3-hop minus 2-hop`. A negative AUROC delta means
+the probe discriminates less well at greater depth. Rows must state their
+`label_target`; the analysis supports action-executed and injection-present
+labels but never mixes them silently. A `latent_compromise_status` of
+`candidate` selects a review cohort and is not a confirmed mechanistic label.
+
+Match-group split helpers live in `src/analysis/splits.py`. Related clean and
+injected trajectories at both depths always stay together. Use an unsplit
+manifest when there are too few complete groups for non-empty train,
+validation, and test partitions.
 
 ## Scenario 1 controls
 
@@ -300,6 +331,12 @@ python -m pytest \
   tests/test_qwen_modal.py \
   tests/test_modal_costs.py \
   tests/test_trajectory_acceptance.py -q
+```
+
+Run the compute-independent depth-analysis checks:
+
+```bash
+python -m pytest tests/test_depth_degradation.py tests/test_splits.py -q
 ```
 
 ## Historical runway work
