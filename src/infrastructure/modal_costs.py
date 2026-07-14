@@ -28,6 +28,25 @@ class CostRecordValidationError(ValueError):
     """Raised when a local cost or token-usage record is inconsistent."""
 
 
+def resolve_modal_input_id(
+    input_id: str | None,
+    function_call_id: str | None,
+) -> str:
+    """Choose a safe Modal identifier for a per-input cost artifact.
+
+    Modal may not expose ``current_input_id()`` inside every class method. In
+    that case, the function-call ID still gives the invocation a stable,
+    collision-resistant name. Invalid values are never written into a path.
+    """
+
+    for value in (input_id, function_call_id):
+        if isinstance(value, str) and _SAFE_ID.fullmatch(value):
+            return value
+    raise CostRecordValidationError(
+        "Modal did not provide a safe input ID or function-call ID"
+    )
+
+
 def _non_negative_int(value: Any, field: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
         raise CostRecordValidationError(f"{field} must be a non-negative integer")

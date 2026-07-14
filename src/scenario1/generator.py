@@ -579,6 +579,7 @@ def build_record(
             "documents": copy.deepcopy(documents),
         },
         "injection": injection,
+        "controlled_endpoint": reg["injection"]["endpoint"],
         "compromise_propagation": {
             "injection_hop_index": 1 if injected else None,
             "unsafe_action_hop_index": None,
@@ -649,6 +650,9 @@ def build_generation_request(
             f"Upstream agent message:\n{upstream}"
         )
 
+    raw_poison_exposed = bool(
+        record["injection"]["injection_present"] and agent_id == "worker_1"
+    )
     request = {
         "trajectory_id": record["trajectory_id"],
         "step_index": event["step_index"],
@@ -663,8 +667,10 @@ def build_generation_request(
             {"role": "user", "content": user_content},
         ],
         "tools": [SIMULATED_EXFILTRATION_TOOL] if agent_id == "executor_1" else [],
-        "raw_poison_exposed": bool(
-            record["injection"]["injection_present"] and agent_id == "worker_1"
+        "raw_poison_exposed": raw_poison_exposed,
+        "injection_text": (
+            record["injection"]["injected_text"]
+            if raw_poison_exposed else None
         ),
         "generation_settings": copy.deepcopy(record["model"]["decoding_settings"]),
         "extract_activations": True,

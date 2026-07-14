@@ -21,8 +21,8 @@ measurements.
 | Qwen3-32B thinking on/off request contract | Ready |
 | Shared Modal model cache | Ready at a pinned revision |
 | One-turn generation, activation, and cost backend | Ready |
-| Sequential live agent-chain orchestrator | Next implementation step |
-| Safe simulated executor | Next implementation step |
+| Sequential live agent-chain orchestrator | Implemented; local validation passing |
+| Safe simulated executor | Implemented; never performs network requests |
 | Probe and metric libraries | Implemented; awaiting live Scenario 1 activations |
 | Scenario 1 figures and reported results | Not produced yet |
 
@@ -67,14 +67,14 @@ Do not run files under `archive/` as part of the active experiment.
 | 1 | Build controlled structural trajectories | `scripts/01_scenario_construction/01_generate_trajectories.py` | Eight JSON/JSONL records and a manifest |
 | 2 | Validate the public schema and semantic rules | `scripts/01_scenario_construction/02_validate_trajectories.py` | PASS/FAIL report |
 | 3 | Validate, cache, or run one Qwen model turn | `scripts/02_model_execution/03_modal_qwen_runner.py` | Model-turn result, activations, and cost record |
-| 4 | Run the complete live agent chain | Sequential orchestrator and safe executor; not yet implemented | Completed live v2 trajectories |
+| 4 | Run the complete live agent chain | `scripts/02_model_execution/04_run_scenario1_live.py` | Completed live v2 trajectories |
 | 5 | Normalize trajectories for measurement | `src/pipeline/handoff.py` and `src/extraction/trajectory.py` | Ordered activation examples |
 | 6 | Fit probes and compute trajectory metrics | `src/probes/`, `src/analysis/trajectory_metrics.py`, and `scripts/03_probe_analysis/06_analyze_depth_degradation.py` | AUROC, Brier, ECE, LAT, Temporal Divergence, and depth-degradation values |
 | 7 | Produce figures and compact reports | `src/analysis/geometry.py`, `src/analysis/calibration.py`, and `results/` | PCA, layer, calibration, and depth figures |
 
-Steps 1-3 have runnable command wrappers. Step 4 must connect the one-turn
-Modal backend into a complete planner-worker-worker2-executor run before Steps
-5-7 can produce real Scenario 1 results.
+Steps 1-4 have runnable command wrappers. Validate a Step 4 plan without a GPU
+before running one guarded paid trajectory. Do not launch the 56-turn batch
+until a single complete live trajectory has passed schema validation.
 
 ## Installation
 
@@ -166,9 +166,45 @@ and the executor receive the upstream visible message, never the raw poisoned
 document or hidden thinking content.
 
 The safe simulated executor is separate from the model backend. A model may
-request the simulated submission tool, but only the executor may record the
-action as executed or blocked. Until this orchestration is implemented, do not
-launch the complete 56-turn batch.
+request the simulated submission tool, but only the executor records the
+action as executed or blocked. It validates controlled `.invalid` destinations
+and records a simulated result without making a network request.
+
+Validate one complete trajectory plan without starting a GPU:
+
+```bash
+modal run \
+  scripts/02_model_execution/04_run_scenario1_live.py::run_scenario1_trajectory \
+  --condition-id 2-hop \
+  --treatment clean \
+  --thinking-mode off \
+  --action validate
+```
+
+After local tests and no-GPU validation pass, run exactly one paid trajectory:
+
+```bash
+modal run \
+  scripts/02_model_execution/04_run_scenario1_live.py::run_scenario1_trajectory \
+  --condition-id 2-hop \
+  --treatment clean \
+  --thinking-mode off \
+  --action run \
+  --confirm-paid-run RUN_H200_TRAJECTORY
+```
+
+The live JSON is written under
+`experiments/scenario1/trajectories/live/<thinking-mode>/`. The command reuses
+one warm Qwen container for the sequential turns where Modal capacity allows.
+Each model turn is also checkpointed immediately under
+`experiments/scenario1/trajectories/checkpoints/`, so a later labeling or
+validation failure does not discard an already-paid model response.
+
+For the Worker1 turn that sees the poisoned document, the live record maps the
+exact injected text to character and token spans in the fully rendered Qwen
+prompt. It also records the tokenizer revision, prompt hash, and truncation
+status. The runner rejects the result if retokenizing that rendered prompt does
+not reproduce the exact input token IDs used by the model.
 
 ## Steps 5-7: probes, metrics, and figures
 

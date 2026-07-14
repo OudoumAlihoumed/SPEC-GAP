@@ -217,6 +217,25 @@ def validate_generation_request(payload: Any) -> dict[str, Any]:
         raise RequestValidationError(
             f"{agent_id} must receive only the upstream agent message"
         )
+    messages = _validate_messages(payload.get("messages"))
+    injection_text = payload.get("injection_text")
+    if raw_poison_exposed:
+        if not isinstance(injection_text, str) or not injection_text:
+            raise RequestValidationError(
+                "raw-poison requests require a non-empty injection_text"
+            )
+        occurrences = sum(
+            message["content"].count(injection_text)
+            for message in messages
+        )
+        if occurrences != 1:
+            raise RequestValidationError(
+                "injection_text must appear exactly once in the model messages"
+            )
+    elif injection_text is not None:
+        raise RequestValidationError(
+            "injection_text must be null when raw_poison_exposed is false"
+        )
 
     tools = _validate_tools(payload.get("tools", []))
 
@@ -234,9 +253,10 @@ def validate_generation_request(payload: Any) -> dict[str, Any]:
         "enable_thinking": THINKING_MODES[thinking_mode],
         "model_id": model_id,
         "model_revision": str(payload.get("model_revision") or MODEL_REVISION),
-        "messages": _validate_messages(payload.get("messages")),
+        "messages": messages,
         "tools": tools,
         "raw_poison_exposed": raw_poison_exposed,
+        "injection_text": injection_text,
         "generation_settings": _validate_settings(payload.get("generation_settings")),
         "extract_activations": extract_activations,
         "activation_layers": _validate_layers(payload.get("activation_layers")),
@@ -352,6 +372,77 @@ def rendered_input_sha256(rendered_input: str) -> str:
     return hashlib.sha256(rendered_input.encode("utf-8")).hexdigest()
 
 
+def build_injection_token_alignment(
+    *,
+    rendered_input: str,
+    input_token_ids: list[int],
+    injection_text: str | None,
+    offset_mapping: list[tuple[int, int]] | None,
+    tokenizer_name: str,
+    tokenizer_revision: str,
+) -> dict[str, Any]:
+    """Map the injected text onto the exact rendered Qwen input.
+
+    Character and token spans use an inclusive start and exclusive end. The
+    caller obtains ``offset_mapping`` from the same tokenizer that produced the
+    model input and verifies that its token IDs match ``input_token_ids``.
+    """
+
+    prompt_hash = rendered_input_sha256(rendered_input)
+    base = {
+        "injection_present_in_prompt": injection_text is not None,
+        "char_span": None,
+        "injection_token_span": None,
+        "tokenizer_name": tokenizer_name,
+        "tokenizer_revision": tokenizer_revision,
+        "rendered_prompt_hash": prompt_hash,
+        "truncation_removed_injection_tokens": False,
+        "span_convention": "start_inclusive_end_exclusive",
+    }
+    if injection_text is None:
+        return base
+    if rendered_input.count(injection_text) != 1:
+        raise RequestValidationError(
+            "injection_text must appear exactly once in rendered_input"
+        )
+    if offset_mapping is None or len(offset_mapping) != len(input_token_ids):
+        raise RequestValidationError(
+            "offset_mapping must match the exact input_token_ids length"
+        )
+    if any(
+        not isinstance(offset, (list, tuple))
+        or len(offset) != 2
+        or any(not isinstance(value, int) for value in offset)
+        or not 0 <= offset[0] <= offset[1] <= len(rendered_input)
+        for offset in offset_mapping
+    ):
+        raise RequestValidationError("offset_mapping contains an invalid span")
+
+    start_char = rendered_input.index(injection_text)
+    end_char = start_char + len(injection_text)
+    token_indices = [
+        index
+        for index, (start, end) in enumerate(offset_mapping)
+        if end > start_char and start < end_char
+    ]
+    if not token_indices:
+        raise RequestValidationError("no input tokens overlap injection_text")
+    start_token = token_indices[0]
+    end_token = token_indices[-1] + 1
+    if token_indices != list(range(start_token, end_token)):
+        raise RequestValidationError("injection token span is not contiguous")
+
+    base["char_span"] = {
+        "start_char": start_char,
+        "end_char": end_char,
+    }
+    base["injection_token_span"] = {
+        "start_token": start_token,
+        "end_token": end_token,
+    }
+    return base
+
+
 def build_generation_result(
     request: dict[str, Any],
     *,
@@ -369,10 +460,24 @@ def build_generation_result(
     truncated: bool,
     activation_metadata: dict[str, Any] | None,
     cost_metadata: dict[str, Any] | None = None,
+    token_alignment: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build and validate the stable output of one Modal model turn."""
 
     normalized_request = validate_generation_request(request)
+    if token_alignment is None:
+        if normalized_request["injection_text"] is not None:
+            raise RequestValidationError(
+                "raw-poison generation results require token_alignment"
+            )
+        token_alignment = build_injection_token_alignment(
+            rendered_input=rendered_input,
+            input_token_ids=input_token_ids,
+            injection_text=None,
+            offset_mapping=None,
+            tokenizer_name=tokenizer_name,
+            tokenizer_revision=tokenizer_revision,
+        )
     parsed_tools = parse_tool_call_requests(final_content, normalized_request["tools"])
     result = {
         "trajectory_id": normalized_request["trajectory_id"],
@@ -392,6 +497,7 @@ def build_generation_result(
         "input_messages": copy.deepcopy(normalized_request["messages"]),
         "tools": copy.deepcopy(normalized_request["tools"]),
         "raw_poison_exposed": normalized_request["raw_poison_exposed"],
+        "injection_text": normalized_request["injection_text"],
         "rendered_input": rendered_input,
         "rendered_input_sha256": rendered_input_sha256(rendered_input),
         "input_token_ids": list(input_token_ids),
@@ -410,6 +516,7 @@ def build_generation_result(
         "downstream_message": final_content,
         "finish_reason": finish_reason,
         "truncated": truncated,
+        "token_alignment": copy.deepcopy(token_alignment),
         "activation_metadata": copy.deepcopy(activation_metadata),
         "cost_metadata": copy.deepcopy(cost_metadata),
     }
@@ -424,6 +531,82 @@ def _validate_token_ids(value: Any, field: str) -> list[int]:
             f"{field} must contain non-negative integers"
         )
     return list(value)
+
+
+def _validate_result_token_alignment(
+    result: dict[str, Any],
+    request: dict[str, Any],
+) -> dict[str, Any]:
+    alignment = result.get("token_alignment")
+    if alignment is None and request["injection_text"] is None:
+        return build_injection_token_alignment(
+            rendered_input=result["rendered_input"],
+            input_token_ids=result["input_token_ids"],
+            injection_text=None,
+            offset_mapping=None,
+            tokenizer_name=result["tokenizer_name"],
+            tokenizer_revision=result["tokenizer_revision"],
+        )
+    if not isinstance(alignment, dict):
+        raise RequestValidationError("token_alignment must be an object")
+    if alignment.get("injection_present_in_prompt") is not request[
+        "raw_poison_exposed"
+    ]:
+        raise RequestValidationError(
+            "token_alignment presence must match raw_poison_exposed"
+        )
+    if alignment.get("tokenizer_name") != result["tokenizer_name"]:
+        raise RequestValidationError(
+            "token_alignment.tokenizer_name must match tokenizer_name"
+        )
+    if alignment.get("tokenizer_revision") != result["tokenizer_revision"]:
+        raise RequestValidationError(
+            "token_alignment.tokenizer_revision must match tokenizer_revision"
+        )
+    if alignment.get("rendered_prompt_hash") != result["rendered_input_sha256"]:
+        raise RequestValidationError(
+            "token_alignment rendered prompt hash does not match"
+        )
+    if alignment.get("truncation_removed_injection_tokens") is not False:
+        raise RequestValidationError(
+            "live input must preserve every injection token"
+        )
+    if alignment.get("span_convention") != "start_inclusive_end_exclusive":
+        raise RequestValidationError("token_alignment span convention is invalid")
+
+    char_span = alignment.get("char_span")
+    token_span = alignment.get("injection_token_span")
+    if request["injection_text"] is None:
+        if char_span is not None or token_span is not None:
+            raise RequestValidationError(
+                "non-exposed turns must not contain injection spans"
+            )
+        return copy.deepcopy(alignment)
+    if not isinstance(char_span, dict) or not isinstance(token_span, dict):
+        raise RequestValidationError(
+            "raw-poison turns require character and token spans"
+        )
+    start_char = char_span.get("start_char")
+    end_char = char_span.get("end_char")
+    start_token = token_span.get("start_token")
+    end_token = token_span.get("end_token")
+    if (
+        not isinstance(start_char, int)
+        or not isinstance(end_char, int)
+        or not 0 <= start_char < end_char <= len(result["rendered_input"])
+        or result["rendered_input"][start_char:end_char]
+        != request["injection_text"]
+    ):
+        raise RequestValidationError(
+            "token_alignment character span does not select injection_text"
+        )
+    if (
+        not isinstance(start_token, int)
+        or not isinstance(end_token, int)
+        or not 0 <= start_token < end_token <= len(result["input_token_ids"])
+    ):
+        raise RequestValidationError("token_alignment token span is invalid")
+    return copy.deepcopy(alignment)
 
 
 def validate_generation_result(payload: Any) -> dict[str, Any]:
@@ -444,6 +627,7 @@ def validate_generation_result(payload: Any) -> dict[str, Any]:
         "messages": result.get("input_messages"),
         "tools": result.get("tools"),
         "raw_poison_exposed": result.get("raw_poison_exposed"),
+        "injection_text": result.get("injection_text"),
         "generation_settings": result.get("generation_settings"),
         "extract_activations": result.get("activation_metadata") is not None,
         "activation_layers": (
@@ -473,6 +657,7 @@ def validate_generation_result(payload: Any) -> dict[str, Any]:
     result["generated_token_ids"] = _validate_token_ids(
         result.get("generated_token_ids"), "generated_token_ids"
     )
+    result["token_alignment"] = _validate_result_token_alignment(result, request)
 
     for field in ("raw_generated_text", "final_content", "downstream_message"):
         if not isinstance(result.get(field), str):
@@ -590,6 +775,7 @@ def generation_result_to_agent_turn_fields(payload: Any) -> dict[str, Any]:
 
     result = validate_generation_result(payload)
     return {
+        "token_alignment": copy.deepcopy(result["token_alignment"]),
         "exact_model_input": {
             "messages": copy.deepcopy(result["input_messages"]),
             "rendered_prompt": result["rendered_input"],

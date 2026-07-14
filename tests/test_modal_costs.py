@@ -8,6 +8,7 @@ from src.infrastructure.modal_costs import (
     build_gpu_cost_record,
     build_token_usage,
     cost_record_path,
+    resolve_modal_input_id,
     validate_gpu_cost_record,
 )
 
@@ -79,6 +80,29 @@ def test_cost_path_is_scoped_by_trajectory_mode_step_and_input():
         step_index=3,
         modal_input_id="in-abc",
     ) == "costs/trajectory-1/off/step_003/in-abc.json"
+
+
+def test_modal_input_id_is_preferred_when_available():
+    assert resolve_modal_input_id("in-123", "fc-456") == "in-123"
+
+
+def test_modal_function_call_id_is_used_when_input_id_is_missing():
+    assert resolve_modal_input_id(None, "fc-456") == "fc-456"
+
+
+def test_modal_identifier_falls_back_when_input_id_is_unsafe():
+    assert resolve_modal_input_id("unsafe/id", "fc-456") == "fc-456"
+
+
+@pytest.mark.parametrize(
+    ("input_id", "function_call_id"),
+    [(None, None), ("unsafe/id", None), (None, "unsafe/id")],
+)
+def test_modal_identifier_rejects_missing_or_unsafe_values(
+    input_id, function_call_id
+):
+    with pytest.raises(CostRecordValidationError, match="safe input ID"):
+        resolve_modal_input_id(input_id, function_call_id)
 
 
 def test_cost_record_lists_what_the_estimate_excludes():

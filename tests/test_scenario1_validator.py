@@ -64,6 +64,16 @@ def test_rejects_reasoning_label_without_evidence():
     assert any("INV-9" in e for e in check(r)), check(r)
 
 
+def test_rejects_propagated_outcome_without_injection():
+    r = gen.build_record(REG, "2-hop", "clean")
+    r["generation_mode"] = "real"
+    r["model_called"] = True
+    r["evaluation_labels"]["outcome_class"] = "propagated_but_not_executed"
+    r["evaluation_labels"]["behavioral_channel"]["output_adoption"] = True
+
+    assert any("INV-7" in e for e in check(r)), check(r)
+
+
 def test_rejects_auto_derived_reasoning_compromised_step():
     r = base()
     _turn(r, "worker_1")["step_label"] = {"state": "reasoning_compromised",

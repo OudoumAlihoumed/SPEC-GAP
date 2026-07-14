@@ -130,9 +130,28 @@ modal billing report --for today --show-resources --json
 
 Billing reports may arrive a few minutes after a run.
 
-## Current boundary
+## Complete trajectory runner
 
-The one-turn backend and model cache are ready. The sequential live
-planner-worker-worker2-executor orchestrator and safe simulated executor must
-be completed before launching the full 56-turn two-mode run. This prevents
-isolated model calls from being mistaken for complete trajectories.
+Step 4 connects the one-turn backend to the sequential Scenario 1
+planner-worker-worker2-executor orchestrator. It forwards only visible final
+content and uses a no-network simulated executor for tool requests.
+
+Validate a complete request plan without a GPU:
+
+```bash
+modal run \
+  scripts/02_model_execution/04_run_scenario1_live.py::run_scenario1_trajectory \
+  --condition-id 2-hop \
+  --treatment clean \
+  --thinking-mode off \
+  --action validate
+```
+
+A paid trajectory additionally requires
+`--action run --confirm-paid-run RUN_H200_TRAJECTORY`. Run one complete
+trajectory and validate its saved v2 JSON before launching the full 56-turn
+two-mode batch.
+
+The raw-poison Worker1 result includes the injection's exact character and
+token spans in the rendered Qwen prompt. The saved tokenizer revision and
+prompt hash make that alignment reproducible for later activation analysis.
