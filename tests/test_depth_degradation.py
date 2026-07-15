@@ -8,6 +8,7 @@ from src.analysis.depth_degradation import (
     analyze_depth_degradation,
     prediction_manifest_hash,
     tabular_result_rows,
+    temporal_divergence_rows,
 )
 
 
@@ -133,7 +134,7 @@ def _analyze(rows, *, random_state=11):
 def test_reports_executor_metrics_and_match_group_depth_delta():
     result = _analyze(_prediction_rows())
 
-    assert result["schema_version"] == "spec_gap.depth_degradation.v2"
+    assert result["schema_version"] == "spec_gap.depth_degradation.v3"
     assert result["sampling_grid"]["fully_crossed"] is True
     assert len(result["depth_metrics"]) == 2
     assert all(group["observation_agent"] == "executor" for group in result["depth_metrics"])
@@ -142,6 +143,12 @@ def test_reports_executor_metrics_and_match_group_depth_delta():
     assert comparison["deltas"]["auroc"] < 0
     assert comparison["deltas"]["brier"] > 0
     assert comparison["confidence_intervals"]["brier"] is not None
+    assert all(group["temporal_auroc"] is not None for group in result["depth_metrics"])
+    assert all(group["temporal_brier"] is not None for group in result["depth_metrics"])
+    assert all(group["temporal_ece"] is not None for group in result["depth_metrics"])
+    assert result["analysis_config"]["temporal_classification_score"].startswith(
+        "post_anchor_mean"
+    )
 
     table = tabular_result_rows(result)
     assert {row["record_type"] for row in table} == {
@@ -178,6 +185,20 @@ def test_thinking_modes_are_never_pooled():
     assert {row["thinking_mode"] for row in result["depth_comparisons"]} == {"off", "on"}
 
 
+def test_exports_one_temporal_row_per_trajectory_and_configuration():
+    rows = _prediction_rows(layers=(16, 32), thinking_modes=("off", "on"))
+
+    temporal_rows = temporal_divergence_rows(rows)
+
+    assert len(temporal_rows) == 6 * 4 * 2 * 2
+    assert all(
+        row["classification_score"] == row["post_anchor_mean"]
+        for row in temporal_rows
+    )
+    assert {row["layer"] for row in temporal_rows} == {16, 32}
+    assert {row["thinking_mode"] for row in temporal_rows} == {"off", "on"}
+
+
 def test_classification_metrics_ignore_non_executor_score_changes():
     rows = _prediction_rows()
     baseline = _analyze(rows)
@@ -192,6 +213,7 @@ def test_classification_metrics_ignore_non_executor_score_changes():
         assert before["brier"] == after["brier"]
         assert before["ece"] == after["ece"]
         assert before["temporal_divergence_mean"] != after["temporal_divergence_mean"]
+        assert before["temporal_brier"] != after["temporal_brier"]
 
 
 def test_rejects_missing_hop_condition_in_match_group():

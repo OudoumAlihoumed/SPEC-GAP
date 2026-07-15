@@ -73,8 +73,11 @@ agent.
 ## Activation metadata
 
 Qwen3-32B has 64 layers. The initial scan requests all layers, numbered 0 to
-63. `primary_layer` is optional and remains null until the data supports a
-specific analysis layer.
+63. `primary_layer` stays null in the trajectory record because the trajectory
+schema does not claim that a best layer has been discovered. The preliminary
+analysis separately declares layer 40 as a prespecified reference and layers
+32 and 48 as prespecified ablations. This choice is recorded in the analysis
+manifest rather than written back into the source trajectory.
 
 For each live turn, the binary activation artifact may contain three named
 checkpoints: the last prompt token, the last reasoning token when thinking is

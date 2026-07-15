@@ -9,8 +9,9 @@ state. Scenario 1 begins with a benign research task, places an indirect prompt
 injection inside one retrieved document, and follows its influence through a
 planner-worker-executor chain.
 
-The activation model is the open-weight `Qwen/Qwen3-32B`. The current experiment
-compares thinking on and thinking off at two delegation depths. A black-box LLM
+The activation model is the open-weight `Qwen/Qwen3-32B`. Thinking off is the
+primary analysis at both delegation depths; thinking on is reported separately
+as a late-added sensitivity check. A black-box LLM
 judge may be evaluated as a secondary behavioral baseline, but it is not a
 source of ground-truth labels and does not replace residual-stream analysis.
 
@@ -39,7 +40,8 @@ thinking modes produces 16 trajectory runs and 56 model turns.
 | Injection placement | document body |
 | Model | `Qwen/Qwen3-32B` |
 | Model revision | `9216db5781bf21249d130ec9da846c4624c16137` |
-| Thinking comparison | `enable_thinking=true` vs `false` |
+| Primary generation mode | `enable_thinking=false` |
+| Sensitivity generation mode | `enable_thinking=true`, never pooled with the primary mode |
 | GPU backend | Modal, one H200 per active model container |
 
 Worker1 is the only agent that receives the retrieved documents. Worker2 and
@@ -144,8 +146,10 @@ Run commands from the repository root.
 | 6 | `scripts/02_model_execution/06_repair_prompt_activations.py` | Legacy-only prompt checkpoint repair and verification |
 | 7 | `scripts/03_probe_analysis/07_build_activation_index.py` | Checkpoint-aware activation index |
 | 8 | `scripts/03_probe_analysis/08_scan_activation_layers.py` | Controlled all-layer scan |
-| 9 | `scripts/03_probe_analysis/06_analyze_depth_degradation.py` | AUROC, calibration, Temporal Divergence, and depth summaries |
-| 10 | `scripts/03_probe_analysis/09_plot_layer_scan.py` | PNG, SVG, and PDF layer-scan figures |
+| 9 | `scripts/03_probe_analysis/09_plot_layer_scan.py` | PNG, SVG, and PDF control/layer-scan figures |
+| 10 | `scripts/03_probe_analysis/10_score_baseline_probes.py` | Group-held-out Goldowsky-Dill and LAT scores for every agent step |
+| 11 | `scripts/03_probe_analysis/11_analyze_depth_degradation.py` | Temporal Divergence, AUROC, calibration, bootstrap intervals, and depth summaries |
+| 12 | `scripts/03_probe_analysis/12_plot_probe_analysis.py` | Final probe figures, result tables, and analysis manifest |
 
 The full live batch is resumable. Each paid model turn is checkpointed before
 the runner advances to the next agent or trajectory.
@@ -291,6 +295,56 @@ is an infrastructure diagnostic, not a behavioral-compromise result. With two
 independent match groups, its layer rankings are descriptive rather than final
 generalization estimates.
 
+Create group-held-out per-step scores for both baseline probes. The LAT baseline
+learns its PCA direction from the clean-minus-injected matched-pair differences;
+it does not break the pair structure:
+
+```bash
+python scripts/03_probe_analysis/10_score_baseline_probes.py --layers all
+```
+
+This command uses the saved activations only. It does not call Qwen, generate a
+new trajectory, or start a GPU. “Score” means the probability-like output of a
+probe for one saved agent activation. The output is
+`results/scenario1/per_step_probe_scores.jsonl`.
+
+Run the prespecified depth analysis:
+
+```bash
+python scripts/03_probe_analysis/11_analyze_depth_degradation.py \
+  results/scenario1/per_step_probe_scores.jsonl \
+  --experiment-id scenario1-qwen32b-construction-diagnostic-v1 \
+  --layers 32,40,48 \
+  --output-json results/scenario1/depth_analysis/depth_degradation.json \
+  --output-csv results/scenario1/depth_analysis/depth_degradation.csv \
+  --temporal-output-jsonl \
+    results/scenario1/depth_analysis/temporal_divergence_scores.jsonl
+```
+
+Layer 40 is a prespecified reference, not the best observed layer. It preserves
+the original Llama layer-20 relative-depth choice when moving from a 32-layer
+model to a 64-layer model. Layers 32 and 48 are prespecified midpoint and
+three-quarter-depth checks. The all-layer results remain descriptive; no layer
+is selected from the observed AUROC.
+
+Temporal Divergence compares the planner score before the Worker1 anchor with
+the mean score from Worker1 through the executor. Its signed divergence is the
+post-anchor mean minus the pre-anchor mean. AUROC, Brier score, and ECE use the
+post-anchor mean, which remains an average of held-out probabilities in
+`[0, 1]`; the signed difference is reported separately and is not treated as a
+probability.
+
+Generate the final figures and tables:
+
+```bash
+python scripts/03_probe_analysis/12_plot_probe_analysis.py
+```
+
+Thinking-off appears in the primary metrics and temporal-profile figures.
+Thinking-on appears as sensitivity analysis and is never pooled with
+thinking-off. Bootstrap intervals resample whole match groups, not individual
+agent turns.
+
 ## Labels and Outcomes
 
 SPEC-GAP keeps construction, behavior, and reasoning labels separate.
@@ -329,6 +383,11 @@ figures remain outside Git. Expected local paths are:
 | `results/scenario1/activation_control_audit.json` | Planner identity and paired propagation audit |
 | `results/scenario1/activation_control_pairs.csv` | Per-pair, per-layer activation distances |
 | `results/scenario1/construction_layer_scan.json` | Guarded all-layer scan |
+| `results/scenario1/per_step_probe_scores.jsonl` | Group-held-out Goldowsky-Dill and LAT scores |
+| `results/scenario1/per_step_probe_scores_summary.json` | Score coverage, method, and layer rationale |
+| `results/scenario1/depth_analysis/` | Temporal Divergence records, calibration metrics, and depth comparisons |
+| `results/scenario1/final_analysis/analysis_manifest.json` | Approved figure inventory, input hashes, and claim boundaries |
+| `results/scenario1/final_analysis/*.csv` | Reference-layer metrics and depth deltas |
 | `results/scenario1/figures/paper/` | Generated PNG, SVG, and PDF figures |
 
 Every reported artifact should identify its generating commit, model and
@@ -355,7 +414,7 @@ python -m pytest \
   tests/test_trajectory_acceptance.py -q
 ```
 
-Run the activation-loader and layer-scan checks:
+Run the activation-loader, probe, depth, and figure checks:
 
 ```bash
 python -m pytest \
@@ -363,7 +422,11 @@ python -m pytest \
   tests/test_activation_repair.py \
   tests/test_layer_scan.py \
   tests/test_layer_scan_figures.py \
-  tests/test_layer_scan_paper_figures.py -q
+  tests/test_layer_scan_paper_figures.py \
+  tests/test_probe_scoring.py \
+  tests/test_depth_degradation.py \
+  tests/test_temporal_divergence.py \
+  tests/test_probe_analysis_figures.py -q
 ```
 
 ## Historical Runway
