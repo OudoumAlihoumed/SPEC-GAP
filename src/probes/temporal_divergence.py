@@ -2,7 +2,9 @@
 
 Temporal Divergence does not train a second representation probe. It aggregates
 ordered per-step probabilities from a baseline probe around a predeclared
-injection (or matched clean-control) anchor.
+injection (or matched clean-control) anchor. The signed divergence is the
+post-anchor path mean minus the pre-anchor mean. The post-anchor path mean is a
+separate probability-valued classifier input; the signed difference is not.
 """
 
 from __future__ import annotations

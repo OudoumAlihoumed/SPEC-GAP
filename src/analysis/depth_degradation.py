@@ -58,12 +58,12 @@ BEHAVIORAL_OUTCOMES = {
     "indeterminate",
 }
 LATENT_STATUSES = {"not_candidate", "candidate", "probe_supported"}
-TEMPORAL_SCORE_SCHEMA = "spec_gap.temporal_divergence_score.v1"
+TEMPORAL_SCORE_SCHEMA = "spec_gap.temporal_divergence_score.v2"
 BASELINE_METRIC_NAMES = ("auroc", "brier", "ece")
 TEMPORAL_METRIC_NAMES = (
-    "temporal_auroc",
-    "temporal_brier",
-    "temporal_ece",
+    "path_mean_auroc",
+    "path_mean_brier",
+    "path_mean_ece",
     "temporal_pre_anchor_mean",
     "temporal_post_anchor_mean",
     "temporal_divergence_mean",
@@ -193,14 +193,14 @@ def analyze_depth_degradation(
                 "temporal_divergence_mean": (
                     "signed change; interpret relative to the declared probe direction"
                 ),
-                "temporal_auroc": (
-                    "negative delta indicates worse trajectory-level discrimination at 3-hop"
+                "path_mean_auroc": (
+                    "negative delta indicates worse temporal path-mean discrimination at 3-hop"
                 ),
-                "temporal_brier": (
-                    "positive delta indicates worse Temporal Divergence probabilistic accuracy"
+                "path_mean_brier": (
+                    "positive delta indicates worse temporal path-mean probabilistic accuracy"
                 ),
-                "temporal_ece": (
-                    "positive delta indicates worse Temporal Divergence calibration"
+                "path_mean_ece": (
+                    "positive delta indicates worse temporal path-mean calibration"
                 ),
             },
         })
@@ -211,7 +211,7 @@ def analyze_depth_degradation(
         str(row.get("evaluation_method", "not_declared")) for row in rows
     })
     return {
-        "schema_version": "spec_gap.depth_degradation.v3",
+        "schema_version": "spec_gap.depth_degradation.v4",
         "experiment_id": experiment_id,
         "data_manifest_hash": prediction_manifest_hash(rows),
         "n_match_groups": n_match_groups,
@@ -240,15 +240,17 @@ def analyze_depth_degradation(
                 "pre-anchor mean is the planner score; post-anchor mean averages "
                 "Worker1 through executor; divergence is post-anchor minus pre-anchor"
             ),
-            "temporal_classification_score": (
-                "post_anchor_mean, an average of held-out per-agent probabilities in [0, 1]"
+            "path_mean_classification_score": (
+                "post_anchor_mean, the temporal path mean of held-out per-agent "
+                "probabilities in [0, 1]"
             ),
-            "temporal_calibration_note": (
-                "Brier and ECE use post_anchor_mean. The signed divergence remains a "
-                "separate trajectory-shape statistic and is not treated as a probability."
+            "path_mean_calibration_note": (
+                "AUROC, Brier, and ECE use post_anchor_mean. Signed Temporal Divergence "
+                "remains a separate trajectory-shape statistic and is not treated as a "
+                "probability."
             ),
             "temporal_indeterminate_policy": (
-                "indeterminate trajectories remain in Temporal Divergence"
+                "indeterminate trajectories remain in temporal path and divergence summaries"
             ),
             "bootstrap_unit": "match_group_id for depth metrics and depth deltas",
             "score_generation_evaluation_methods": evaluation_methods,
@@ -557,7 +559,7 @@ def tabular_result_rows(result: dict) -> list[dict]:
 
 
 def temporal_divergence_rows(rows: Iterable[dict]) -> list[dict]:
-    """Return one transparent Temporal Divergence record per trajectory/config."""
+    """Return path-mean and signed-divergence values per trajectory/config."""
 
     rows = sorted((dict(row) for row in rows), key=_prediction_row_sort_key)
     validate_prediction_rows(rows)
@@ -596,7 +598,7 @@ def temporal_divergence_rows(rows: Iterable[dict]) -> list[dict]:
                 "action_fired": first["action_fired"],
                 "latent_compromise_status": str(first["latent_compromise_status"]),
                 "evaluation_method": first.get("evaluation_method"),
-                "classification_score_name": "post_anchor_mean",
+                "classification_score_name": "temporal_path_mean",
                 "classification_score": aggregate["post_anchor_mean"],
                 "pre_anchor_mean": aggregate["pre_anchor_mean"],
                 "post_anchor_mean": aggregate["post_anchor_mean"],
@@ -674,7 +676,7 @@ def _unique_executor_rows(rows: list[dict]) -> list[dict]:
 
 
 def _temporal_rows(rows: list[dict]) -> list[dict]:
-    """Aggregate ordered per-agent scores into one Temporal Divergence row."""
+    """Aggregate ordered per-agent scores into one temporal-analysis row."""
 
     grouped = _group_rows(rows, ("trajectory_id",))
     values = []
@@ -715,7 +717,7 @@ def _temporal_snapshot_from_aggregates(
     n_bins: int,
 ) -> dict:
     if not temporal_rows:
-        raise ValueError("Temporal Divergence requires at least one trajectory.")
+        raise ValueError("Temporal path analysis requires at least one trajectory.")
     scored = [row for row in temporal_rows if row["label"] is not None]
     classification = _classification_snapshot(
         [
@@ -725,9 +727,9 @@ def _temporal_snapshot_from_aggregates(
         n_bins=n_bins,
     )
     return {
-        "temporal_auroc": classification["auroc"],
-        "temporal_brier": classification["brier"],
-        "temporal_ece": classification["ece"],
+        "path_mean_auroc": classification["auroc"],
+        "path_mean_brier": classification["brier"],
+        "path_mean_ece": classification["ece"],
         "temporal_pre_anchor_mean": float(np.mean([
             row["pre_anchor_mean"] for row in temporal_rows
         ])),

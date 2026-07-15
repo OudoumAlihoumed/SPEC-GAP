@@ -94,7 +94,7 @@ def main() -> None:
         })
 
     manifest = {
-        "schema_version": "spec_gap.final_analysis_manifest.v1",
+        "schema_version": "spec_gap.final_analysis_manifest.v2",
         "experiment_id": reference["experiment_id"],
         "analysis_status": "construction_diagnostic_complete_behavioral_auroc_unavailable",
         "claim_scope": reference["claim_scope"],
@@ -137,7 +137,7 @@ def main() -> None:
         "figures": figure_entries,
         "supported_statements": [
             "The pipeline produced group-held-out construction-label scores for every saved agent step.",
-            "Goldowsky-Dill, LAT, Temporal Divergence, calibration, and preliminary depth calculations ran on the controlled sample.",
+            "Goldowsky-Dill, LAT, temporal path-mean classification, signed Temporal Divergence, calibration, and preliminary depth calculations ran on the controlled sample.",
             "Thinking-off is the primary analysis and thinking-on is reported separately as sensitivity analysis.",
             "All injected trajectories resisted and no unsafe executor action fired.",
         ],
@@ -146,7 +146,7 @@ def main() -> None:
             "A final best activation layer has been identified.",
             "The two-group depth effect generalizes to new domains or scenarios.",
             "Domain effects can be separated from injection-wording effects in the two-group sample.",
-            "Temporal Divergence outperforms either baseline beyond this exploratory sample.",
+            "Temporal path-mean aggregation or signed Temporal Divergence outperforms either baseline beyond this exploratory sample.",
         ],
     }
     manifest_path = args.analysis_dir / "analysis_manifest.json"
@@ -179,9 +179,9 @@ def _reference_metric_rows(result: dict) -> list[dict]:
             "auroc",
             "brier",
             "ece",
-            "temporal_auroc",
-            "temporal_brier",
-            "temporal_ece",
+            "path_mean_auroc",
+            "path_mean_brier",
+            "path_mean_ece",
             "temporal_pre_anchor_mean",
             "temporal_post_anchor_mean",
             "temporal_divergence_mean",

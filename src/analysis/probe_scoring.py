@@ -222,7 +222,7 @@ def write_per_step_probe_scores(
     rows: Sequence[dict[str, Any]],
     path: str | Path,
 ) -> None:
-    """Write stable JSON Lines for downstream Temporal Divergence analysis."""
+    """Write stable JSON Lines for downstream temporal path analysis."""
 
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)

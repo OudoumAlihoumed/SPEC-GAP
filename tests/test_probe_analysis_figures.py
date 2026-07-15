@@ -14,9 +14,9 @@ def _metric_row(mode, probe, layer, hop_mode):
         "auroc": 0.75,
         "brier": 0.22,
         "ece": 0.18,
-        "temporal_auroc": 0.80,
-        "temporal_brier": 0.20,
-        "temporal_ece": 0.15,
+        "path_mean_auroc": 0.80,
+        "path_mean_brier": 0.20,
+        "path_mean_ece": 0.15,
         "temporal_pre_anchor_mean": 0.25,
         "temporal_post_anchor_mean": 0.60,
         "temporal_divergence_mean": 0.35,
@@ -49,9 +49,9 @@ def _comparison_row(mode, probe, layer):
         "auroc": -0.10,
         "brier": 0.02,
         "ece": 0.01,
-        "temporal_auroc": -0.05,
-        "temporal_brier": 0.01,
-        "temporal_ece": 0.02,
+        "path_mean_auroc": -0.05,
+        "path_mean_brier": 0.01,
+        "path_mean_ece": 0.02,
         "temporal_pre_anchor_mean": 0.0,
         "temporal_post_anchor_mean": -0.03,
         "temporal_divergence_mean": -0.03,
@@ -157,3 +157,13 @@ def test_saves_primary_sensitivity_and_appendix_figures(tmp_path):
     }
     assert all(path.is_file() and path.stat().st_size > 1000 for path in paths)
     assert plt.get_fignums() == []
+
+
+def test_primary_caption_separates_path_mean_from_signed_divergence():
+    primary = next(
+        entry for entry in figure_catalog()
+        if entry["stem"] == "figure3_primary_probe_metrics"
+    )
+
+    assert "temporal path-mean" in primary["caption"]
+    assert "Signed Temporal Divergence" in primary["caption"]

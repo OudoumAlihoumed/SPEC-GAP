@@ -28,7 +28,7 @@ PROBE_COLORS = {
 }
 AGGREGATION_LABELS = {
     "executor": "Executor",
-    "temporal": "Temporal Divergence",
+    "path_mean": "Temporal path mean",
 }
 CONDITION_COLORS = {"clean": "#0072B2", "injected": "#D55E00"}
 OUTCOME_ORDER = (
@@ -114,8 +114,9 @@ def figure_catalog() -> list[dict[str, Any]]:
             "title": "Thinking-off probe metrics at prespecified layer 40",
             "caption": (
                 "Group-held-out construction-label AUROC, Brier score, and ECE for "
-                "executor-only and Temporal Divergence aggregation at 2-hop and 3-hop. "
-                "Intervals resample match groups; n=2 independent groups."
+                "executor-only and temporal path-mean aggregation at 2-hop and 3-hop. "
+                "Signed Temporal Divergence is reported separately. Intervals resample "
+                "match groups; n=2 independent groups."
             ),
         },
         {
@@ -173,9 +174,9 @@ def _probe_metrics_figure(
     thinking_mode: str,
 ) -> plt.Figure:
     metric_specs = (
-        ("auroc", "temporal_auroc", "AUROC", 0.0, 1.0),
-        ("brier", "temporal_brier", "Brier score ↓", 0.0, 0.8),
-        ("ece", "temporal_ece", "ECE ↓", 0.0, 0.9),
+        ("auroc", "path_mean_auroc", "AUROC", 0.0, 1.0),
+        ("brier", "path_mean_brier", "Brier score ↓", 0.0, 0.8),
+        ("ece", "path_mean_ece", "ECE ↓", 0.0, 0.9),
     )
     with plt.rc_context(_paper_style()):
         figure, axes = plt.subplots(1, 3, figsize=(9.0, 3.25), squeeze=False)
@@ -186,7 +187,7 @@ def _probe_metrics_figure(
             for probe in PROBE_ORDER:
                 for aggregation, metric, marker, linestyle in (
                     ("executor", executor_metric, "o", "-"),
-                    ("temporal", temporal_metric, "s", "--"),
+                    ("path_mean", temporal_metric, "s", "--"),
                 ):
                     points = [
                         _depth_metric(
@@ -268,7 +269,7 @@ def _depth_delta_figure(result: dict[str, Any]) -> plt.Figure:
             axis.axhline(0.0, color="#666666", linestyle=":", linewidth=1)
             for aggregation, metric, marker, offset in (
                 ("executor", "auroc", "o", -0.09),
-                ("temporal", "temporal_auroc", "s", 0.09),
+                ("path_mean", "path_mean_auroc", "s", 0.09),
             ):
                 for probe_index, probe in enumerate(PROBE_ORDER):
                     comparison = _depth_comparison(
@@ -313,7 +314,7 @@ def _depth_delta_figure(result: dict[str, Any]) -> plt.Figure:
                 color="#444444",
                 marker="s",
                 linestyle="none",
-                label="Temporal Divergence",
+                label="Temporal path mean",
             ),
         ]
         figure.legend(
@@ -502,11 +503,11 @@ def _all_layer_figure(result: dict[str, Any]) -> plt.Figure:
                     )
                     axis.plot(
                         layers,
-                        [row["temporal_auroc"] for row in points],
+                        [row["path_mean_auroc"] for row in points],
                         color=color,
                         linestyle="--",
                         linewidth=1.0,
-                        label=f"{hop_mode} · temporal",
+                        label=f"{hop_mode} · path mean",
                     )
                 axis.axhline(0.5, color="#777777", linestyle=":", linewidth=0.8)
                 for layer, linestyle in (

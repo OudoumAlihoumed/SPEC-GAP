@@ -137,7 +137,7 @@ activation index
 → strict planner and paired controls
 → all-layer descriptive scan
 → group-held-out Goldowsky-Dill and LAT scores
-→ Temporal Divergence over ordered agent scores
+→ temporal path mean and signed Temporal Divergence over ordered agent scores
 → AUROC, Brier score, ECE, bootstrap intervals, and depth deltas
 → final figures and result manifest
 ```
@@ -145,9 +145,10 @@ activation index
 All four trajectories from a match group stay in the same held-out fold.
 The LAT direction is learned from clean-minus-injected activation differences
 within the declared matched pairs. Thinking modes are analyzed separately.
-Temporal Divergence uses the planner as the pre-anchor point and Worker1 through
-executor as the post-anchor path. Its post-anchor mean is used for probability
-metrics; its signed post-minus-pre shift is reported separately.
+The temporal path mean uses Worker1 through executor as the post-anchor path and
+is used for AUROC, Brier score, and ECE. Signed Temporal Divergence subtracts
+the planner's pre-anchor score from that path mean and is reported separately
+as a trajectory-shape statistic.
 
 With only two match groups, each domain currently appears with one injection
 wording. Domain and wording effects are therefore confounded in this snapshot.
