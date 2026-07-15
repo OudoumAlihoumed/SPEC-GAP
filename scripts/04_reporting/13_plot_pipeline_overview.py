@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import matplotlib
 
@@ -12,6 +13,14 @@ from matplotlib.patches import FancyArrowPatch, FancyBboxPatch  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from src.analysis.figure_export import (  # noqa: E402
+    normalize_svg,
+    save_reproducible_figure,
+)
+
+
 OUTPUT_DIR = ROOT / "docs" / "assets"
 OUTPUT_STEM = "scenario1_pipeline_overview"
 FORMATS = ("png", "svg", "pdf")
@@ -37,13 +46,9 @@ WHITE = "#FFFFFF"
 
 
 def _normalize_svg(path: Path) -> None:
-    """Remove renderer-added trailing spaces while preserving the SVG content."""
+    """Keep the historical local helper while using the shared implementation."""
 
-    lines = path.read_text(encoding="utf-8").splitlines()
-    path.write_text(
-        "\n".join(line.rstrip() for line in lines) + "\n",
-        encoding="utf-8",
-    )
+    normalize_svg(path)
 
 
 def _box(
@@ -613,7 +618,8 @@ def main() -> None:
         metadata = {"Title": "SPEC-GAP Scenario 1: Live Evaluation Pipeline"}
         if suffix in {"png", "pdf"}:
             metadata["Author"] = "SPEC-GAP"
-        figure.savefig(
+        save_reproducible_figure(
+            figure,
             path,
             dpi=300,
             bbox_inches="tight",
@@ -621,8 +627,6 @@ def main() -> None:
             facecolor=WHITE,
             metadata=metadata,
         )
-        if suffix == "svg":
-            _normalize_svg(path)
         print(path)
     plt.close(figure)
 

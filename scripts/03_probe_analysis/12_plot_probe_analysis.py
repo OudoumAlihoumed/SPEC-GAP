@@ -8,6 +8,7 @@ import csv
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -19,6 +20,12 @@ from src.analysis.probe_analysis_figures import (  # noqa: E402
     REFERENCE_LAYER,
     figure_catalog,
     save_probe_analysis_figures,
+)
+from src.analysis.reporting_snapshot import (  # noqa: E402
+    build_reporting_snapshot,
+    load_reporting_snapshot,
+    sha256_file,
+    write_reporting_snapshot,
 )
 
 
@@ -42,6 +49,32 @@ def main() -> None:
         default=PROJECT_ROOT / "results/scenario1/per_step_probe_scores.jsonl",
     )
     parser.add_argument(
+        "--snapshot-input",
+        type=Path,
+        help=(
+            "Rebuild figures from a compact tracked reporting snapshot instead of "
+            "local raw analysis outputs."
+        ),
+    )
+    parser.add_argument(
+        "--snapshot-output",
+        type=Path,
+        default=(
+            PROJECT_ROOT / "docs/data/scenario1/reporting_snapshot.json"
+        ),
+        help="Compact public snapshot written when raw analysis outputs are used.",
+    )
+    parser.add_argument(
+        "--trajectory-root",
+        type=Path,
+        default=PROJECT_ROOT / "experiments/scenario1/trajectories/live",
+        help="Live trajectory tree used to record model and decoding provenance.",
+    )
+    parser.add_argument(
+        "--analysis-revision",
+        help="Git revision that produced the raw analysis outputs (default: current HEAD).",
+    )
+    parser.add_argument(
         "--figure-dir",
         type=Path,
         default=PROJECT_ROOT / "results/scenario1/figures/paper",
@@ -54,9 +87,44 @@ def main() -> None:
     parser.add_argument("--dpi", type=int, default=300)
     args = parser.parse_args()
 
-    reference = _read_json(args.reference_result)
-    all_layer = _read_json(args.all_layer_result)
-    score_rows = load_prediction_jsonl(args.per_step_scores)
+    if args.snapshot_input:
+        if args.analysis_revision:
+            raise ValueError("--analysis-revision cannot be combined with --snapshot-input.")
+        snapshot = load_reporting_snapshot(args.snapshot_input)
+        reference = snapshot["reference_result"]
+        all_layer = snapshot["all_layer_result"]
+        score_rows = snapshot["per_step_rows"]
+        snapshot_path = args.snapshot_input
+    else:
+        reference = _read_json(args.reference_result)
+        all_layer = _read_json(args.all_layer_result)
+        score_rows = load_prediction_jsonl(args.per_step_scores)
+        source_artifacts = {
+            "per_step_probe_scores": {
+                "path": _relative(args.per_step_scores),
+                "sha256": sha256_file(args.per_step_scores),
+            },
+            "reference_depth_result": {
+                "path": _relative(args.reference_result),
+                "sha256": sha256_file(args.reference_result),
+            },
+            "all_layer_descriptive_result": {
+                "path": _relative(args.all_layer_result),
+                "sha256": sha256_file(args.all_layer_result),
+            },
+        }
+        snapshot = build_reporting_snapshot(
+            reference,
+            all_layer,
+            score_rows,
+            analysis_revision=args.analysis_revision or _git_revision(),
+            reporting_revision=_git_revision(),
+            source_artifacts=source_artifacts,
+            model_configs=_load_model_configs(args.trajectory_root),
+        )
+        write_reporting_snapshot(snapshot, args.snapshot_output)
+        snapshot_path = args.snapshot_output
+
     figure_paths = save_probe_analysis_figures(
         reference,
         all_layer,
@@ -71,18 +139,7 @@ def main() -> None:
     _write_csv(_reference_metric_rows(reference), metric_table)
     _write_csv(_reference_delta_rows(reference), delta_table)
 
-    unique_trajectories = {}
-    for row in score_rows:
-        unique_trajectories.setdefault(str(row["trajectory_id"]), row)
-    outcomes = {
-        outcome: sum(
-            row["behavioral_outcome"] == outcome
-            for row in unique_trajectories.values()
-        )
-        for outcome in sorted({
-            str(row["behavioral_outcome"]) for row in unique_trajectories.values()
-        })
-    }
+    sample = snapshot["sample"]
     catalog = figure_catalog()
     by_stem = {entry["stem"]: entry for entry in catalog}
     figure_entries = []
@@ -94,8 +151,11 @@ def main() -> None:
         })
 
     manifest = {
-        "schema_version": "spec_gap.final_analysis_manifest.v2",
+        "schema_version": "spec_gap.final_analysis_manifest.v3",
         "experiment_id": reference["experiment_id"],
+        "analysis_revision": snapshot["analysis_revision"],
+        "reporting_revision": snapshot["reporting_revision"],
+        "model_configs": snapshot["model_configs"],
         "analysis_status": "construction_diagnostic_complete_behavioral_auroc_unavailable",
         "claim_scope": reference["claim_scope"],
         "label_target": "injection_present",
@@ -113,25 +173,11 @@ def main() -> None:
             "ablations": [32, 48],
             "all_layer_scan_role": "descriptive_only_no_post_hoc_selection",
         },
-        "sample": {
-            "match_groups": reference["n_match_groups"],
-            "trajectory_runs": len(unique_trajectories),
-            "behavioral_outcomes": outcomes,
-            "unsafe_action_executed_count": outcomes.get("executed", 0),
-        },
-        "source_artifacts": {
-            "per_step_probe_scores": {
-                "path": _relative(args.per_step_scores),
-                "sha256": _sha256(args.per_step_scores),
-            },
-            "reference_depth_result": {
-                "path": _relative(args.reference_result),
-                "sha256": _sha256(args.reference_result),
-            },
-            "all_layer_descriptive_result": {
-                "path": _relative(args.all_layer_result),
-                "sha256": _sha256(args.all_layer_result),
-            },
+        "sample": sample,
+        "source_artifacts": snapshot["source_artifacts"],
+        "reporting_snapshot": {
+            "path": _relative(snapshot_path),
+            "sha256": _sha256(snapshot_path),
         },
         "tables": [_relative(metric_table), _relative(delta_table)],
         "figures": figure_entries,
@@ -153,6 +199,7 @@ def main() -> None:
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     print(json.dumps({
         "analysis_manifest": _relative(manifest_path),
+        "reporting_snapshot": _relative(snapshot_path),
         "figure_files": len(figure_paths),
         "figure_stems": [entry["stem"] for entry in catalog],
         "metric_table": _relative(metric_table),
@@ -237,6 +284,64 @@ def _read_json(path: Path) -> dict:
     if not isinstance(payload, dict):
         raise ValueError(f"Analysis result {path} must contain one object.")
     return payload
+
+
+def _load_model_configs(trajectory_root: Path) -> list[dict]:
+    """Read one consistent model configuration for each thinking mode."""
+
+    configs: dict[str, dict] = {}
+    for path in sorted(trajectory_root.rglob("*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(f"Cannot read live trajectory {path}: {error}") from error
+        model = payload.get("model") if isinstance(payload, dict) else None
+        if not isinstance(model, dict):
+            continue
+        mode = model.get("thinking_mode")
+        if mode not in {"off", "on"}:
+            continue
+        normalized = {
+            field: model.get(field)
+            for field in (
+                "model_name",
+                "provider",
+                "model_revision",
+                "tokenizer_name",
+                "tokenizer_revision",
+                "dtype",
+                "seed",
+                "num_hidden_layers",
+                "thinking_mode",
+                "decoding_settings",
+            )
+        }
+        previous = configs.setdefault(str(mode), normalized)
+        if previous != normalized:
+            raise ValueError(
+                f"Live trajectories contain inconsistent model settings for thinking {mode}."
+            )
+    if set(configs) != {"off", "on"}:
+        raise ValueError(
+            "Live trajectory provenance must cover thinking off and thinking on."
+        )
+    return [configs[mode] for mode in ("off", "on")]
+
+
+def _git_revision() -> str:
+    """Return the exact committed code revision used for snapshot generation."""
+
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=PROJECT_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    revision = completed.stdout.strip()
+    if not revision:
+        raise ValueError("Could not determine the current Git revision.")
+    return revision
 
 
 def _sha256(path: Path) -> str:

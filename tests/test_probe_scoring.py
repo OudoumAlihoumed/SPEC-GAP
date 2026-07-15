@@ -139,6 +139,16 @@ def test_requires_explicit_behavioral_action_label(monkeypatch):
         )
 
 
+def test_behavioral_action_target_is_not_advertised_by_current_probe_sample():
+    with pytest.raises(ValueError, match="Behavioral-action probes require mixed"):
+        generate_per_step_probe_scores(
+            _index_rows(),
+            match_group_designs=_designs(),
+            label_target="unsafe_action_executed",
+            verify_checksums=False,
+        )
+
+
 def test_manifest_loader_requires_one_design_per_group(tmp_path):
     manifest = tmp_path / "manifest.json"
     manifest.write_text(json.dumps({

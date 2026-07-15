@@ -27,6 +27,10 @@ def test_reporting_commands_follow_data_dependencies():
         "14_plot_investor_figures.py",
     ]
     assert all(command[0] == "python-test" for command in commands)
+    assert commands[0][2:] == (
+        "--snapshot-input",
+        str(PROJECT_ROOT / "docs/data/scenario1/reporting_snapshot.json"),
+    )
 
 
 def test_reporting_bundle_stops_on_checked_subprocesses():

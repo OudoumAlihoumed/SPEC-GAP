@@ -13,6 +13,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
+from src.analysis.figure_export import save_reproducible_figure
+
 
 FORMATS = ("png", "svg", "pdf")
 REFERENCE_LAYER = 40
@@ -717,4 +719,10 @@ def _save(
             "Description": claim_scope,
             "Keywords": ["SPEC-GAP", "activation probes", "Temporal Divergence"],
         }
-    figure.savefig(path, dpi=dpi, bbox_inches="tight", metadata=metadata)
+    save_reproducible_figure(
+        figure,
+        path,
+        dpi=dpi,
+        bbox_inches="tight",
+        metadata=metadata,
+    )

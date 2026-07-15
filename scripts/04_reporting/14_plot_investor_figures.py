@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import csv
 from pathlib import Path
+import sys
 from typing import Any
 
 import matplotlib
@@ -15,9 +15,18 @@ from matplotlib.patches import FancyArrowPatch, FancyBboxPatch  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from src.analysis.figure_export import (  # noqa: E402
+    normalize_svg,
+    save_reproducible_figure,
+)
+from src.analysis.reporting_snapshot import load_reporting_snapshot  # noqa: E402
+
+
 OUTPUT_DIR = ROOT / "docs" / "assets"
-METRICS_PATH = (
-    ROOT / "results" / "scenario1" / "final_analysis" / "reference_layer_metrics.csv"
+SNAPSHOT_PATH = (
+    ROOT / "docs" / "data" / "scenario1" / "reporting_snapshot.json"
 )
 FORMATS = ("png", "svg", "pdf")
 
@@ -55,13 +64,9 @@ PROBE_COLORS = {
 
 
 def _normalize_svg(path: Path) -> None:
-    """Remove renderer-added trailing spaces while preserving the SVG content."""
+    """Keep the historical local helper while using the shared implementation."""
 
-    lines = path.read_text(encoding="utf-8").splitlines()
-    path.write_text(
-        "\n".join(line.rstrip() for line in lines) + "\n",
-        encoding="utf-8",
-    )
+    normalize_svg(path)
 
 
 def _canvas(title: str, subtitle: str) -> tuple[plt.Figure, plt.Axes]:
@@ -218,8 +223,15 @@ def _stat_card(
     )
 
 
-def runway_to_live_figure() -> plt.Figure:
+def runway_to_live_figure(snapshot: dict[str, Any] | None = None) -> plt.Figure:
     """Show the feedback-driven move from the runway to the live system."""
+
+    snapshot = snapshot or load_reporting_snapshot(SNAPSHOT_PATH)
+    sample = snapshot["sample"]
+    layer_count = len({
+        int(row["layer"])
+        for row in snapshot["all_layer_result"]["depth_metrics"]
+    })
 
     figure, axis = _canvas(
         "From Runway signal testing to live exploit-chain evaluation",
@@ -330,7 +342,7 @@ def runway_to_live_figure() -> plt.Figure:
         9.59,
         5.15,
         1.62,
-        "16",
+        str(sample["trajectory_runs"]),
         "live runs",
         facecolor=WHITE,
         edgecolor=ORANGE,
@@ -340,7 +352,7 @@ def runway_to_live_figure() -> plt.Figure:
         11.38,
         5.15,
         1.62,
-        "56",
+        str(sample["agent_turns"]),
         "agent turns",
         facecolor=WHITE,
         edgecolor=ORANGE,
@@ -350,7 +362,7 @@ def runway_to_live_figure() -> plt.Figure:
         13.17,
         5.15,
         1.86,
-        "64",
+        str(layer_count),
         "activation layers",
         facecolor=WHITE,
         edgecolor=ORANGE,
@@ -441,36 +453,31 @@ def runway_to_live_figure() -> plt.Figure:
     return figure
 
 
-def _read_thinking_off_metrics() -> dict[tuple[str, str], dict[str, float]]:
+def _read_thinking_off_metrics(
+    snapshot: dict[str, Any] | None = None,
+) -> dict[tuple[str, str], dict[str, float]]:
+    snapshot = snapshot or load_reporting_snapshot(SNAPSHOT_PATH)
     rows: dict[tuple[str, str], dict[str, float]] = {}
-    with METRICS_PATH.open(newline="", encoding="utf-8") as handle:
-        for raw in csv.DictReader(handle):
-            if raw["thinking_mode"] != "off" or int(raw["layer"]) != 40:
-                continue
-            key = (raw["probe_name"], raw["hop_mode"])
-            rows[key] = {
-                field: float(raw[field])
-                for field in (
-                    "auroc",
-                    "auroc_ci_lower",
-                    "auroc_ci_upper",
-                    "brier",
-                    "brier_ci_lower",
-                    "brier_ci_upper",
-                    "ece",
-                    "ece_ci_lower",
-                    "ece_ci_upper",
-                    "path_mean_auroc",
-                    "path_mean_auroc_ci_lower",
-                    "path_mean_auroc_ci_upper",
-                    "path_mean_brier",
-                    "path_mean_brier_ci_lower",
-                    "path_mean_brier_ci_upper",
-                    "path_mean_ece",
-                    "path_mean_ece_ci_lower",
-                    "path_mean_ece_ci_upper",
-                )
-            }
+    for raw in snapshot["reference_result"]["depth_metrics"]:
+        if raw["thinking_mode"] != "off" or int(raw["layer"]) != 40:
+            continue
+        key = (raw["probe_name"], raw["hop_mode"])
+        values = {}
+        for field in (
+            "auroc",
+            "brier",
+            "ece",
+            "path_mean_auroc",
+            "path_mean_brier",
+            "path_mean_ece",
+        ):
+            values[field] = float(raw[field])
+            interval = raw["confidence_intervals"][field]
+            if interval is None:
+                raise ValueError(f"Missing primary interval for {key}/{field}.")
+            values[f"{field}_ci_lower"] = float(interval["lower"])
+            values[f"{field}_ci_upper"] = float(interval["upper"])
+        rows[key] = values
     missing = [
         (probe, hop)
         for probe in PROBE_ORDER
@@ -482,10 +489,10 @@ def _read_thinking_off_metrics() -> dict[tuple[str, str], dict[str, float]]:
     return rows
 
 
-def primary_metrics_figure() -> plt.Figure:
+def primary_metrics_figure(snapshot: dict[str, Any] | None = None) -> plt.Figure:
     """Create an investor-readable version of the primary metrics figure."""
 
-    rows = _read_thinking_off_metrics()
+    rows = _read_thinking_off_metrics(snapshot)
     with plt.rc_context(
         {
             "font.family": "DejaVu Sans",
@@ -618,17 +625,33 @@ def primary_metrics_figure() -> plt.Figure:
         return figure
 
 
-def behavioral_boundary_figure() -> plt.Figure:
+def behavioral_boundary_figure(snapshot: dict[str, Any] | None = None) -> plt.Figure:
     """Summarize the current behavioral evidence and next milestone."""
+
+    snapshot = snapshot or load_reporting_snapshot(SNAPSHOT_PATH)
+    sample = snapshot["sample"]
+    outcomes = sample["behavioral_outcomes"]
 
     figure, axis = _canvas(
         "What the current run established—and what it did not",
         "The model generated every response and action request naturally; no successful compromise was scripted into the data.",
     )
     cards = (
-        (0.82, "8", "clean trajectories", BLUE_LIGHT, BLUE),
-        (5.56, "8", "injected trajectories resisted", GREEN_LIGHT, GREEN),
-        (10.30, "0", "unsafe actions executed", RED_LIGHT, RED),
+        (0.82, str(outcomes.get("clean", 0)), "clean trajectories", BLUE_LIGHT, BLUE),
+        (
+            5.56,
+            str(outcomes.get("resisted", 0)),
+            "injected trajectories resisted",
+            GREEN_LIGHT,
+            GREEN,
+        ),
+        (
+            10.30,
+            str(sample["unsafe_action_executed_count"]),
+            "unsafe actions executed",
+            RED_LIGHT,
+            RED,
+        ),
     )
     for x, value, label, facecolor, edgecolor in cards:
         _box(
@@ -727,7 +750,8 @@ def _save(figure: plt.Figure, stem: str) -> list[Path]:
         metadata: dict[str, Any] = {"Title": stem.replace("_", " ").title()}
         if suffix in {"png", "pdf"}:
             metadata["Author"] = "SPEC-GAP"
-        figure.savefig(
+        save_reproducible_figure(
+            figure,
             path,
             dpi=300,
             bbox_inches="tight",
@@ -735,8 +759,6 @@ def _save(figure: plt.Figure, stem: str) -> list[Path]:
             facecolor=WHITE,
             metadata=metadata,
         )
-        if suffix == "svg":
-            _normalize_svg(path)
         paths.append(path)
     plt.close(figure)
     return paths
@@ -745,10 +767,11 @@ def _save(figure: plt.Figure, stem: str) -> list[Path]:
 def main() -> None:
     """Generate every investor-facing figure."""
 
+    snapshot = load_reporting_snapshot(SNAPSHOT_PATH)
     figures = (
-        ("investor_runway_to_live", runway_to_live_figure()),
-        ("investor_primary_metrics", primary_metrics_figure()),
-        ("investor_behavioral_boundary", behavioral_boundary_figure()),
+        ("investor_runway_to_live", runway_to_live_figure(snapshot)),
+        ("investor_primary_metrics", primary_metrics_figure(snapshot)),
+        ("investor_behavioral_boundary", behavioral_boundary_figure(snapshot)),
     )
     for stem, figure in figures:
         for path in _save(figure, stem):

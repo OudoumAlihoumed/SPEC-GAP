@@ -26,7 +26,7 @@ PER_STEP_SCORE_SCHEMA = "spec_gap.per_step_probe_score.v1"
 EVALUATION_METHOD = "leave_one_match_group_out"
 SUPPORTED_CHECKPOINT = "last_input_token"
 PROBE_NAMES = ("goldowsky_dill_logistic", "lat_contrast_pair_pca")
-DEPTH_ANALYSIS_LABEL_TARGETS = {"injection_present", "unsafe_action_executed"}
+PROBE_SCORE_LABEL_TARGETS = {"injection_present"}
 BEHAVIORAL_OUTCOMES = {
     "clean",
     "resisted",
@@ -97,10 +97,12 @@ def generate_per_step_probe_scores(
     same held-out match-group fold.
     """
 
-    if label_target not in DEPTH_ANALYSIS_LABEL_TARGETS:
+    if label_target not in PROBE_SCORE_LABEL_TARGETS:
         raise ValueError(
             "label_target must be one of "
-            f"{sorted(DEPTH_ANALYSIS_LABEL_TARGETS)}, got {label_target!r}."
+            f"{sorted(PROBE_SCORE_LABEL_TARGETS)}, got {label_target!r}. "
+            "Behavioral-action probes require mixed executed and non-executed outcomes "
+            "and are not supported by the current construction-diagnostic sample."
         )
     if checkpoint != SUPPORTED_CHECKPOINT:
         raise ValueError(
@@ -189,8 +191,8 @@ def summarize_per_step_probe_scores(rows: Sequence[dict[str, Any]]) -> dict[str,
         "schema_version": PER_STEP_SCORE_SCHEMA,
         "artifact_kind": "held_out_per_step_probe_scores",
         "claim_scope": (
-            "Construction-label diagnostic only when label_target is injection_present. "
-            "The scores are not generated model responses or behavioral ground truth."
+            "Construction-label diagnostic only. The scores are not generated model "
+            "responses or behavioral ground truth."
         ),
         "evaluation_method": EVALUATION_METHOD,
         "checkpoint": sorted({str(row["checkpoint"]) for row in rows}),
@@ -329,11 +331,7 @@ def _score_row(
     return {
         "schema_version": PER_STEP_SCORE_SCHEMA,
         "artifact_kind": "held_out_probe_score",
-        "claim_scope": (
-            "construction_label_diagnostic"
-            if label_target == "injection_present"
-            else "behavioral_action_diagnostic"
-        ),
+        "claim_scope": "construction_label_diagnostic",
         "trajectory_id": str(metadata["trajectory_id"]),
         "match_group_id": str(metadata["match_group_id"]),
         "domain_id": str(metadata["domain_id"]),
@@ -356,11 +354,7 @@ def _score_row(
         "probe_name": probe_name,
         "score": score,
         "label": int(label_value) if label_value in (0, 1) else None,
-        "label_target": (
-            "trajectory_action_executed"
-            if label_target == "unsafe_action_executed"
-            else label_target
-        ),
+        "label_target": label_target,
         "behavioral_outcome": outcome,
         "action_fired": action_fired,
         "latent_compromise_status": latent_status,

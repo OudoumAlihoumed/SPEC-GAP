@@ -10,10 +10,17 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-REPORTING_SCRIPTS = (
-    PROJECT_ROOT / "scripts/03_probe_analysis/12_plot_probe_analysis.py",
-    PROJECT_ROOT / "scripts/04_reporting/13_plot_pipeline_overview.py",
-    PROJECT_ROOT / "scripts/04_reporting/14_plot_investor_figures.py",
+REPORTING_SNAPSHOT = (
+    PROJECT_ROOT / "docs/data/scenario1/reporting_snapshot.json"
+)
+REPORTING_STAGES = (
+    (
+        PROJECT_ROOT / "scripts/03_probe_analysis/12_plot_probe_analysis.py",
+        "--snapshot-input",
+        REPORTING_SNAPSHOT,
+    ),
+    (PROJECT_ROOT / "scripts/04_reporting/13_plot_pipeline_overview.py",),
+    (PROJECT_ROOT / "scripts/04_reporting/14_plot_investor_figures.py",),
 )
 
 
@@ -23,8 +30,8 @@ def reporting_commands(
     """Return the stable command sequence used to rebuild reporting outputs."""
 
     return tuple(
-        (str(python_executable), str(script))
-        for script in REPORTING_SCRIPTS
+        (str(python_executable), *(str(part) for part in stage))
+        for stage in REPORTING_STAGES
     )
 
 

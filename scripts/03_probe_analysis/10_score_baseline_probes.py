@@ -40,11 +40,6 @@ def main() -> None:
         default=PROJECT_ROOT / "experiments/scenario1/manifest.json",
     )
     parser.add_argument(
-        "--label-target",
-        choices=("injection_present", "unsafe_action_executed"),
-        default="injection_present",
-    )
-    parser.add_argument(
         "--layers",
         default="all",
         help="Comma-separated layer indices, or 'all' (default).",
@@ -68,7 +63,7 @@ def main() -> None:
     score_rows = generate_per_step_probe_scores(
         load_activation_index(args.index),
         match_group_designs=load_match_group_designs(args.manifest),
-        label_target=args.label_target,
+        label_target="injection_present",
         layers=selected_layers,
         verify_checksums=not args.skip_checksums,
         random_state=args.random_state,
