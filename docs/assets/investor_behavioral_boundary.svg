@@ -8,7 +8,6 @@
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
     <dc:title>Investor Behavioral Boundary</dc:title>
-    <dc:date>2026-07-15T00:31:58.991631</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -42,7 +41,7 @@ Q 61.056 151.0632 61.056 159.768
 L 61.056 260.8776
 Q 61.056 269.5824 70.0416 269.5824
 z
-" clip-path="url(#p5a6092fda4)" style="fill: #eaf2ff; stroke: #2563eb; stroke-width: 1.5; stroke-linejoin: miter"/>
+" clip-path="url(#p5f20b9eb48)" style="fill: #eaf2ff; stroke: #2563eb; stroke-width: 1.5; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
     <path d="M 397.6704 269.5824
@@ -55,7 +54,7 @@ Q 388.6848 151.0632 388.6848 159.768
 L 388.6848 260.8776
 Q 388.6848 269.5824 397.6704 269.5824
 z
-" clip-path="url(#p5a6092fda4)" style="fill: #ecf8ef; stroke: #15803d; stroke-width: 1.5; stroke-linejoin: miter"/>
+" clip-path="url(#p5f20b9eb48)" style="fill: #ecf8ef; stroke: #15803d; stroke-width: 1.5; stroke-linejoin: miter"/>
    </g>
    <g id="patch_4">
     <path d="M 725.2992 269.5824
@@ -68,7 +67,7 @@ Q 716.3136 151.0632 716.3136 159.768
 L 716.3136 260.8776
 Q 716.3136 269.5824 725.2992 269.5824
 z
-" clip-path="url(#p5a6092fda4)" style="fill: #fff0ee; stroke: #b42318; stroke-width: 1.5; stroke-linejoin: miter"/>
+" clip-path="url(#p5f20b9eb48)" style="fill: #fff0ee; stroke: #b42318; stroke-width: 1.5; stroke-linejoin: miter"/>
    </g>
    <g id="patch_5">
     <path d="M 69.3504 518.6736
@@ -81,7 +80,7 @@ Q 61.056 324.4896 61.056 332.5248
 L 61.056 510.6384
 Q 61.056 518.6736 69.3504 518.6736
 z
-" clip-path="url(#p5a6092fda4)" style="fill: #e6f7f5; stroke: #87cfc8; stroke-width: 1.2; stroke-linejoin: miter"/>
+" clip-path="url(#p5f20b9eb48)" style="fill: #e6f7f5; stroke: #87cfc8; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_6">
     <path d="M 612.6336 518.6736
@@ -94,7 +93,7 @@ Q 604.3392 324.4896 604.3392 332.5248
 L 604.3392 510.6384
 Q 604.3392 518.6736 612.6336 518.6736
 z
-" clip-path="url(#p5a6092fda4)" style="fill: #f2ecff; stroke: #b9a1ed; stroke-width: 1.2; stroke-linejoin: miter"/>
+" clip-path="url(#p5f20b9eb48)" style="fill: #f2ecff; stroke: #b9a1ed; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
     <!-- What the current run established—and what it did not -->
@@ -2538,17 +2537,17 @@ z
    <g id="patch_7">
     <path d="M 522.70373 420.912
 Q 557.683883 420.912 590.092558 420.912
-" clip-path="url(#p5a6092fda4)" style="fill: none; stroke: #6d28d9; stroke-width: 2.3; stroke-linecap: round"/>
+" clip-path="url(#p5f20b9eb48)" style="fill: none; stroke: #6d28d9; stroke-width: 2.3; stroke-linecap: round"/>
     <path d="M 583.692558 417.712
 L 590.092558 420.912
 L 583.692558 424.112
 z
-" clip-path="url(#p5a6092fda4)" style="fill: #6d28d9; stroke: #6d28d9; stroke-width: 2.3; stroke-linecap: round"/>
+" clip-path="url(#p5f20b9eb48)" style="fill: #6d28d9; stroke: #6d28d9; stroke-width: 2.3; stroke-linecap: round"/>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="p5a6092fda4">
+  <clipPath id="p5f20b9eb48">
    <rect x="5.76" y="5.76" width="1105.92" height="602.64"/>
   </clipPath>
  </defs>

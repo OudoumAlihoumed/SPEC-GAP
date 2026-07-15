@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -12,6 +13,10 @@ from src.analysis.reporting_snapshot import (
     load_reporting_snapshot,
     write_reporting_snapshot,
 )
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+TRACKED_SNAPSHOT = PROJECT_ROOT / "docs/data/scenario1/reporting_snapshot.json"
 
 
 def _depth_metric(layer, *, mode="off", probe="goldowsky_dill_logistic", hop="2-hop"):
@@ -140,3 +145,17 @@ def test_snapshot_rejects_mode_specific_decoding_changes():
             },
             model_configs=configs,
         )
+
+
+def test_repository_includes_a_valid_public_reporting_snapshot():
+    snapshot = load_reporting_snapshot(TRACKED_SNAPSHOT)
+
+    assert snapshot["sample"] == {
+        "agent_turns": 56,
+        "behavioral_outcomes": {"clean": 8, "resisted": 8},
+        "match_groups": 2,
+        "trajectory_runs": 16,
+        "unsafe_action_executed_count": 0,
+    }
+    assert snapshot["analysis_revision"]
+    assert snapshot["reporting_revision"]
