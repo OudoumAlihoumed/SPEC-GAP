@@ -12,6 +12,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
+from src.analysis.figure_export import save_reproducible_figure
+
 
 CHECKPOINT_ORDER = (
     "last_input_token",
@@ -451,7 +453,8 @@ def _save(
             "Description": result["claim_scope"],
             "Keywords": ["SPEC-GAP", "activation probes", "exploratory"],
         }
-    figure.savefig(
+    save_reproducible_figure(
+        figure,
         path,
         dpi=dpi,
         bbox_inches="tight",
