@@ -15,6 +15,10 @@ results/**/*.jsonl
 results/**/*.png
 results/**/*.svg
 results/**/*.pdf
+!results/scenario1/figures/*.png
+!results/scenario1/figures/paper/*.png
+!results/scenario1/figures/paper/*.svg
+!results/scenario1/figures/paper/*.pdf
 results/**/*.code-workspace
 !results/.gitkeep
 data/**/*.pt
