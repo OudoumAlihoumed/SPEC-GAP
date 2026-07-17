@@ -270,8 +270,12 @@ def _write_csv(rows: list[dict], path: Path) -> None:
         raise ValueError(f"Cannot write an empty result table to {path}.")
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = sorted({field for row in rows for field in row})
-    with path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=fieldnames,
+            lineterminator="\n",
+        )
         writer.writeheader()
         writer.writerows(rows)
 

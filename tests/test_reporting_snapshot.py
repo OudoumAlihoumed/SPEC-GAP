@@ -17,6 +17,18 @@ from src.analysis.reporting_snapshot import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TRACKED_SNAPSHOT = PROJECT_ROOT / "docs/data/scenario1/reporting_snapshot.json"
+TRACKED_MANIFEST = (
+    PROJECT_ROOT / "results/scenario1/final_analysis/analysis_manifest.json"
+)
+TRACKED_TEMPORAL_RECORDS = (
+    PROJECT_ROOT
+    / "results/scenario1/depth_analysis/temporal_divergence_scores.jsonl"
+)
+TRACKED_PUBLIC_TABLES = (
+    PROJECT_ROOT / "results/scenario1/depth_analysis/depth_degradation.csv",
+    PROJECT_ROOT / "results/scenario1/final_analysis/reference_layer_depth_deltas.csv",
+    PROJECT_ROOT / "results/scenario1/final_analysis/reference_layer_metrics.csv",
+)
 
 
 def _depth_metric(layer, *, mode="off", probe="goldowsky_dill_logistic", hop="2-hop"):
@@ -159,3 +171,37 @@ def test_repository_includes_a_valid_public_reporting_snapshot():
     }
     assert snapshot["analysis_revision"]
     assert snapshot["reporting_revision"]
+
+
+def test_repository_includes_manifest_tables_figures_and_temporal_records():
+    manifest = json.loads(TRACKED_MANIFEST.read_text(encoding="utf-8"))
+
+    published_paths = [
+        PROJECT_ROOT / path
+        for path in manifest["tables"]
+    ]
+    published_paths.extend(
+        PROJECT_ROOT / path
+        for figure in manifest["figures"]
+        for path in figure["files"]
+    )
+    assert published_paths
+    assert all(path.is_file() and path.stat().st_size > 0 for path in published_paths)
+
+    temporal_rows = [
+        json.loads(line)
+        for line in TRACKED_TEMPORAL_RECORDS.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert temporal_rows
+    assert {row["schema_version"] for row in temporal_rows} == {
+        "spec_gap.temporal_divergence_score.v2"
+    }
+    assert {row["label_target"] for row in temporal_rows} == {
+        "injection_present"
+    }
+    assert {int(row["layer"]) for row in temporal_rows} == {32, 40, 48}
+
+
+def test_public_result_tables_use_portable_line_endings():
+    assert all(b"\r" not in path.read_bytes() for path in TRACKED_PUBLIC_TABLES)

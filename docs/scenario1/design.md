@@ -143,7 +143,7 @@ activation index
 ```
 
 All four trajectories from a match group stay in the same held-out fold.
-The LAT direction is learned from clean-minus-injected activation differences
+The LAT direction is learned from injected-minus-clean activation differences
 within the declared matched pairs. Thinking modes are analyzed separately.
 The temporal path mean uses Worker1 through executor as the post-anchor path and
 is used for AUROC, Brier score, and ECE. Signed Temporal Divergence subtracts

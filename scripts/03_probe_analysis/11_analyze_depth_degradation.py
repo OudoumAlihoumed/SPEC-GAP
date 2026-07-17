@@ -62,8 +62,12 @@ def main() -> None:
         rows = tabular_result_rows(result)
         args.output_csv.parent.mkdir(parents=True, exist_ok=True)
         fieldnames = sorted({key for row in rows for key in row})
-        with args.output_csv.open("w", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        with args.output_csv.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=fieldnames,
+                lineterminator="\n",
+            )
             writer.writeheader()
             writer.writerows(rows)
 

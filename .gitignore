@@ -19,6 +19,12 @@ results/**/*.pdf
 !results/scenario1/figures/paper/*.png
 !results/scenario1/figures/paper/*.svg
 !results/scenario1/figures/paper/*.pdf
+!results/scenario1/depth_analysis/depth_degradation.json
+!results/scenario1/depth_analysis/depth_degradation.csv
+!results/scenario1/depth_analysis/temporal_divergence_scores.jsonl
+!results/scenario1/final_analysis/analysis_manifest.json
+!results/scenario1/final_analysis/reference_layer_metrics.csv
+!results/scenario1/final_analysis/reference_layer_depth_deltas.csv
 results/**/*.code-workspace
 !results/.gitkeep
 data/**/*.pt

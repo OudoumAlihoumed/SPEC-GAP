@@ -27,6 +27,15 @@ select a best layer after seeing the results.
 
 Each main figure is also available as SVG and PDF in the same directory.
 
+The compact result files behind these figures are also tracked:
+
+- [analysis manifest](../final_analysis/analysis_manifest.json);
+- [layer-40 metrics](../final_analysis/reference_layer_metrics.csv);
+- [layer-40 depth changes](../final_analysis/reference_layer_depth_deltas.csv);
+- [reference depth analysis](../depth_analysis/depth_degradation.json);
+- [reference depth table](../depth_analysis/depth_degradation.csv);
+- [per-trajectory temporal path and divergence records](../depth_analysis/temporal_divergence_scores.jsonl).
+
 ## Appendix figures
 
 - [All-layer robustness](paper/appendix_all_layer_robustness.png) shows the
@@ -42,8 +51,16 @@ Each main figure is also available as SVG and PDF in the same directory.
 - [Thinking-on construction scan](construction_layer_scan_thinking_on.png)
 - [Planner negative controls](planner_negative_controls.png)
 
-Rebuild the reviewed reporting bundle from the repository root with:
+Rebuild the final probe figures, tables, manifest, and public presentation
+assets from the repository root with:
 
 ```bash
 python scripts/04_reporting/15_build_reporting_bundle.py
+```
+
+The planner-control, shared-input, and full-layer heatmap figures require the
+local activation-scan result and are regenerated separately with:
+
+```bash
+python scripts/03_probe_analysis/09_plot_layer_scan.py
 ```
