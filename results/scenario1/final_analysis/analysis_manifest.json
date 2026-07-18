@@ -1,0 +1,181 @@
+{
+  "analysis_revision": "8bd23d07d14b6fbcc5739af066714113dbcab490",
+  "analysis_status": "construction_diagnostic_complete_behavioral_auroc_unavailable",
+  "claim_scope": "group-held-out exploratory analysis with only two independent match groups",
+  "experiment_id": "scenario1-qwen32b-construction-diagnostic-v1",
+  "figures": [
+    {
+      "caption": "All 64 layers are shown without selecting a best layer. Vertical markers identify the prespecified reference and ablation layers. n=2 groups.",
+      "files": [
+        "results/scenario1/figures/paper/appendix_all_layer_robustness.pdf",
+        "results/scenario1/figures/paper/appendix_all_layer_robustness.png",
+        "results/scenario1/figures/paper/appendix_all_layer_robustness.svg"
+      ],
+      "role": "exploratory_appendix",
+      "stem": "appendix_all_layer_robustness",
+      "title": "Descriptive all-layer AUROC"
+    },
+    {
+      "caption": "The same group-held-out construction-label analysis for the late-added thinking-on condition. It is not pooled with the primary thinking-off run.",
+      "files": [
+        "results/scenario1/figures/paper/appendix_thinking_on_probe_metrics.pdf",
+        "results/scenario1/figures/paper/appendix_thinking_on_probe_metrics.png",
+        "results/scenario1/figures/paper/appendix_thinking_on_probe_metrics.svg"
+      ],
+      "role": "sensitivity",
+      "stem": "appendix_thinking_on_probe_metrics",
+      "title": "Thinking-on sensitivity metrics at layer 40"
+    },
+    {
+      "caption": "Group-held-out construction-label AUROC, Brier score, and ECE for executor-only and temporal path-mean aggregation at 2-hop and 3-hop. Signed Temporal Divergence is reported separately. Intervals resample match groups; n=2 independent groups.",
+      "files": [
+        "results/scenario1/figures/paper/figure3_primary_probe_metrics.pdf",
+        "results/scenario1/figures/paper/figure3_primary_probe_metrics.png",
+        "results/scenario1/figures/paper/figure3_primary_probe_metrics.svg"
+      ],
+      "role": "primary",
+      "stem": "figure3_primary_probe_metrics",
+      "title": "Thinking-off probe metrics at prespecified layer 40"
+    },
+    {
+      "caption": "Depth change at prespecified layer 40. Thinking-off is the primary analysis and thinking-on is a late-added sensitivity analysis. Positive values indicate higher construction-label AUROC at 3-hop.",
+      "files": [
+        "results/scenario1/figures/paper/figure4_depth_degradation.pdf",
+        "results/scenario1/figures/paper/figure4_depth_degradation.png",
+        "results/scenario1/figures/paper/figure4_depth_degradation.svg"
+      ],
+      "role": "primary_with_sensitivity_panel",
+      "stem": "figure4_depth_degradation",
+      "title": "Preliminary 3-hop minus 2-hop AUROC change"
+    },
+    {
+      "caption": "Thinking-off, layer-40 held-out probabilities across the agent chain. Thin lines are independent match groups and bold lines are their mean.",
+      "files": [
+        "results/scenario1/figures/paper/figure5_temporal_profiles.pdf",
+        "results/scenario1/figures/paper/figure5_temporal_profiles.png",
+        "results/scenario1/figures/paper/figure5_temporal_profiles.svg"
+      ],
+      "role": "primary",
+      "stem": "figure5_temporal_profiles",
+      "title": "Per-agent probe-score trajectories"
+    },
+    {
+      "caption": "All injected runs resisted and no unsafe executor action fired. This prevents behavioral-compromise AUROC estimation in the current sample.",
+      "files": [
+        "results/scenario1/figures/paper/figure6_behavioral_outcomes.pdf",
+        "results/scenario1/figures/paper/figure6_behavioral_outcomes.png",
+        "results/scenario1/figures/paper/figure6_behavioral_outcomes.svg"
+      ],
+      "role": "primary_limitation",
+      "stem": "figure6_behavioral_outcomes",
+      "title": "Observed behavioral outcomes"
+    }
+  ],
+  "label_target": "injection_present",
+  "model_configs": [
+    {
+      "decoding_settings": {
+        "do_sample": true,
+        "max_new_tokens": 2048,
+        "min_p": 0.0,
+        "seed": 0,
+        "temperature": 0.6,
+        "top_k": 20,
+        "top_p": 0.95
+      },
+      "dtype": "bfloat16",
+      "model_name": "Qwen/Qwen3-32B",
+      "model_revision": "9216db5781bf21249d130ec9da846c4624c16137",
+      "num_hidden_layers": 64,
+      "provider": "modal",
+      "seed": 0,
+      "thinking_mode": "off",
+      "tokenizer_name": "Qwen/Qwen3-32B",
+      "tokenizer_revision": "9216db5781bf21249d130ec9da846c4624c16137"
+    },
+    {
+      "decoding_settings": {
+        "do_sample": true,
+        "max_new_tokens": 2048,
+        "min_p": 0.0,
+        "seed": 0,
+        "temperature": 0.6,
+        "top_k": 20,
+        "top_p": 0.95
+      },
+      "dtype": "bfloat16",
+      "model_name": "Qwen/Qwen3-32B",
+      "model_revision": "9216db5781bf21249d130ec9da846c4624c16137",
+      "num_hidden_layers": 64,
+      "provider": "modal",
+      "seed": 0,
+      "thinking_mode": "on",
+      "tokenizer_name": "Qwen/Qwen3-32B",
+      "tokenizer_revision": "9216db5781bf21249d130ec9da846c4624c16137"
+    }
+  ],
+  "prespecified_layer_checks": {
+    "ablations": [
+      32,
+      48
+    ],
+    "all_layer_scan_role": "descriptive_only_no_post_hoc_selection",
+    "reference": 40
+  },
+  "primary_analysis": {
+    "evaluation_method": "leave_one_match_group_out",
+    "layer": 40,
+    "thinking_mode": "off"
+  },
+  "reporting_revision": "ae2414d550b4cc1172a1d93a730d8f43c9cc6e15",
+  "reporting_snapshot": {
+    "path": "docs/data/scenario1/reporting_snapshot.json",
+    "sha256": "12de982c1317697482027a17d29e78dff9673bcfadc94c23fb27492159bd7524"
+  },
+  "sample": {
+    "agent_turns": 56,
+    "behavioral_outcomes": {
+      "clean": 8,
+      "resisted": 8
+    },
+    "match_groups": 2,
+    "trajectory_runs": 16,
+    "unsafe_action_executed_count": 0
+  },
+  "schema_version": "spec_gap.final_analysis_manifest.v3",
+  "sensitivity_analysis": {
+    "reason": "Thinking mode was added after the primary experiment was defined.",
+    "thinking_mode": "on"
+  },
+  "source_artifacts": {
+    "all_layer_descriptive_result": {
+      "path": "results/scenario1/depth_analysis/all_layer_descriptive.json",
+      "sha256": "4c39b264b26b0f2eeb3b2caff22ec0349f39f2c80f470f909649a0ef959d7992"
+    },
+    "per_step_probe_scores": {
+      "path": "results/scenario1/per_step_probe_scores.jsonl",
+      "sha256": "0fef6e73455d7772e7256a24869ed4a595a6bfd2cf9f8431685c85478d245d39"
+    },
+    "reference_depth_result": {
+      "path": "results/scenario1/depth_analysis/depth_degradation.json",
+      "sha256": "34c0d03daa0ac3927a33e3d6f63684a2cfca8c54293318e9f8926e98dbe80c02"
+    }
+  },
+  "supported_statements": [
+    "The pipeline produced group-held-out construction-label scores for every saved agent step.",
+    "Goldowsky-Dill, LAT, temporal path-mean classification, signed Temporal Divergence, calibration, and preliminary depth calculations ran on the controlled sample.",
+    "Thinking-off is the primary analysis and thinking-on is reported separately as sensitivity analysis.",
+    "All injected trajectories resisted and no unsafe executor action fired."
+  ],
+  "tables": [
+    "results/scenario1/final_analysis/reference_layer_metrics.csv",
+    "results/scenario1/final_analysis/reference_layer_depth_deltas.csv"
+  ],
+  "unsupported_statements": [
+    "The probes detect successful behavioral compromise.",
+    "A final best activation layer has been identified.",
+    "The two-group depth effect generalizes to new domains or scenarios.",
+    "Domain effects can be separated from injection-wording effects in the two-group sample.",
+    "Temporal path-mean aggregation or signed Temporal Divergence outperforms either baseline beyond this exploratory sample."
+  ]
+}

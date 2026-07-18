@@ -20,11 +20,11 @@ Each group has four controlled construction cells:
 - clean 3-hop;
 - injected 3-hop.
 
-This gives eight base construction records. The thinking comparison runs each
-base record once with thinking on and once with thinking off, so these eight
-cells become sixteen live pipeline runs. Because a 2-hop pipeline has three
-model turns and a 3-hop pipeline has four, the complete two-mode run contains
-56 model-turn jobs: 28 per thinking mode.
+This gives eight base construction records. Thinking off is the primary run.
+Thinking on was added later and is kept as a separate sensitivity analysis.
+Running both modes turns the eight base cells into sixteen live pipeline runs.
+Because a 2-hop pipeline has three model turns and a 3-hop pipeline has four,
+the complete two-mode run contains 56 model-turn jobs: 28 per thinking mode.
 
 ## Shared design rules
 
@@ -117,9 +117,43 @@ model and tokenizer revisions, raw generation, separated thinking and final
 content, finish reason, truncation, tool requests, activation metadata, token
 usage, and estimated H200 cost.
 
-No primary layer is locked. The first layer scan requests all 64 Qwen layers.
-A primary analysis layer may be selected only after the scan shows enough
-signal.
+The first layer scan requests all 64 Qwen layers. It does not select the layer
+with the highest observed AUROC. The preliminary analysis uses layer 40 as a
+prespecified reference because it preserves the original Llama layer-20
+relative-depth choice when moving from 32 to 64 model layers. Layers 32 and 48
+are prespecified ablations. All 64-layer curves are reported as descriptive
+checks, not as evidence that one layer is final.
+
+## Probe and depth analysis
+
+The current live batch contains only clean and resisted behavioral outcomes.
+It therefore supports a diagnostic of the known construction label
+`injection_present`, but it cannot estimate successful-compromise AUROC.
+
+The CPU-only analysis order is:
+
+```text
+activation index
+→ strict planner and paired controls
+→ all-layer descriptive scan
+→ group-held-out Goldowsky-Dill and LAT scores
+→ temporal path mean and signed Temporal Divergence over ordered agent scores
+→ AUROC, Brier score, ECE, bootstrap intervals, and depth deltas
+→ final figures and result manifest
+```
+
+All four trajectories from a match group stay in the same held-out fold.
+The LAT direction is learned from injected-minus-clean activation differences
+within the declared matched pairs. Thinking modes are analyzed separately.
+The temporal path mean uses Worker1 through executor as the post-anchor path and
+is used for AUROC, Brier score, and ECE. Signed Temporal Divergence subtracts
+the planner's pre-anchor score from that path mean and is reported separately
+as a trajectory-shape statistic.
+
+With only two match groups, each domain currently appears with one injection
+wording. Domain and wording effects are therefore confounded in this snapshot.
+The larger design must rotate each wording across multiple domains before
+either effect is interpreted separately.
 
 ## Labels
 

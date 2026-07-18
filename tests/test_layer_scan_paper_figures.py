@@ -71,6 +71,15 @@ def test_save_paper_figures_in_vector_and_preview_formats(tmp_path):
         "appendix_full_layer_heatmap",
     }
     assert all(path.is_file() and path.stat().st_size > 1000 for path in paths)
+    for path in paths:
+        if path.suffix == ".svg":
+            payload = path.read_text(encoding="utf-8")
+            assert all(line == line.rstrip() for line in payload.splitlines())
+            assert "<dc:date>" not in payload
+        elif path.suffix == ".pdf":
+            payload = path.read_bytes()
+            assert b"CreationDate" not in payload
+            assert b"ModDate" not in payload
     assert plt.get_fignums() == []
 
 
