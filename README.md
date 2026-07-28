@@ -49,8 +49,8 @@ the executor receive the visible upstream message, not the raw document or
 hidden reasoning. This keeps the injection point fixed while increasing the
 distance from injection to action.
 
-See [the Scenario 1 design guide](docs/scenario1/design.md) for the complete
-matching, independence, and exact-input requirements.
+See [the Scenario 1 schema guide](docs/scenario1/schema.md) for the current
+trajectory contract, matching, and exact-input requirements.
 
 ## Repository Structure
 
