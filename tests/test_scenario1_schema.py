@@ -64,6 +64,101 @@ def test_all_records_pass_schema_and_semantics(records):
         assert check(record) == [], f"{record['trajectory_id']}: {check(record)}"
 
 
+def test_schema_requires_construction_and_source_provenance():
+    assert {
+        "independence_group_id",
+        "domain_id",
+        "task_family_id",
+        "task",
+        "document_set",
+        "injection",
+        "provenance",
+    }.issubset(SCHEMA["required"])
+    assert {
+        "user_task",
+        "expected_benign_behavior",
+    }.issubset(SCHEMA["properties"]["task"]["required"])
+
+    documents = SCHEMA["properties"]["document_set"]["properties"]["documents"]
+    assert documents["minContains"] == documents["maxContains"] == 1
+    assert {
+        "doc_id",
+        "title",
+        "role",
+        "text",
+    }.issubset(documents["items"]["required"])
+    assert {
+        "file",
+        "source_pdf",
+        "clean_source_pdf",
+        "injected_source_pdf",
+    }.issubset(documents["items"]["properties"])
+    assert "insertion_anchor" in SCHEMA["$defs"]["injection"]["required"]
+    assert "created_by" in SCHEMA["$defs"]["provenance"]["required"]
+
+
+def test_records_preserve_requested_construction_metadata(records):
+    registries_by_group = {
+        reg["independence_group_id"]: reg for reg in REGISTRIES
+    }
+    for record in records:
+        reg = registries_by_group[record["independence_group_id"]]
+        assert record["domain_id"] == reg["domain_id"]
+        assert record["task_family_id"] == reg["task_family_id"]
+        assert record["task"]["user_task"] == reg["task"]["user_task"]
+        assert (
+            record["task"]["expected_benign_behavior"]
+            == reg["task"]["expected_benign_behavior"]
+        )
+        assert (
+            record["injection"]["insertion_anchor"]
+            == reg["injection"]["insertion_anchor"]
+        )
+        assert record["provenance"]["created_by"] == reg["provenance"]["created_by"]
+
+        slots_by_id = {slot["doc_id"]: slot for slot in reg["document_slots"]}
+        documents = record["document_set"]["documents"]
+        assert len(documents) == 3
+        assert sum(
+            document["role"] == "injection_carrier" for document in documents
+        ) == 1
+        for document in documents:
+            source = slots_by_id[document["doc_id"]]
+            assert document["title"] == source["title"]
+            for field in gen.DOCUMENT_SOURCE_FIELDS:
+                if field in source:
+                    assert document[field] == source[field]
+                else:
+                    assert field not in document
+
+
+def test_schema_rejects_missing_requested_metadata(records):
+    required_paths = (
+        ("independence_group_id",),
+        ("domain_id",),
+        ("task_family_id",),
+        ("task", "user_task"),
+        ("task", "expected_benign_behavior"),
+        ("document_set", "documents", 0, "title"),
+        ("injection", "insertion_anchor"),
+        ("provenance", "created_by"),
+    )
+    for path in required_paths:
+        invalid = copy.deepcopy(records[0])
+        parent = invalid
+        for key in path[:-1]:
+            parent = parent[key]
+        del parent[path[-1]]
+        assert list(VALIDATOR.iter_errors(invalid)), f"{path} was not required"
+
+
+def test_schema_requires_exactly_one_injection_carrier(records):
+    invalid = copy.deepcopy(records[0])
+    for document in invalid["document_set"]["documents"]:
+        document["role"] = "benign"
+    assert list(VALIDATOR.iter_errors(invalid))
+
+
 def test_each_group_holds_task_seed_wording_and_documents_constant(records):
     for group_id in {record["independence_group_id"] for record in records}:
         group = [record for record in records if record["independence_group_id"] == group_id]
@@ -94,6 +189,13 @@ def test_registry_validation_rejects_cross_group_leakage():
         "doc_id"
     ]
     with pytest.raises(ValueError, match="document ID"):
+        gen.validate_registry_set(registries)
+
+
+def test_registry_validation_rejects_missing_document_title():
+    registries = copy.deepcopy(REGISTRIES)
+    del registries[0]["document_slots"][0]["title"]
+    with pytest.raises(ValueError, match="has no title"):
         gen.validate_registry_set(registries)
 
 

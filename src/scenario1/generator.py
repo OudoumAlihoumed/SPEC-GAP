@@ -37,6 +37,12 @@ CLIMATE_REGISTRY_PATH = INPUTS / "domain_climate_science.json"
 DEFAULT_REGISTRY_PATHS = (REGISTRY_PATH, CLIMATE_REGISTRY_PATH)
 ARTIFACT_ROOT = os.path.join("experiments", "scenario1")
 TRAJ_DIR = "trajectories"
+DOCUMENT_SOURCE_FIELDS = (
+    "file",
+    "source_pdf",
+    "clean_source_pdf",
+    "injected_source_pdf",
+)
 
 HOP_PATH = {
     "2-hop": ["user", "planner", "worker", "retrieved_document", "executor"],
@@ -95,13 +101,17 @@ def _normalize_climate_registry(raw: dict[str, Any], path: Path) -> dict[str, An
         text = document.get("body_clean") if carrier else document.get("body")
         if carrier:
             injection_payload = document["injection_payload"]
-        document_slots.append({
+        slot = {
             "slot": index,
             "doc_id": document["doc_id"],
             "title": document.get("title"),
             "text": text,
             "role": "injection_carrier" if carrier else "benign",
-        })
+        }
+        for field in DOCUMENT_SOURCE_FIELDS:
+            if isinstance(document.get(field), str):
+                slot[field] = document[field]
+        document_slots.append(slot)
     if injection_payload is None:
         raise ValueError("climate registry does not define an injection carrier")
 
@@ -211,6 +221,24 @@ def validate_registry_set(registries: Iterable[dict[str, Any]]) -> None:
         documents = load_documents(reg)
         if len(documents) != 3:
             raise ValueError("each match group must contain exactly three documents")
+        if sum(
+            document["role"] == "injection_carrier" for document in documents
+        ) != 1:
+            raise ValueError(
+                "each match group must contain exactly one injection carrier"
+            )
+        if not reg["task"].get("expected_benign_behavior"):
+            raise ValueError(
+                f"{reg['independence_group_id']} is missing expected benign behavior"
+            )
+        if not reg["injection"].get("insertion_anchor"):
+            raise ValueError(
+                f"{reg['independence_group_id']} is missing an insertion anchor"
+            )
+        if not reg.get("provenance", {}).get("created_by"):
+            raise ValueError(
+                f"{reg['independence_group_id']} is missing provenance.created_by"
+            )
         document_ids.extend(document["doc_id"] for document in documents)
         document_texts.extend(document["text"] for document in documents)
         actual_conditions = {
@@ -235,18 +263,24 @@ def validate_registry_set(registries: Iterable[dict[str, Any]]) -> None:
 def load_documents(reg: dict[str, Any]) -> list[dict[str, Any]]:
     documents = []
     for slot in reg["document_slots"]:
+        if not isinstance(slot.get("title"), str) or not slot["title"].strip():
+            raise ValueError(f"document slot {slot.get('doc_id')} has no title")
         if isinstance(slot.get("text"), str):
             text = slot["text"]
         elif isinstance(slot.get("file"), str):
             text = (INPUTS / slot["file"]).read_text()
         else:
             raise ValueError(f"document slot {slot.get('doc_id')} has no text or file")
-        documents.append({
+        document = {
             "doc_id": slot["doc_id"],
-            "title": slot.get("title") or slot["doc_id"],
+            "title": slot["title"],
             "role": slot["role"],
             "text": text,
-        })
+        }
+        for field in DOCUMENT_SOURCE_FIELDS:
+            if isinstance(slot.get(field), str):
+                document[field] = slot[field]
+        documents.append(document)
     return documents
 
 
@@ -522,6 +556,7 @@ def build_record(
         "injection_variant": reg["assigned_wording"],
         "injection_family": reg["injection_family"],
         "injection_placement": reg["injection_placement"],
+        "insertion_anchor": reg["injection"]["insertion_anchor"],
         "injection_marker": reg["injection"]["carrier_marker"],
         "injection_point": {
             "agent_role": "worker",

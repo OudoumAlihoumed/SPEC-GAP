@@ -8,6 +8,8 @@
     "schema_version",
     "trajectory_id",
     "independence_group_id",
+    "domain_id",
+    "task_family_id",
     "treatment",
     "scenario_id",
     "condition_id",
@@ -22,7 +24,8 @@
     "injection",
     "compromise_propagation",
     "trajectory_trace",
-    "evaluation_labels"
+    "evaluation_labels",
+    "provenance"
   ],
   "additionalProperties": true,
   "properties": {
@@ -40,14 +43,17 @@
     },
     "independence_group_id": {
       "type": "string",
+      "minLength": 1,
       "description": "Match-group id: the construction unit. The four trajectories in a group (clean/injected x 2-hop/3-hop) share this id, task, document set, and injection wording, and differ only in treatment and condition_id. Split-safety key: records sharing this id must stay in the same train/val/test split."
     },
     "domain_id": {
       "type": "string",
+      "minLength": 1,
       "description": "Independent domain. Unique per match group."
     },
     "task_family_id": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "document_set_id": {
       "type": "string"
@@ -97,14 +103,17 @@
     "task": {
       "type": "object",
       "required": [
-        "user_task"
+        "user_task",
+        "expected_benign_behavior"
       ],
       "properties": {
         "user_task": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "expected_benign_behavior": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -122,14 +131,65 @@
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
+          "contains": {
+            "type": "object",
+            "required": [
+              "role"
+            ],
+            "properties": {
+              "role": {
+                "const": "injection_carrier"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1,
           "items": {
             "type": "object",
-            "required": ["doc_id", "role", "text"],
+            "required": [
+              "doc_id",
+              "title",
+              "role",
+              "text"
+            ],
             "properties": {
-              "doc_id": {"type": "string"},
-              "title": {"type": "string"},
-              "role": {"enum": ["benign", "injection_carrier"]},
-              "text": {"type": "string"}
+              "doc_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Source text-fixture filename or path, relative to the source registry when the document is file-backed. Omitted for inline source documents."
+              },
+              "source_pdf": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Original source-PDF filename or path for a document whose clean and injected records share one PDF."
+              },
+              "clean_source_pdf": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Clean source-PDF filename or path when the injection carrier has separate clean and injected PDFs."
+              },
+              "injected_source_pdf": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Injected source-PDF filename or path when the injection carrier has separate clean and injected PDFs."
+              },
+              "role": {
+                "enum": [
+                  "benign",
+                  "injection_carrier"
+                ]
+              },
+              "text": {
+                "type": "string"
+              }
             }
           }
         }
@@ -164,6 +224,9 @@
     },
     "evaluation_labels": {
       "$ref": "#/$defs/evaluation_labels"
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
     }
   },
   "$defs": {
@@ -289,6 +352,7 @@
         "injection_variant",
         "injection_family",
         "injection_placement",
+        "insertion_anchor",
         "injection_point",
         "raw_poison_exposed_agents"
       ],
@@ -325,6 +389,11 @@
             "metadata"
           ],
           "description": "body_text for every MVP trajectory. Must not vary alongside wording, or the two axes confound."
+        },
+        "insertion_anchor": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact text in the clean carrier used as the deterministic insertion point. In a clean record, this identifies where the matched injected twin would be modified."
         },
         "injection_marker": {
           "type": [
@@ -367,6 +436,32 @@
           ]
         }
       }
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "created_by"
+      ],
+      "properties": {
+        "created_by": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Contributor responsible for the source registry or trajectory construction input."
+        },
+        "generator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_registry": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
     },
     "compromise_propagation": {
       "type": "object",
