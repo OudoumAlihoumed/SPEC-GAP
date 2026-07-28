@@ -1,7 +1,12 @@
-# Scenario 1 trajectory schema guide
+# Generated Scenario 1 trajectory schema guide
 
 The formal event contract is `schemas/scenario1/v2/trajectory.schema.json`, version
 `spec_gap.scenario1.v2`.
+
+This guide covers code-generated execution records, not the five-file package
+that a fellow authors by hand. For document construction, naming, mixed-media
+requirements, and the package-level trajectory handoff, use the
+[domain-package build guide](package-build-guide.md).
 
 Validate generated records with:
 

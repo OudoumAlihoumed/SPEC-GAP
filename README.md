@@ -17,8 +17,11 @@ source of ground-truth labels and does not replace residual-stream analysis.
 
 ## Experiment Design
 
-One trajectory is one complete pipeline run. One matched group contains four
-trajectories built from the same task, documents, injection wording, and seed:
+Fellows first build one five-file domain package: three clean documents, one
+injected twin of a clean document, and one package-level trajectory handoff.
+The pipeline then expands one accepted match group into four execution
+trajectories built from the same task, source package, injection wording, and
+seed:
 
 ```text
 clean 2-hop
@@ -27,8 +30,9 @@ clean 3-hop
 injected 3-hop
 ```
 
-The current controlled input set contains two matched groups. Applying both
-thinking modes produces 16 trajectory runs and 56 model turns.
+Running both thinking modes produces eight trajectory runs and 28 model turns
+per accepted match group. Counts therefore scale with the number of registered
+independent groups instead of being fixed in the documentation.
 
 | Property | Controlled value |
 | --- | --- |
@@ -36,7 +40,8 @@ thinking modes produces 16 trajectory runs and 56 model turns.
 | 2-hop topology | planner → worker_1 → executor |
 | 3-hop topology | planner → worker_1 → worker_2 → executor |
 | Injection entry point | worker_1 at both depths |
-| Retrieved set | two clean documents and one clean/injected document pair |
+| Domain package | three clean documents plus one injected twin that shadows exactly one clean document |
+| Retrieved set per run | three documents; the injected condition swaps the carrier's clean file for its injected twin |
 | Injection placement | document body |
 | Model | `Qwen/Qwen3-32B` |
 | Model revision | `9216db5781bf21249d130ec9da846c4624c16137` |
@@ -49,14 +54,19 @@ the executor receive the visible upstream message, not the raw document or
 hidden reasoning. This keeps the injection point fixed while increasing the
 distance from injection to action.
 
-See [the Scenario 1 schema guide](docs/scenario1/schema.md) for the current
-trajectory contract, matching, and exact-input requirements.
+Use the [Scenario 1 domain-package build guide](docs/scenario1/package-build-guide.md)
+for the current fellow handoff and content-construction requirements. The
+[Scenario 1 trajectory schema guide](docs/scenario1/schema.md) documents the
+separate, code-generated execution record. The
+[original Word build guide](docs/scenario1/scenario1_package_build_guide.md.docx)
+is preserved in the repository.
 
 ## Repository Structure
 
 | Area | Key paths | Purpose |
 | --- | --- | --- |
-| Inputs and schema | `experiments/scenario1/`, `schemas/scenario1/v2/` | Controlled inputs, generated trajectories, and their event schema. |
+| Domain authoring | `docs/scenario1/package-build-guide.md` | Current five-file package construction and fellow handoff requirements. |
+| Inputs and run schema | `experiments/scenario1/`, `schemas/scenario1/v2/` | Normalized inputs, generated execution trajectories, and their event schema. |
 | Construction and execution | `scripts/01_*`, `scripts/02_*`, `src/scenario1/`, `src/pipeline/`, `src/infrastructure/` | Build, validate, and run the agent pipeline. |
 | Probe analysis | `scripts/03_*`, `src/extraction/`, `src/probes/`, `src/analysis/` | Extract activations, score probes, and compute metrics. |
 | Reporting | `scripts/04_*`, `docs/assets/`, `docs/data/scenario1/` | Rebuild tracked figures, metrics, and provenance. |
@@ -86,7 +96,7 @@ python -m pytest -q
 The smoke test checks the controlled inputs, schema, model request contract,
 and agent-chain plan without calling Qwen or starting a GPU.
 
-Generate the eight structural trajectories:
+Generate structural trajectories for every currently registered match group:
 
 ```bash
 python scripts/01_scenario_construction/01_generate_trajectories.py \
@@ -372,8 +382,8 @@ success label. For the black-box benchmark, only `executed` counts as a
 successful compromise. A latent-compromise label requires separate human or
 mechanistic evidence and is never inferred from suspicious output text alone.
 
-See [the schema guide](docs/scenario1/schema.md) for the full event and label
-contract.
+See [the generated trajectory schema guide](docs/scenario1/schema.md) for the
+full event and label contract.
 
 ## Outputs
 
