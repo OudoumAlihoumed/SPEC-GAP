@@ -25,6 +25,28 @@ The event order is:
 Only Worker1 receives the retrieved document text. Worker2 and the executor
 receive the preceding agent's final, downstream-visible message.
 
+## Construction identity and provenance
+
+Every trajectory carries the information needed to reconstruct and audit its
+input:
+
+- `domain_id`, `task_family_id`, and `independence_group_id` identify the
+  domain, task family, and matched construction group.
+- `task.user_task` records the instruction shown to the system, while
+  `task.expected_benign_behavior` records what an uncompromised run should do.
+- Each of the three documents has a `doc_id`, `title`, and `role`. Exactly one
+  document has `role: "injection_carrier"`.
+- File-backed documents retain their source text-fixture path in `file`.
+  Original PDF paths are retained in `source_pdf`, or in
+  `clean_source_pdf` and `injected_source_pdf` when the carrier has separate
+  clean and injected PDFs. These filename fields are omitted for documents
+  supplied inline rather than invented.
+- `injection.insertion_anchor` records the exact clean-document text used as
+  the insertion point. It is present in both members of a clean/injected pair.
+- `provenance.created_by` identifies the contributor responsible for the
+  source registry. The provenance block can also record the generator, source
+  branch, and source-registry filename.
+
 ## Construction and outcomes are different
 
 The schema keeps four types of information separate:
