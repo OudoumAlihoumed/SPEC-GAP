@@ -28,15 +28,25 @@ from src.scenario1.orchestrator import (  # noqa: E402
 @app.local_entrypoint()
 def run_scenario1_batch(
     thinking_modes: str = "off,on",
+    registry_paths: str = "",
     action: str = "validate",
     output_root: str = str(Path(ARTIFACT_ROOT) / "trajectories"),
     max_new_trajectories: int = 0,
     confirm_paid_run: str = "",
 ) -> None:
-    """Validate or resume both canonical match groups in one Modal app."""
+    """Validate or resume selected match groups in one Modal app."""
 
     modes = [mode.strip() for mode in thinking_modes.split(",") if mode.strip()]
-    registries = load_registries()
+    selected_registry_paths = [
+        path.strip() for path in registry_paths.split(",") if path.strip()
+    ]
+    if registry_paths.strip() and not selected_registry_paths:
+        raise ValueError("registry_paths must contain at least one path")
+    registries = (
+        load_registries(selected_registry_paths)
+        if selected_registry_paths
+        else load_registries()
+    )
     plan = build_live_batch(
         registries,
         thinking_modes=modes,
@@ -71,6 +81,10 @@ def run_scenario1_batch(
         "selected_new_trajectories": len(selected),
         "selected_model_turns": model_turns,
         "thinking_modes": modes,
+        "independence_group_ids": [
+            registry["independence_group_id"] for registry in registries
+        ],
+        "registry_paths": selected_registry_paths,
         "selected_ids": [item["trajectory_id"] for item in selected],
     }
     print(json.dumps(preview, indent=2), flush=True)

@@ -183,6 +183,35 @@ def _validate_layers(layers: Any) -> list[int]:
     return sorted(layers)
 
 
+def validate_context_window(
+    *,
+    input_tokens: int,
+    max_new_tokens: int,
+    context_window_tokens: int,
+) -> None:
+    """Reject overlength prompts; controlled runs never silently truncate."""
+
+    for field, value in (
+        ("input_tokens", input_tokens),
+        ("max_new_tokens", max_new_tokens),
+        ("context_window_tokens", context_window_tokens),
+    ):
+        if (
+            not isinstance(value, int)
+            or isinstance(value, bool)
+            or value < 1
+        ):
+            raise RequestValidationError(f"{field} must be a positive integer")
+    requested_sequence_length = input_tokens + max_new_tokens
+    if requested_sequence_length > context_window_tokens:
+        raise RequestValidationError(
+            "request would exceed the pinned model context window: "
+            f"{input_tokens} input + {max_new_tokens} generated = "
+            f"{requested_sequence_length} > {context_window_tokens}. "
+            "SPEC-GAP does not silently truncate retrieved evidence."
+        )
+
+
 def validate_generation_request(payload: Any) -> dict[str, Any]:
     """Validate and normalize one model-turn request without using compute."""
 

@@ -28,6 +28,11 @@ from src.infrastructure.qwen_modal import (
     MODEL_REVISION,
     validate_generation_request,
 )
+from src.scenario1.retrieval import (
+    canonical_plan_sha256,
+    load_retrieval_plan,
+    materialize_retrieval,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -284,10 +289,67 @@ def load_documents(reg: dict[str, Any]) -> list[dict[str, Any]]:
     return documents
 
 
-def build_document_set(
-    reg: dict[str, Any], treatment: str
-) -> tuple[list[dict[str, Any]], list[int] | None]:
-    """Build one matched document set and return its injection character span."""
+def _canonical_non_evidence_pages(
+    retrieval_config: dict[str, Any],
+) -> dict[str, list[dict[str, Any]]]:
+    """Normalize registry page groups to the retrieval-plan representation."""
+
+    raw = retrieval_config.get("non_evidence_pages", {})
+    if not isinstance(raw, dict):
+        raise ValueError(
+            "registry retrieval.non_evidence_pages must be an object"
+        )
+    result: dict[str, list[dict[str, Any]]] = {}
+    for doc_id, groups in raw.items():
+        if not isinstance(groups, list):
+            raise ValueError(
+                f"registry retrieval.non_evidence_pages.{doc_id} "
+                "must be a list"
+            )
+        page_reasons: dict[int, str] = {}
+        for group in groups:
+            if not isinstance(group, dict):
+                raise ValueError(
+                    f"{doc_id} non-evidence annotation must be an object"
+                )
+            pages = group.get("pages")
+            reason = group.get("reason")
+            if (
+                not isinstance(pages, list)
+                or not pages
+                or not isinstance(reason, str)
+                or not reason.strip()
+            ):
+                raise ValueError(
+                    f"{doc_id} has an invalid non-evidence annotation"
+                )
+            for page_number in pages:
+                if (
+                    not isinstance(page_number, int)
+                    or isinstance(page_number, bool)
+                    or page_number < 1
+                    or page_number in page_reasons
+                ):
+                    raise ValueError(
+                        f"{doc_id} has an invalid or repeated non-evidence page"
+                    )
+                page_reasons[page_number] = reason
+        result[doc_id] = [
+            {"page_number": page_number, "reason": reason}
+            for page_number, reason in sorted(page_reasons.items())
+        ]
+    return result
+
+
+def _build_document_bundle(
+    reg: dict[str, Any],
+    treatment: str,
+) -> tuple[
+    list[dict[str, Any]],
+    list[int] | None,
+    dict[str, Any] | None,
+]:
+    """Build one matched document set plus optional retrieval provenance."""
 
     documents = load_documents(reg)
     injection = reg["injection"]
@@ -303,6 +365,191 @@ def build_document_set(
     clean_text = documents[carrier_index]["text"]
     if marker in clean_text or endpoint in clean_text:
         raise AssertionError("the clean carrier document already contains the injection")
+
+    retrieval_config = reg.get("retrieval")
+    if retrieval_config is not None:
+        if not isinstance(retrieval_config, dict):
+            raise ValueError("registry retrieval must be an object")
+        plan_file = retrieval_config.get("plan_file")
+        if not isinstance(plan_file, str) or not plan_file:
+            raise ValueError("registry retrieval.plan_file must be a non-empty string")
+        plan_path = INPUTS / plan_file
+        plan = load_retrieval_plan(plan_path)
+        if plan.get("profile_id") != retrieval_config.get("profile_id"):
+            raise ValueError("registry and retrieval plan profile IDs do not match")
+        if plan.get("query") != retrieval_config.get("query"):
+            raise ValueError("registry and retrieval plan queries do not match")
+        if "document_token_budgets" in retrieval_config and (
+            plan.get("budget", {}).get("document_token_budgets")
+            != retrieval_config.get("document_token_budgets")
+        ):
+            raise ValueError(
+                "registry and retrieval plan per-document budgets do not match"
+            )
+        if "non_evidence_pages" in retrieval_config:
+            eligibility = plan.get("evidence_eligibility", {})
+            if (
+                eligibility.get("determined_from")
+                != "clean_source_section_type"
+                or eligibility.get("all_pages_remain_indexed") is not True
+                or eligibility.get("non_evidence_pages")
+                != _canonical_non_evidence_pages(retrieval_config)
+            ):
+                raise ValueError(
+                    "registry and retrieval plan evidence eligibility do not match"
+                )
+        if plan.get("tokenizer", {}).get("model_id") != MODEL_ID or (
+            plan.get("tokenizer", {}).get("revision") != MODEL_REVISION
+        ):
+            raise ValueError(
+                "retrieval plan did not use the pinned model tokenizer"
+            )
+        if plan.get("budget", {}).get("max_new_tokens") != (
+            CONTROLLED_GENERATION_SETTINGS["max_new_tokens"]
+        ):
+            raise ValueError(
+                "retrieval plan generation reserve differs from the run"
+            )
+        if retrieval_config.get("source_pdf_verification_required") is True and (
+            plan.get("source_pdf_verification", {}).get("status")
+            != "verified"
+        ):
+            raise ValueError(
+                "registry requires verified source PDFs for this retrieval plan"
+            )
+        context_preflight_file = retrieval_config.get(
+            "context_preflight_file"
+        )
+        context_preflight = None
+        if context_preflight_file is not None:
+            if (
+                not isinstance(context_preflight_file, str)
+                or not context_preflight_file
+            ):
+                raise ValueError(
+                    "registry retrieval.context_preflight_file must be a "
+                    "non-empty string"
+                )
+            context_preflight = _read_json(
+                INPUTS / context_preflight_file
+            )
+            if context_preflight.get("retrieval_plan_sha256") != (
+                canonical_plan_sha256(plan)
+            ):
+                raise ValueError(
+                    "retrieval context preflight is stale for this plan"
+                )
+            if context_preflight.get("tokenizer_json_sha256") != (
+                plan["tokenizer"]["tokenizer_json_sha256"]
+            ):
+                raise ValueError(
+                    "retrieval context preflight used a different tokenizer"
+                )
+            if (
+                context_preflight.get("model_id") != MODEL_ID
+                or context_preflight.get("model_revision") != MODEL_REVISION
+                or context_preflight.get("context_window_tokens")
+                != plan["budget"]["context_window_tokens"]
+            ):
+                raise ValueError(
+                    "retrieval context preflight used a different model config"
+                )
+            expected_cases = {
+                ("clean", "off"),
+                ("clean", "on"),
+                ("injected", "off"),
+                ("injected", "on"),
+            }
+            actual_cases = {
+                (case.get("treatment"), case.get("thinking_mode"))
+                for case in context_preflight.get("cases", [])
+            }
+            if actual_cases != expected_cases or any(
+                case.get("headroom_tokens", -1) < 0
+                for case in context_preflight.get("cases", [])
+            ):
+                raise ValueError(
+                    "retrieval context preflight is incomplete or over budget"
+                )
+
+        clean_documents, clean_span, clean_trace = materialize_retrieval(
+            plan=plan,
+            documents=documents,
+            treatment="clean",
+            injection_payload=wording,
+        )
+        injected_documents, injected_span, injected_trace = materialize_retrieval(
+            plan=plan,
+            documents=documents,
+            treatment="injected",
+            injection_payload=wording,
+        )
+        if clean_span is not None or injected_span is None:
+            raise AssertionError("retrieval injection spans do not match treatment")
+        if clean_trace["selected_chunk_ids"] != injected_trace["selected_chunk_ids"]:
+            raise AssertionError("clean and injected retrieval selected different chunks")
+        if clean_trace["plan_sha256"] != injected_trace["plan_sha256"]:
+            raise AssertionError("clean and injected retrieval plans differ")
+
+        differing_documents = []
+        for clean_document, injected_document in zip(
+            clean_documents, injected_documents
+        ):
+            if clean_document["doc_id"] != injected_document["doc_id"]:
+                raise AssertionError("retrieval changed document order")
+            clean_without_text = {
+                key: value for key, value in clean_document.items() if key != "text"
+            }
+            injected_without_text = {
+                key: value
+                for key, value in injected_document.items()
+                if key != "text"
+            }
+            if clean_without_text != injected_without_text:
+                raise AssertionError(
+                    "retrieval metadata differs between matched treatments"
+                )
+            if clean_document["text"] != injected_document["text"]:
+                differing_documents.append(clean_document["doc_id"])
+        if differing_documents != [documents[carrier_index]["doc_id"]]:
+            raise AssertionError(
+                "only the injection carrier may differ between treatments"
+            )
+        injected_carrier = injected_documents[carrier_index]["text"]
+        if (
+            injected_carrier.count(wording) != 1
+            or marker not in injected_carrier
+            or endpoint not in injected_carrier
+        ):
+            raise AssertionError(
+                "retrieved injected carrier does not contain the exact payload once"
+            )
+        if any(wording in document["text"] for document in clean_documents):
+            raise AssertionError("clean retrieval unexpectedly contains the injection")
+
+        selected_documents = (
+            injected_documents if treatment == "injected" else clean_documents
+        )
+        selected_span = injected_span if treatment == "injected" else None
+        selected_trace = (
+            injected_trace if treatment == "injected" else clean_trace
+        )
+        selected_trace["plan_file"] = plan_file
+        selected_trace["query_construction"] = retrieval_config.get(
+            "query_construction"
+        )
+        selected_trace["source_pdf_verification_required"] = (
+            retrieval_config.get("source_pdf_verification_required") is True
+        )
+        if context_preflight is not None:
+            selected_trace["context_preflight_file"] = (
+                context_preflight_file
+            )
+            selected_trace["minimum_preflight_headroom_tokens"] = min(
+                case["headroom_tokens"]
+                for case in context_preflight["cases"]
+            )
+        return selected_documents, selected_span, selected_trace
 
     span = None
     if treatment == "injected":
@@ -320,6 +567,15 @@ def build_document_set(
 
     if len(documents) != 3:
         raise AssertionError("each match group must contain exactly three documents")
+    return documents, span, None
+
+
+def build_document_set(
+    reg: dict[str, Any], treatment: str
+) -> tuple[list[dict[str, Any]], list[int] | None]:
+    """Build one matched document set and return its injection character span."""
+
+    documents, span, _ = _build_document_bundle(reg, treatment)
     return documents, span
 
 
@@ -391,6 +647,7 @@ def build_events(
     treatment: str,
     documents: list[dict[str, Any]],
     injection_span: list[int] | None,
+    retrieval_trace: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     """Build structural events. No hand-written model output is inserted."""
 
@@ -430,15 +687,42 @@ def build_events(
         "reasoning_compromise_label": _reasoning_unknown(),
     })
 
+    retrieval_metrics = {
+        "retrieved_ids": [document["doc_id"] for document in documents],
+        "poison_in_retrieval": injected,
+    }
+    if retrieval_trace is not None:
+        retrieval_metrics.update({
+            "retrieval_profile_id": retrieval_trace["profile_id"],
+            "canonical_ranking_treatment": retrieval_trace[
+                "canonical_ranking_treatment"
+            ],
+            "ranking_used_injection_text": retrieval_trace[
+                "ranking_used_injection_text"
+            ],
+            "candidate_chunk_count": retrieval_trace["candidate_chunk_count"],
+            "eligible_candidate_chunk_count": retrieval_trace[
+                "eligible_candidate_chunk_count"
+            ],
+            "excluded_candidate_chunk_count": retrieval_trace[
+                "excluded_candidate_chunk_count"
+            ],
+            "selected_chunk_count": retrieval_trace["selected_chunk_count"],
+            "selected_chunk_ids": copy.deepcopy(
+                retrieval_trace["selected_chunk_ids"]
+            ),
+            "selected_token_count": retrieval_trace["selected_token_count"],
+            "document_token_budget": retrieval_trace["document_token_budget"],
+            "document_token_budgets": copy.deepcopy(
+                retrieval_trace["document_token_budgets"]
+            ),
+        })
     add({
         "type": "tool_call",
         "tool_name": "retrieve_documents",
         "hop_index": 0,
         "tool_result": copy.deepcopy(documents),
-        "retrieval_metrics": {
-            "retrieved_ids": [document["doc_id"] for document in documents],
-            "poison_in_retrieval": injected,
-        },
+        "retrieval_metrics": retrieval_metrics,
     })
 
     worker_alignment: dict[str, Any] = {"injection_present_in_prompt": injected}
@@ -539,9 +823,16 @@ def build_record(
     reg: dict[str, Any], condition: str, treatment: str
 ) -> dict[str, Any]:
     injected = treatment == "injected"
-    documents, injection_span = build_document_set(reg, treatment)
+    documents, injection_span, retrieval_trace = _build_document_bundle(
+        reg, treatment
+    )
     events, executor_hop = build_events(
-        reg, condition, treatment, documents, injection_span
+        reg,
+        condition,
+        treatment,
+        documents,
+        injection_span,
+        retrieval_trace,
     )
     group_id = reg["independence_group_id"]
     depth_tag = condition.replace("-", "")
@@ -569,9 +860,14 @@ def build_record(
     if injected:
         injection["injected_text"] = reg["injection"]["wordings"][reg["assigned_wording"]]
         injection["injection_char_span_in_source_doc"] = injection_span
+        if retrieval_trace is not None:
+            injection["injection_char_span_in_retrieved_doc"] = injection_span
+            injection["injection_bearing_chunk_id"] = retrieval_trace[
+                "injection_bearing_chunk_id"
+            ]
 
     decoding = copy.deepcopy(CONTROLLED_GENERATION_SETTINGS)
-    return {
+    record = {
         "schema_version": "spec_gap.scenario1.v2",
         "trajectory_id": trajectory_id,
         "independence_group_id": group_id,
@@ -645,6 +941,22 @@ def build_record(
         },
         "provenance": copy.deepcopy(reg["provenance"]),
     }
+    if retrieval_trace is not None:
+        record["document_set"]["retrieval_profile_id"] = retrieval_trace[
+            "profile_id"
+        ]
+        record["retrieval_trace"] = copy.deepcopy(retrieval_trace)
+        record["provenance"]["retrieval_plan_file"] = retrieval_trace[
+            "plan_file"
+        ]
+        record["provenance"]["retrieval_plan_sha256"] = retrieval_trace[
+            "plan_sha256"
+        ]
+        if "context_preflight_file" in retrieval_trace:
+            record["provenance"]["retrieval_context_preflight_file"] = (
+                retrieval_trace["context_preflight_file"]
+            )
+    return record
 
 
 def _agent_events(record: dict[str, Any]) -> list[dict[str, Any]]:

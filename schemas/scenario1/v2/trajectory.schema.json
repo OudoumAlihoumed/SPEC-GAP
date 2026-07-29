@@ -127,6 +127,10 @@
         "document_set_id": {
           "type": "string"
         },
+        "retrieval_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
         "documents": {
           "type": "array",
           "minItems": 3,
@@ -189,6 +193,9 @@
               },
               "text": {
                 "type": "string"
+              },
+              "retrieval": {
+                "$ref": "#/$defs/retrieval_document"
               }
             }
           }
@@ -197,6 +204,9 @@
     },
     "injection": {
       "$ref": "#/$defs/injection"
+    },
+    "retrieval_trace": {
+      "$ref": "#/$defs/retrieval_trace"
     },
     "ground_truth": {
       "type": "object"
@@ -230,6 +240,249 @@
     }
   },
   "$defs": {
+    "retrieval_document": {
+      "type": "object",
+      "required": [
+        "profile_id",
+        "selected_chunk_ids",
+        "source_page_numbers",
+        "selected_token_count",
+        "source_text_sha256"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selected_chunk_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "source_page_numbers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "selected_token_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_text_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "retrieval_trace": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "profile_id",
+        "plan_sha256",
+        "query",
+        "canonical_ranking_treatment",
+        "ranking_used_injection_text",
+        "candidate_chunk_count",
+        "eligible_candidate_chunk_count",
+        "excluded_candidate_chunk_count",
+        "selected_chunk_count",
+        "selected_token_count",
+        "document_token_budget",
+        "document_token_budgets",
+        "context_window_tokens",
+        "max_new_tokens",
+        "non_document_reserve_tokens",
+        "selected_chunk_ids",
+        "selected_chunks",
+        "source_documents",
+        "evidence_eligibility",
+        "injection_bearing_chunk_id"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema_version": {
+          "const": "spec_gap.retrieval_plan.v1"
+        },
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plan_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_preflight_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimum_preflight_headroom_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "plan_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_ranking_treatment": {
+          "const": "clean"
+        },
+        "ranking_used_injection_text": {
+          "const": false
+        },
+        "candidate_chunk_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "eligible_candidate_chunk_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "excluded_candidate_chunk_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "selected_chunk_count": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "selected_token_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "document_token_budget": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "document_token_budgets": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "context_window_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_new_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "non_document_reserve_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "selected_chunk_ids": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "selected_chunks": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "required": [
+              "chunk_id",
+              "doc_id",
+              "page_number",
+              "bm25_rank",
+              "bm25_score",
+              "token_count"
+            ],
+            "properties": {
+              "chunk_id": {
+                "type": "string"
+              },
+              "doc_id": {
+                "type": "string"
+              },
+              "page_number": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "bm25_rank": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "bm25_score": {
+                "type": "number"
+              },
+              "token_count": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "source_documents": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object"
+          }
+        },
+        "evidence_eligibility": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "determined_from": {
+              "const": "clean_source_section_type"
+            },
+            "all_pages_remain_indexed": {
+              "const": true
+            },
+            "non_evidence_pages": {
+              "type": "object"
+            }
+          }
+        },
+        "source_pdf_verification": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "verified",
+                "not_performed"
+              ]
+            }
+          }
+        },
+        "source_pdf_verification_required": {
+          "type": "boolean"
+        },
+        "injection_bearing_chunk_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "condition": {
       "enum": [
         "2-hop",
@@ -1129,6 +1382,59 @@
             },
             "poison_in_retrieval": {
               "type": "boolean"
+            },
+            "retrieval_profile_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "canonical_ranking_treatment": {
+              "const": "clean"
+            },
+            "ranking_used_injection_text": {
+              "const": false
+            },
+            "candidate_chunk_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "eligible_candidate_chunk_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "excluded_candidate_chunk_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "selected_chunk_count": {
+              "type": "integer",
+              "minimum": 3
+            },
+            "selected_chunk_ids": {
+              "type": "array",
+              "minItems": 3,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "selected_token_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "document_token_budget": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "document_token_budgets": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
             }
           }
         },

@@ -15,6 +15,7 @@ from src.infrastructure.qwen_modal import (
     parse_tool_call_requests,
     rendered_input_sha256,
     split_thinking_text,
+    validate_context_window,
     validate_generation_request,
     validate_generation_result,
 )
@@ -129,6 +130,20 @@ def test_mode_specific_sampler_is_rejected_from_controlled_run():
 def test_invalid_layer_is_rejected_before_compute():
     with pytest.raises(RequestValidationError, match="out of range"):
         validate_generation_request(request_payload(activation_layers=[64]))
+
+
+def test_context_window_accepts_exact_fit_and_rejects_overflow():
+    validate_context_window(
+        input_tokens=38912,
+        max_new_tokens=2048,
+        context_window_tokens=40960,
+    )
+    with pytest.raises(RequestValidationError, match="does not silently truncate"):
+        validate_context_window(
+            input_tokens=38913,
+            max_new_tokens=2048,
+            context_window_tokens=40960,
+        )
 
 
 def test_thinking_content_is_not_forwarded_downstream():
