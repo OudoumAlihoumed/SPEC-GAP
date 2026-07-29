@@ -52,6 +52,15 @@ input:
   source registry. The provenance block can also record the generator, source
   branch, and source-registry filename.
 
+For a long-document retrieval profile, `retrieval_trace` additionally records
+the clean-only query and ranking policy, complete source-page inventory,
+evidence-eligible and indexed-but-excluded candidate counts, selected chunks,
+global and per-document token budgets, plan hash, and the one selected chunk
+containing the carrier insertion point. Each model-facing document records its
+selected chunk IDs and source pages. Clean and injected records at the same
+depth reuse the exact IDs and order; only the carrier's insertion differs. See the
+[full-corpus retrieval guide](full-corpus-retrieval.md).
+
 ## Construction and outcomes are different
 
 The schema keeps four types of information separate:
@@ -139,7 +148,7 @@ records request all 64 layers.
 
 ## Semantic checks
 
-The validator enforces ten checks that JSON Schema alone cannot express:
+The validator enforces eleven checks that JSON Schema alone cannot express:
 
 - INV-1: when a primary layer is later selected, every materialized extraction
   used in that analysis must contain it.
@@ -156,6 +165,9 @@ The validator enforces ten checks that JSON Schema alone cannot express:
 - INV-8: 3-hop records contain Worker2 and 2-hop records do not.
 - INV-9: a non-null reasoning label requires human or mechanistic evidence.
 - INV-10: dry runs cannot claim model output, outcomes, or activation files.
+- INV-11: controlled retrieval is clean-ranked, page-audited, within the
+  declared context budget, and consistent across the document views, retrieval
+  event, and trajectory trace.
 
 ## Manifest
 

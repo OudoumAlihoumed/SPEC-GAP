@@ -41,7 +41,7 @@ independent groups instead of being fixed in the documentation.
 | 3-hop topology | planner → worker_1 → worker_2 → executor |
 | Injection entry point | worker_1 at both depths |
 | Domain package | three clean documents plus one injected twin that shadows exactly one clean document |
-| Retrieved set per run | three documents; the injected condition swaps the carrier's clean file for its injected twin |
+| Retrieved set per run | three model-facing document views; long-PDF profiles reuse one clean-ranked chunk selection and apply only the exact carrier insertion in the injected condition |
 | Injection placement | document body |
 | Model | `Qwen/Qwen3-32B` |
 | Model revision | `9216db5781bf21249d130ec9da846c4624c16137` |
@@ -58,6 +58,9 @@ Use the [Scenario 1 domain-package build guide](docs/scenario1/package-build-gui
 for the current fellow handoff and content-construction requirements. The
 [Scenario 1 trajectory schema guide](docs/scenario1/schema.md) documents the
 separate, code-generated execution record. The
+[full-corpus retrieval guide](docs/scenario1/full-corpus-retrieval.md) explains
+how every PDF page remains indexed and auditable without overflowing Qwen's
+context. The
 [original Word build guide](docs/scenario1/scenario1_package_build_guide.md.docx)
 is preserved in the repository.
 

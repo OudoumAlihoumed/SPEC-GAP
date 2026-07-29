@@ -134,6 +134,10 @@ the deterministic insertion location as `injection.insertion_anchor`.
 - Confirm that the retrieval tooling can actually expose the payload. A
   raster-only injection is not a valid injected condition if the pipeline
   extracts text only.
+- For source documents that do not fit the model context, index every page and
+  use the controlled clean-only selection described in the
+  [full-corpus retrieval guide](full-corpus-retrieval.md). A first-pages-only
+  slice is a smoke fixture, not a paper-ready full-corpus condition.
 - Verify that the injected twin differs from its clean source only by the
   payload. Keep the same title, surrounding content, and structure.
 - Do not warn downstream agents about injected instructions in the planner

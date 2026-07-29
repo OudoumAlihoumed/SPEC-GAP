@@ -25,6 +25,7 @@ from src.infrastructure.qwen_modal import (
     build_generation_result,
     build_injection_token_alignment,
     split_thinking_text,
+    validate_context_window,
     validate_generation_request,
 )
 from src.infrastructure.modal_costs import (
@@ -512,6 +513,24 @@ class Qwen3Runner:
             key: value.to(self.model.device) for key, value in model_inputs.items()
         }
         input_length = int(model_inputs["input_ids"].shape[-1])
+        context_window = getattr(
+            self.model.config,
+            "max_position_embeddings",
+            None,
+        )
+        if (
+            not isinstance(context_window, int)
+            or isinstance(context_window, bool)
+            or context_window < 1
+        ):
+            raise RuntimeError(
+                "loaded model does not expose a valid max_position_embeddings"
+            )
+        validate_context_window(
+            input_tokens=input_length,
+            max_new_tokens=settings["max_new_tokens"],
+            context_window_tokens=context_window,
+        )
 
         with torch.inference_mode():
             sequences = self.model.generate(

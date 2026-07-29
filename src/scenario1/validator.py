@@ -30,6 +30,8 @@ Two layers:
               construction/auto proxies may not set it.
        INV-10 dry runs are honest: no model call, generated output, outcome, or
               extracted activation may be claimed.
+       INV-11 full-corpus retrieval is treatment-blind, budgeted, page-audited,
+              and internally consistent with the retrieved document views.
 
 Usage:
   python scripts/01_scenario_construction/02_validate_trajectories.py \
@@ -247,6 +249,298 @@ def semantic_checks(t):
                 meta = e.get(key)
                 if meta and (meta.get("layers_extracted") or meta.get("storage_path")):
                     errs.append(f"INV-10 {e['agent_id']}.{key}: dry_run claims an artifact")
+
+    # INV-11: optional controlled retrieval metadata must agree everywhere it
+    # is recorded. Cross-treatment equality is additionally enforced while
+    # materializing the matched pair in generator.py.
+    retrieval = t.get("retrieval_trace")
+    if retrieval is not None:
+        selected_ids = retrieval.get("selected_chunk_ids", [])
+        selected_chunks = retrieval.get("selected_chunks", [])
+        if retrieval.get("canonical_ranking_treatment") != "clean" or \
+                retrieval.get("ranking_used_injection_text") is not False:
+            errs.append("INV-11 retrieval ranking must use clean text only")
+        if [chunk.get("chunk_id") for chunk in selected_chunks] != selected_ids:
+            errs.append("INV-11 selected chunk trace does not match selected IDs")
+        if len(selected_ids) != retrieval.get("selected_chunk_count"):
+            errs.append("INV-11 selected chunk count is inconsistent")
+        selected_tokens = sum(
+            chunk.get("token_count", 0) for chunk in selected_chunks
+        )
+        if selected_tokens != retrieval.get("selected_token_count"):
+            errs.append("INV-11 selected token total is inconsistent")
+        if selected_tokens > retrieval.get("document_token_budget", -1):
+            errs.append("INV-11 selected chunks exceed the document token budget")
+        reserved_total = (
+            retrieval.get("document_token_budget", 0)
+            + retrieval.get("max_new_tokens", 0)
+            + retrieval.get("non_document_reserve_tokens", 0)
+        )
+        if reserved_total > retrieval.get("context_window_tokens", -1):
+            errs.append("INV-11 retrieval budget exceeds the context window")
+        sources = retrieval.get("source_documents", [])
+        candidate_count = retrieval.get("candidate_chunk_count")
+        eligible_count = retrieval.get(
+            "eligible_candidate_chunk_count",
+            candidate_count,
+        )
+        excluded_count = retrieval.get("excluded_candidate_chunk_count", 0)
+        if (
+            not isinstance(candidate_count, int)
+            or not isinstance(eligible_count, int)
+            or not isinstance(excluded_count, int)
+            or eligible_count + excluded_count != candidate_count
+        ):
+            errs.append("INV-11 eligible and excluded candidate counts are inconsistent")
+        if sum(source.get("candidate_chunk_count", 0) for source in sources) != (
+            candidate_count
+        ):
+            errs.append("INV-11 candidate chunk count is inconsistent")
+
+        eligibility = retrieval.get("evidence_eligibility")
+        excluded_pages_by_document = {}
+        if eligibility is not None:
+            if (
+                not isinstance(eligibility, dict)
+                or eligibility.get("determined_from")
+                != "clean_source_section_type"
+                or eligibility.get("all_pages_remain_indexed") is not True
+            ):
+                errs.append(
+                    "INV-11 evidence eligibility must use clean source section types"
+                )
+            raw_exclusions = (
+                eligibility.get("non_evidence_pages", {})
+                if isinstance(eligibility, dict)
+                else {}
+            )
+            if not isinstance(raw_exclusions, dict):
+                errs.append("INV-11 non-evidence page annotations are invalid")
+                raw_exclusions = {}
+            for doc_id, entries in raw_exclusions.items():
+                pages = set()
+                if not isinstance(entries, list):
+                    errs.append(
+                        f"INV-11 {doc_id}: non-evidence page annotations are invalid"
+                    )
+                    continue
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        errs.append(
+                            f"INV-11 {doc_id}: non-evidence page annotation is invalid"
+                        )
+                        continue
+                    page_number = entry.get("page_number")
+                    reason = entry.get("reason")
+                    if (
+                        not isinstance(page_number, int)
+                        or isinstance(page_number, bool)
+                        or page_number in pages
+                        or not isinstance(reason, str)
+                        or not reason.strip()
+                    ):
+                        errs.append(
+                            f"INV-11 {doc_id}: non-evidence page annotation is invalid"
+                        )
+                        continue
+                    pages.add(page_number)
+                excluded_pages_by_document[doc_id] = pages
+
+        source_doc_ids = {
+            source.get("doc_id")
+            for source in sources
+            if isinstance(source.get("doc_id"), str)
+        }
+        if eligibility is not None and (
+            set(excluded_pages_by_document) - source_doc_ids
+        ):
+            errs.append("INV-11 non-evidence pages reference an unknown source")
+        for source in sources:
+            doc_id = source.get("doc_id")
+            page_count = source.get("page_count")
+            if (
+                not isinstance(page_count, int)
+                or source.get("indexed_page_numbers")
+                != list(range(1, page_count + 1))
+            ):
+                errs.append(
+                    f"INV-11 {doc_id}: not every source page was indexed"
+                )
+            if eligibility is not None and isinstance(page_count, int):
+                excluded_pages = sorted(
+                    excluded_pages_by_document.get(doc_id, set())
+                )
+                eligible_pages = [
+                    page_number
+                    for page_number in range(1, page_count + 1)
+                    if page_number not in excluded_pages
+                ]
+                source_eligible = source.get(
+                    "eligible_candidate_chunk_count"
+                )
+                source_excluded = source.get(
+                    "excluded_candidate_chunk_count"
+                )
+                if (
+                    source.get("non_evidence_page_numbers")
+                    != excluded_pages
+                    or source.get("evidence_eligible_page_numbers")
+                    != eligible_pages
+                    or not isinstance(source_eligible, int)
+                    or not isinstance(source_excluded, int)
+                    or source_eligible + source_excluded
+                    != source.get("candidate_chunk_count")
+                ):
+                    errs.append(
+                        f"INV-11 {doc_id}: evidence eligibility summary is inconsistent"
+                    )
+        if eligibility is not None and (
+            sum(
+                source.get("eligible_candidate_chunk_count", 0)
+                for source in sources
+            )
+            != eligible_count
+            or sum(
+                source.get("excluded_candidate_chunk_count", 0)
+                for source in sources
+            )
+            != excluded_count
+        ):
+            errs.append("INV-11 source evidence-eligibility counts are inconsistent")
+        for chunk in selected_chunks:
+            if chunk.get("page_number") in excluded_pages_by_document.get(
+                chunk.get("doc_id"),
+                set(),
+            ):
+                errs.append("INV-11 a selected chunk comes from a non-evidence page")
+        if retrieval.get("source_pdf_verification_required") is True and (
+            retrieval.get("source_pdf_verification", {}).get("status")
+            != "verified"
+        ):
+            errs.append("INV-11 required source PDF verification is missing")
+
+        documents = t.get("document_set", {}).get("documents", [])
+        document_chunk_ids = []
+        document_tokens = 0
+        for document in documents:
+            metadata = document.get("retrieval")
+            if not isinstance(metadata, dict):
+                errs.append(
+                    f"INV-11 {document.get('doc_id')}: retrieval metadata is missing"
+                )
+                continue
+            if metadata.get("profile_id") != retrieval.get("profile_id"):
+                errs.append(
+                    f"INV-11 {document.get('doc_id')}: retrieval profile differs"
+                )
+            document_chunk_ids.extend(metadata.get("selected_chunk_ids", []))
+            document_tokens += metadata.get("selected_token_count", 0)
+        if document_chunk_ids != selected_ids:
+            errs.append("INV-11 document chunk IDs do not match the retrieval trace")
+        if document_tokens != selected_tokens:
+            errs.append("INV-11 document token counts do not match the retrieval trace")
+        document_budgets = retrieval.get("document_token_budgets")
+        if document_budgets is not None:
+            document_ids = {
+                document.get("doc_id")
+                for document in documents
+                if isinstance(document.get("doc_id"), str)
+            }
+            if (
+                not isinstance(document_budgets, dict)
+                or set(document_budgets) != document_ids
+                or any(
+                    not isinstance(value, int)
+                    or isinstance(value, bool)
+                    or value < 1
+                    for value in document_budgets.values()
+                )
+                or sum(document_budgets.values())
+                > retrieval.get("document_token_budget", -1)
+            ):
+                errs.append("INV-11 per-document token budgets are invalid")
+            else:
+                selected_tokens_by_document = {
+                    doc_id: sum(
+                        chunk.get("token_count", 0)
+                        for chunk in selected_chunks
+                        if chunk.get("doc_id") == doc_id
+                    )
+                    for doc_id in document_ids
+                }
+                if any(
+                    selected_tokens_by_document[doc_id] > budget
+                    for doc_id, budget in document_budgets.items()
+                ):
+                    errs.append(
+                        "INV-11 selected chunks exceed a per-document token budget"
+                    )
+
+        carrier = next(
+            (document for document in documents
+             if document.get("role") == "injection_carrier"),
+            None,
+        )
+        if carrier is None or retrieval.get("injection_bearing_chunk_id") not in (
+            carrier.get("retrieval", {}).get("selected_chunk_ids", [])
+        ):
+            errs.append("INV-11 injection-bearing chunk is not in the carrier view")
+        injected_text = t.get("injection", {}).get("injected_text")
+        payload_occurrences = (
+            sum(document.get("text", "").count(injected_text) for document in documents)
+            if isinstance(injected_text, str) and injected_text
+            else 0
+        )
+        expected_occurrences = 1 if t.get("treatment") == "injected" else 0
+        if payload_occurrences != expected_occurrences:
+            errs.append(
+                "INV-11 retrieved views contain the wrong number of injection payloads"
+            )
+
+        retrieval_events = [
+            event for event in t.get("trajectory_trace", {}).get("full_events", [])
+            if event.get("type") == "tool_call"
+            and event.get("tool_name") == "retrieve_documents"
+        ]
+        if len(retrieval_events) != 1:
+            errs.append("INV-11 trajectory must contain one retrieval event")
+        else:
+            metrics = retrieval_events[0].get("retrieval_metrics", {})
+            if metrics.get("selected_chunk_ids") != selected_ids:
+                errs.append("INV-11 retrieval event selected IDs are inconsistent")
+            if metrics.get("ranking_used_injection_text") is not False:
+                errs.append("INV-11 retrieval event is not treatment-blind")
+            metric_fields = (
+                "retrieval_profile_id",
+                "canonical_ranking_treatment",
+                "candidate_chunk_count",
+                "eligible_candidate_chunk_count",
+                "excluded_candidate_chunk_count",
+                "selected_chunk_count",
+                "selected_token_count",
+                "document_token_budget",
+                "document_token_budgets",
+            )
+            retrieval_fields = {
+                "retrieval_profile_id": retrieval.get("profile_id"),
+                "canonical_ranking_treatment": retrieval.get(
+                    "canonical_ranking_treatment"
+                ),
+                "candidate_chunk_count": candidate_count,
+                "eligible_candidate_chunk_count": eligible_count,
+                "excluded_candidate_chunk_count": excluded_count,
+                "selected_chunk_count": retrieval.get("selected_chunk_count"),
+                "selected_token_count": retrieval.get("selected_token_count"),
+                "document_token_budget": retrieval.get(
+                    "document_token_budget"
+                ),
+                "document_token_budgets": document_budgets,
+            }
+            if any(
+                metrics.get(field) != retrieval_fields[field]
+                for field in metric_fields
+            ):
+                errs.append("INV-11 retrieval event metrics are inconsistent")
     return errs
 
 
