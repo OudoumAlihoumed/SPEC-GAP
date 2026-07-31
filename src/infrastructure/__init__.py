@@ -14,11 +14,14 @@ from .modal_costs import (
 )
 from .qwen_modal import (
     CONTROLLED_GENERATION_SETTINGS,
+    DEFAULT_GENERATION_PROTOCOL_ID,
+    GENERATION_PROTOCOL_SETTINGS,
     MODEL_ID,
     MODEL_LAYER_COUNT,
     MODEL_REVISION,
     RequestValidationError,
     build_generation_result,
+    generation_settings_for_protocol,
     generation_result_to_agent_turn_fields,
     parse_tool_call_requests,
     rendered_input_sha256,
@@ -30,6 +33,8 @@ from .qwen_modal import (
 __all__ = [
     "COST_SCHEMA_VERSION",
     "CONTROLLED_GENERATION_SETTINGS",
+    "DEFAULT_GENERATION_PROTOCOL_ID",
+    "GENERATION_PROTOCOL_SETTINGS",
     "GPU_COUNT",
     "GPU_TYPE",
     "H200_USD_PER_SECOND",
@@ -43,6 +48,7 @@ __all__ = [
     "build_token_usage",
     "cost_record_path",
     "generation_result_to_agent_turn_fields",
+    "generation_settings_for_protocol",
     "parse_tool_call_requests",
     "rendered_input_sha256",
     "resolve_modal_input_id",

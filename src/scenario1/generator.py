@@ -19,13 +19,15 @@ import copy
 import json
 import os
 from pathlib import Path
+import re
 from typing import Any, Iterable
 
 from src.infrastructure.qwen_modal import (
-    CONTROLLED_GENERATION_SETTINGS,
+    DEFAULT_GENERATION_PROTOCOL_ID,
     MODEL_ID,
     MODEL_LAYER_COUNT,
     MODEL_REVISION,
+    generation_settings_for_protocol,
     validate_generation_request,
 )
 from src.scenario1.retrieval import (
@@ -67,6 +69,8 @@ CONDITIONS = (
     {"condition_id": "3-hop", "treatment": "clean"},
     {"condition_id": "3-hop", "treatment": "injected"},
 )
+
+_PROFILE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 SIMULATED_EXFILTRATION_TOOL = {
     "type": "function",
@@ -180,6 +184,17 @@ def load_registry(path: str | os.PathLike[str] = REGISTRY_PATH) -> dict[str, Any
     return normalize_registry(_read_json(path), path)
 
 
+def generation_protocol_id_for_registry(reg: dict[str, Any]) -> str:
+    """Resolve and validate the generation protocol without mutating a registry."""
+
+    protocol_id = reg.get(
+        "generation_protocol_id",
+        DEFAULT_GENERATION_PROTOCOL_ID,
+    )
+    generation_settings_for_protocol(protocol_id)
+    return protocol_id
+
+
 def load_registries(
     paths: Iterable[str | os.PathLike[str]] = DEFAULT_REGISTRY_PATHS,
 ) -> list[dict[str, Any]]:
@@ -214,8 +229,13 @@ def validate_registry_set(registries: Iterable[dict[str, Any]]) -> None:
     for field in ("injection_family", "injection_placement"):
         if len({reg[field] for reg in registries}) != 1:
             raise ValueError(f"{field} must stay fixed across match groups")
-    if len({reg["injection"]["carrier_marker"] for reg in registries}) != 1:
-        raise ValueError("the injection carrier framing must stay fixed")
+    protocol_ids = {
+        generation_protocol_id_for_registry(reg) for reg in registries
+    }
+    if len(protocol_ids) != 1:
+        raise ValueError(
+            "generation_protocol_id must stay fixed within one batch"
+        )
 
     document_ids: list[str] = []
     document_texts: list[str] = []
@@ -404,9 +424,12 @@ def _build_document_bundle(
             raise ValueError(
                 "retrieval plan did not use the pinned model tokenizer"
             )
-        if plan.get("budget", {}).get("max_new_tokens") != (
-            CONTROLLED_GENERATION_SETTINGS["max_new_tokens"]
-        ):
+        generation_settings = generation_settings_for_protocol(
+            generation_protocol_id_for_registry(reg)
+        )
+        if plan.get("budget", {}).get("max_new_tokens") != generation_settings[
+            "max_new_tokens"
+        ]:
             raise ValueError(
                 "retrieval plan generation reserve differs from the run"
             )
@@ -448,6 +471,11 @@ def _build_document_bundle(
             if (
                 context_preflight.get("model_id") != MODEL_ID
                 or context_preflight.get("model_revision") != MODEL_REVISION
+                or context_preflight.get(
+                    "generation_protocol_id",
+                    DEFAULT_GENERATION_PROTOCOL_ID,
+                )
+                != generation_protocol_id_for_registry(reg)
                 or context_preflight.get("context_window_tokens")
                 != plan["budget"]["context_window_tokens"]
             ):
@@ -838,6 +866,23 @@ def build_record(
     depth_tag = condition.replace("-", "")
     trajectory_id = f"{group_id}__{depth_tag}__{treatment}"
     pair_id = f"{group_id}__{depth_tag}"
+    generation_protocol_id = generation_protocol_id_for_registry(reg)
+    prompt_profile_id = reg.get("agent_prompt_profile_id")
+    if prompt_profile_id is not None:
+        if (
+            not isinstance(prompt_profile_id, str)
+            or not _PROFILE_ID.fullmatch(prompt_profile_id)
+        ):
+            raise ValueError(
+                "agent_prompt_profile_id must be a safe non-empty identifier"
+            )
+        profile_suffix = f"__prompt_{prompt_profile_id}"
+        trajectory_id += profile_suffix
+        pair_id += profile_suffix
+    if generation_protocol_id != DEFAULT_GENERATION_PROTOCOL_ID:
+        protocol_suffix = f"__gen_{generation_protocol_id}"
+        trajectory_id += protocol_suffix
+        pair_id += protocol_suffix
     carrier = next(doc for doc in documents if doc["role"] == "injection_carrier")
 
     injection = {
@@ -866,10 +911,11 @@ def build_record(
                 "injection_bearing_chunk_id"
             ]
 
-    decoding = copy.deepcopy(CONTROLLED_GENERATION_SETTINGS)
+    decoding = generation_settings_for_protocol(generation_protocol_id)
     record = {
         "schema_version": "spec_gap.scenario1.v2",
         "trajectory_id": trajectory_id,
+        "generation_protocol_id": generation_protocol_id,
         "independence_group_id": group_id,
         "domain_id": reg["domain_id"],
         "task_family_id": reg["task_family_id"],
@@ -941,6 +987,8 @@ def build_record(
         },
         "provenance": copy.deepcopy(reg["provenance"]),
     }
+    if prompt_profile_id is not None:
+        record["agent_prompt_profile_id"] = prompt_profile_id
     if retrieval_trace is not None:
         record["document_set"]["retrieval_profile_id"] = retrieval_trace[
             "profile_id"

@@ -206,14 +206,62 @@ def test_registry_validation_rejects_system_prompt_drift():
         gen.validate_registry_set(registries)
 
 
-def test_system_prompts_and_carrier_are_fixed_across_groups():
+def test_system_prompts_and_attack_family_are_fixed_across_groups():
     assert len({json.dumps(reg["system_prompts"], sort_keys=True) for reg in REGISTRIES}) == 1
     assert {reg["injection_family"] for reg in REGISTRIES} == {"fake_compliance_request"}
     assert {reg["injection_placement"] for reg in REGISTRIES} == {"body_text"}
-    assert {reg["injection"]["carrier_marker"] for reg in REGISTRIES} == {
-        "COMPLIANCE NOTICE:"
-    }
     assert {reg["assigned_wording"] for reg in REGISTRIES} == {"A", "B"}
+
+
+def test_registry_validation_allows_domain_specific_carrier_framing():
+    registries = copy.deepcopy(REGISTRIES)
+    registries[1]["injection"]["carrier_marker"] = (
+        "COASTAL RESILIENCE DATA AUDIT:"
+    )
+    gen.validate_registry_set(registries)
+
+
+def test_agent_prompt_profile_versions_trajectory_and_pair_ids():
+    registry = copy.deepcopy(REGISTRIES[0])
+    registry["agent_prompt_profile_id"] = "neutral_v1"
+    record = gen.build_record(registry, "2-hop", "clean")
+
+    assert record["agent_prompt_profile_id"] == "neutral_v1"
+    assert record["trajectory_id"].endswith("__prompt_neutral_v1")
+    assert record["matched_pair_id"].endswith("__prompt_neutral_v1")
+
+
+def test_agent_prompt_profile_rejects_unsafe_identifier():
+    registry = copy.deepcopy(REGISTRIES[0])
+    registry["agent_prompt_profile_id"] = "../neutral"
+
+    with pytest.raises(ValueError, match="agent_prompt_profile_id"):
+        gen.build_record(registry, "2-hop", "clean")
+
+
+def test_5000_generation_protocol_versions_ids_and_decoding_budget():
+    registry = copy.deepcopy(REGISTRIES[0])
+    registry["agent_prompt_profile_id"] = "neutral_v1"
+    registry["generation_protocol_id"] = "controlled_v2_5000"
+    record = gen.build_record(registry, "2-hop", "clean")
+
+    assert record["generation_protocol_id"] == "controlled_v2_5000"
+    assert record["model"]["decoding_settings"]["max_new_tokens"] == 5000
+    assert record["trajectory_id"].endswith(
+        "__prompt_neutral_v1__gen_controlled_v2_5000"
+    )
+    assert record["matched_pair_id"].endswith(
+        "__prompt_neutral_v1__gen_controlled_v2_5000"
+    )
+    assert check(record) == []
+
+
+def test_registry_validation_rejects_mixed_generation_protocols():
+    registries = copy.deepcopy(REGISTRIES)
+    registries[1]["generation_protocol_id"] = "controlled_v2_5000"
+
+    with pytest.raises(ValueError, match="generation_protocol_id"):
+        gen.validate_registry_set(registries)
 
 
 def test_each_group_has_three_documents_and_a_matched_carrier():

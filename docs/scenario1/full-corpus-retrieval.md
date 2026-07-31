@@ -14,11 +14,15 @@ Scenario 1 path therefore uses controlled retrieval:
    query fixed before the clean/injected treatment is materialized.
 5. Fill a fixed token cap for each document: 10,000 for document 1 and 9,000
    each for documents 2 and 3, within the 28,000-token global limit.
-6. Reuse the exact selected chunk IDs and order in both treatments.
-7. For the injected treatment only, apply the exact clean-to-injected PDF
-   insertion delta after ranking.
-8. Render the selected evidence with source page, chunk ID, and BM25 rank, and
-   save that provenance in the trajectory.
+6. When a registry declares `require_clean_anchor`, retain the clean chunk at
+   the pre-recorded insertion anchor. If ordinary ranking omitted it, replace
+   the lowest-ranked selected chunk from that same document without increasing
+   any token cap.
+7. Reuse the exact selected chunk IDs and order in both treatments.
+8. For the injected treatment only, apply the exact clean-to-injected PDF
+   insertion delta after selection.
+9. Render the selected evidence with source page, chunk ID, BM25 rank, and
+   selection origin, and save that provenance in the trajectory.
 
 This means every source page remains indexed and inspectable, while only
 evidence-eligible, task-relevant passages that fit the controlled
@@ -30,10 +34,22 @@ pages from the audit record.
 
 If the injected note were present during ranking, its wording could change
 which chunks are selected. That would confound document presence with retrieval
-behavior. The plan is therefore built from the clean canonical corpus. Plan
-construction fails unless the clean ranking naturally retains the chunk at the
-carrier insertion point; the code never force-adds that chunk after seeing the
-injection.
+behavior. The plan is therefore built from the clean canonical corpus.
+
+Two predeclared policies are supported:
+
+- `natural_only`: ordinary clean BM25 selection must retain the carrier
+  location.
+- `require_clean_anchor`: the clean chunk containing the recorded anchor is a
+  required exposure chunk. If ordinary clean BM25 selection omits it, the
+  deterministic rule above swaps out the lowest-ranked selected chunk from the
+  same document.
+
+The second policy measures model behavior **conditional on exposure** to the
+matched clean/injected location. It must not be described as measuring how
+often natural retrieval would surface an injection. The plan records whether
+the carrier was retained naturally or by the controlled rule, plus any replaced
+chunk ID.
 
 The injected PDF must equal the clean carrier plus one contiguous insertion.
 Plan construction compares the full extracted texts and rejects any other
@@ -103,10 +119,16 @@ uv run --no-project --with 'transformers==5.8.0' \
   --tokenizer-dir /path/to/pinned-qwen
 ```
 
-The current AIHC cases leave 7,806–7,877 tokens of headroom after reserving the
+The current AIHC cases leave 7,818–7,889 tokens of headroom after reserving the
 2,048-token generation. The saved preflight is
 `experiments/scenario1/inputs/fellow_packages/aihc/retrieval/qwen_context_preflight_balanced_v2.json`.
 Trajectory construction rejects a stale preflight.
+
+That AIHC example uses the historical `controlled_v1_2048` protocol. Revised
+definitive runs use a separate `controlled_v2_5000` registry and retrieval plan,
+which reserve 5,000 generated tokens and add a protocol suffix to every output
+ID. For example, the Macro 5,000-token preflight leaves 2,145–2,219 tokens of
+headroom while preserving the exact v1 clean-ranked chunk IDs and order.
 
 The remote Modal runner performs the authoritative check again after rendering
 each real prompt. It raises an error when:

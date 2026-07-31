@@ -42,6 +42,15 @@ CONTROLLED_GENERATION_SETTINGS = {
     "seed": 0,
 }
 
+DEFAULT_GENERATION_PROTOCOL_ID = "controlled_v1_2048"
+GENERATION_PROTOCOL_SETTINGS = {
+    DEFAULT_GENERATION_PROTOCOL_ID: copy.deepcopy(CONTROLLED_GENERATION_SETTINGS),
+    "controlled_v2_5000": {
+        **CONTROLLED_GENERATION_SETTINGS,
+        "max_new_tokens": 5000,
+    },
+}
+
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _TOOL_CALL_BLOCK = re.compile(
@@ -52,6 +61,20 @@ _TOOL_CALL_BLOCK = re.compile(
 
 class RequestValidationError(ValueError):
     """Raised before a malformed request can start remote model execution."""
+
+
+def generation_settings_for_protocol(
+    protocol_id: str | None = None,
+) -> dict[str, Any]:
+    """Return an isolated settings copy for one registered run protocol."""
+
+    selected = protocol_id or DEFAULT_GENERATION_PROTOCOL_ID
+    if not isinstance(selected, str) or selected not in GENERATION_PROTOCOL_SETTINGS:
+        raise RequestValidationError(
+            "generation_protocol_id must be one of "
+            f"{sorted(GENERATION_PROTOCOL_SETTINGS)}"
+        )
+    return copy.deepcopy(GENERATION_PROTOCOL_SETTINGS[selected])
 
 
 def _require_string(payload: dict[str, Any], field: str) -> str:

@@ -32,6 +32,11 @@
     "schema_version": {
       "const": "spec_gap.scenario1.v2"
     },
+    "generation_protocol_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Versioned generation budget and sampler profile. Historical records may omit this field and are interpreted as controlled_v1_2048."
+    },
     "trajectory_id": {
       "type": "string"
     },

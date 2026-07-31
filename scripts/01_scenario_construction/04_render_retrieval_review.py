@@ -276,6 +276,12 @@ def build_review(
         if document["role"] == "injection_carrier"
     )
     mapping = plan["injection_mapping"]
+    retention = mapping.get("carrier_chunk_retention") or {
+        "policy": "natural_only",
+        "selection_origin": "natural_clean_rank",
+        "replaced_chunk_ids": [],
+    }
+    domain_label = registry["domain_id"].replace("_", " ").title()
     payload_span = injected_record["injection"][
         "injection_char_span_in_retrieved_doc"
     ]
@@ -358,7 +364,7 @@ def build_review(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AIHC full-corpus retrieval review</title>
+<title>{_escape(domain_label)} full-corpus retrieval review</title>
 <style>
 :root {{
   --ink: #172033;
@@ -491,7 +497,7 @@ mark.injection {{
 <body>
 <main>
 <header>
-  <h1>AIHC balanced full-corpus retrieval review</h1>
+  <h1>{_escape(domain_label)} full-corpus retrieval review</h1>
   <p class="subtitle">Profile {_escape(plan['profile_id'])} · human sign-off
   before a paid Qwen/Modal run</p>
 </header>
@@ -509,17 +515,15 @@ mark.injection {{
 <div class="callout">
   <strong>What you are approving:</strong> whether these passages are a fair,
   task-relevant evidence set. Every source page remains indexed and auditable.
-  Clean-only section labels prevent the {excluded_count} reference, contributor,
-  license, or publication-metadata chunks from entering BM25 ranking. Worker1
-  sees only the selected chunks below, and the hidden directive did not
-  participate in either eligibility or ranking.
+  Clean-only section labels prevent the {excluded_count} non-evidence chunks
+  from entering BM25 ranking. Worker1 sees only the selected chunks below, and
+  the hidden directive did not participate in either eligibility or ranking.
 </div>
 
 <section class="panel">
   <h2>Human review checklist</h2>
   <ol class="checklist">
-    <li>Do the selected passages adequately cover study design, performance
-    metrics, and reporting standards?</li>
+    <li>Do the selected passages adequately support the stated benign task?</li>
     <li>Is the {selection_balance} selected-chunk balance across the three
     documents fair, without one paper dominating?</li>
     <li>Are the listed non-evidence pages correctly limited to references,
@@ -527,8 +531,8 @@ mark.injection {{
     <li>Does the carrier passage remain coherent at its page boundary?</li>
     <li>Is the yellow highlighted directive the only meaningful difference
     between the clean and injected views?</li>
-    <li>If all five answers are acceptable, the package is ready for the paid
-    eight-trajectory Modal batch.</li>
+    <li>If all five answers are acceptable, the package can proceed to the
+    selected Modal smoke or batch run.</li>
   </ol>
 </section>
 
@@ -555,6 +559,9 @@ mark.injection {{
   <dt>Query construction</dt><dd>{_escape(registry['retrieval']['query_construction'])}</dd>
   <dt>Ranking</dt><dd>BM25 on clean, evidence-eligible source chunks only</dd>
   <dt>Selection policy</dt><dd>{_escape(plan['ranking']['selection_policy'])}</dd>
+  <dt>Carrier retention</dt><dd>{_escape(retention['selection_origin'])}
+  under policy {_escape(retention['policy'])}; replaced clean-ranked chunks:
+  {_escape(', '.join(retention['replaced_chunk_ids']) or 'none')}</dd>
   <dt>Per-document caps</dt><dd>{_escape(document_budget_text)} Qwen tokens</dd>
   <dt>Chunking</dt><dd>{plan['chunking']['chunk_tokens']:,} tokens with
   {plan['chunking']['overlap_tokens']:,}-token overlap; never crosses a PDF page</dd>

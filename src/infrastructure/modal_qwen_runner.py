@@ -28,6 +28,7 @@ from src.infrastructure.qwen_modal import (
     validate_context_window,
     validate_generation_request,
 )
+from src.infrastructure.modal_billing import BASE_BILLING_TAGS
 from src.infrastructure.modal_costs import (
     build_gpu_cost_record,
     build_token_usage,
@@ -63,7 +64,7 @@ image = (
 
 app = modal.App(
     APP_NAME,
-    tags={"project": "spec-gap", "component": "qwen3-inference"},
+    tags=BASE_BILLING_TAGS,
 )
 model_volume = modal.Volume.from_name(MODEL_VOLUME_NAME, create_if_missing=True)
 artifact_volume = modal.Volume.from_name(ARTIFACT_VOLUME_NAME, create_if_missing=True)

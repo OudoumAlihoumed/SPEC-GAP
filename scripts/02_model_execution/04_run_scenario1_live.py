@@ -11,15 +11,16 @@ import sys
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.infrastructure.modal_qwen_runner import Qwen3Runner, app
-from src.scenario1.generator import (
+from src.infrastructure.modal_billing import scenario1_billing_tags  # noqa: E402
+from src.infrastructure.modal_qwen_runner import Qwen3Runner, app  # noqa: E402
+from src.scenario1.generator import (  # noqa: E402
     ARTIFACT_ROOT,
     REGISTRY_PATH,
     build_record,
     build_request_plan,
     load_registry,
 )
-from src.scenario1.orchestrator import (
+from src.scenario1.orchestrator import (  # noqa: E402
     run_live_trajectory,
     write_live_trajectory,
     write_model_turn_result,
@@ -71,6 +72,17 @@ def run_scenario1_trajectory(
             "paid trajectory execution requires "
             "--confirm-paid-run RUN_H200_TRAJECTORY"
         )
+
+    billing_tags = scenario1_billing_tags(
+        domain_ids=[structural["domain_id"]],
+        generation_protocol_ids=[structural["generation_protocol_id"]],
+        run_kind="single_trajectory",
+    )
+    app.set_tags(billing_tags)
+    print(json.dumps({
+        "modal_app_id": app.app_id,
+        "billing_tags": billing_tags,
+    }, indent=2))
 
     runner = Qwen3Runner()
     live = run_live_trajectory(

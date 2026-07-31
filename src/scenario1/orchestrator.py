@@ -387,6 +387,34 @@ def write_model_turn_result(
     return path
 
 
+def load_model_turn_result(
+    request: dict[str, Any],
+    output_root: str | Path,
+) -> dict[str, Any] | None:
+    """Load an exact matching turn checkpoint, if one was already written."""
+
+    import json
+
+    path = (
+        Path(output_root)
+        / "checkpoints"
+        / request["trajectory_id"]
+        / request["thinking_mode"]
+        / f"step_{request['step_index']:03d}.json"
+    )
+    if not path.exists():
+        return None
+    try:
+        result = validate_generation_result(json.loads(path.read_text()))
+        _validate_result_matches_request(request, result)
+    except (OSError, json.JSONDecodeError, ValueError) as error:
+        raise ValueError(
+            f"cannot resume from invalid model-turn checkpoint at {path}: "
+            f"{error}"
+        ) from error
+    return result
+
+
 def write_live_trajectory(
     record: dict[str, Any],
     output_root: str | Path,

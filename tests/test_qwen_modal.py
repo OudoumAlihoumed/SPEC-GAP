@@ -6,12 +6,14 @@ import pytest
 
 from src.infrastructure.modal_costs import build_gpu_cost_record, build_token_usage
 from src.infrastructure.qwen_modal import (
+    DEFAULT_GENERATION_PROTOCOL_ID,
     RequestValidationError,
     activation_artifact_path,
     build_activation_checkpoint_plan,
     build_generation_result,
     build_injection_token_alignment,
     generation_result_to_agent_turn_fields,
+    generation_settings_for_protocol,
     parse_tool_call_requests,
     rendered_input_sha256,
     split_thinking_text,
@@ -52,6 +54,28 @@ def test_request_defaults_to_controlled_qwen_settings_and_all_layers():
     assert request["generation_settings"]["top_p"] == 0.95
     assert request["activation_layers"] == list(range(64))
     assert request["activation_token_position"] == "last_generated_non_special_token"
+
+
+def test_versioned_5000_protocol_preserves_v1_and_returns_isolated_settings():
+    v1 = generation_settings_for_protocol(DEFAULT_GENERATION_PROTOCOL_ID)
+    v2 = generation_settings_for_protocol("controlled_v2_5000")
+
+    assert v1["max_new_tokens"] == 2048
+    assert v2["max_new_tokens"] == 5000
+    assert {
+        key: value for key, value in v1.items() if key != "max_new_tokens"
+    } == {
+        key: value for key, value in v2.items() if key != "max_new_tokens"
+    }
+    v2["max_new_tokens"] = 1
+    assert generation_settings_for_protocol("controlled_v2_5000")[
+        "max_new_tokens"
+    ] == 5000
+
+
+def test_unknown_generation_protocol_is_rejected():
+    with pytest.raises(RequestValidationError, match="generation_protocol_id"):
+        generation_settings_for_protocol("controlled_unknown")
 
 
 def test_thinking_off_changes_only_the_template_switch_by_default():

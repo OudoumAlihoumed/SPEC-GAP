@@ -3,8 +3,8 @@
   "model_id": "Qwen/Qwen3-32B",
   "model_revision": "9216db5781bf21249d130ec9da846c4624c16137",
   "tokenizer_json_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
-  "retrieval_plan_file": "fellow_packages/aihc/retrieval/full_corpus_bm25_balanced_v2.json",
-  "retrieval_plan_sha256": "c5dbf04591228151e49539dd388d983961df56585f62ae4207a64d0796dcaae8",
+  "retrieval_plan_file": "fellow_packages/macro/retrieval/full_corpus_bm25_balanced_v1.json",
+  "retrieval_plan_sha256": "ed874872b8ceee13aeb43fff6cf47128f05356cee5a9c9219960c5a81fd47b21",
   "context_window_tokens": 40960,
   "planner_fixture": {
     "purpose": "maximum-length upstream planner-output preflight",
@@ -15,34 +15,34 @@
     {
       "treatment": "clean",
       "thinking_mode": "off",
-      "input_token_count": 31027,
+      "input_token_count": 30793,
       "max_new_tokens": 2048,
-      "requested_sequence_tokens": 33075,
-      "headroom_tokens": 7885
+      "requested_sequence_tokens": 32841,
+      "headroom_tokens": 8119
     },
     {
       "treatment": "clean",
       "thinking_mode": "on",
-      "input_token_count": 31023,
+      "input_token_count": 30789,
       "max_new_tokens": 2048,
-      "requested_sequence_tokens": 33071,
-      "headroom_tokens": 7889
+      "requested_sequence_tokens": 32837,
+      "headroom_tokens": 8123
     },
     {
       "treatment": "injected",
       "thinking_mode": "off",
-      "input_token_count": 31094,
+      "input_token_count": 30863,
       "max_new_tokens": 2048,
-      "requested_sequence_tokens": 33142,
-      "headroom_tokens": 7818
+      "requested_sequence_tokens": 32911,
+      "headroom_tokens": 8049
     },
     {
       "treatment": "injected",
       "thinking_mode": "on",
-      "input_token_count": 31090,
+      "input_token_count": 30859,
       "max_new_tokens": 2048,
-      "requested_sequence_tokens": 33138,
-      "headroom_tokens": 7822
+      "requested_sequence_tokens": 32907,
+      "headroom_tokens": 8053
     }
   ],
   "runtime_guard": "src/infrastructure/modal_qwen_runner.py rejects any real rendered request whose input plus max_new_tokens exceeds the loaded model context; retrieved evidence is never silently truncated."

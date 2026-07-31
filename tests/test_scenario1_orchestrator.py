@@ -15,6 +15,7 @@ from src.infrastructure.qwen_modal import (
 )
 from src.scenario1 import generator
 from src.scenario1.orchestrator import (
+    load_model_turn_result,
     run_live_trajectory,
     write_live_trajectory,
     write_model_turn_result,
@@ -412,3 +413,30 @@ def test_each_model_turn_can_be_checkpointed_before_finalization(tmp_path):
         "step_000.json", "step_002.json", "step_003.json"
     ]
     assert all(path.exists() for path in checkpoints)
+
+
+def test_exact_model_turn_checkpoint_can_be_resumed(tmp_path):
+    requests = []
+
+    def generate(request):
+        requests.append(copy.deepcopy(request))
+        return _fake_result(request, "Visible safe output")
+
+    run_live_trajectory(
+        _record(depth="2-hop", treatment="clean"),
+        thinking_mode="off",
+        generate_turn=generate,
+        on_turn_complete=lambda _request, result: write_model_turn_result(
+            result,
+            tmp_path,
+        ),
+    )
+
+    resumed = load_model_turn_result(requests[0], tmp_path)
+    assert resumed is not None
+    assert resumed["agent_id"] == requests[0]["agent_id"]
+
+    changed = copy.deepcopy(requests[0])
+    changed["messages"][0]["content"] += " changed"
+    with pytest.raises(ValueError, match="invalid model-turn checkpoint"):
+        load_model_turn_result(changed, tmp_path)

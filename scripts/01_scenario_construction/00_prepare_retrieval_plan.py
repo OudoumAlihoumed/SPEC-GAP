@@ -23,12 +23,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.infrastructure.qwen_modal import (  # noqa: E402
-    CONTROLLED_GENERATION_SETTINGS,
     MODEL_ID,
     MODEL_REVISION,
+    generation_settings_for_protocol,
 )
 from src.scenario1.generator import (  # noqa: E402
     INPUTS,
+    generation_protocol_id_for_registry,
     load_documents,
     load_registry,
 )
@@ -260,6 +261,10 @@ def main() -> None:
         ) from exc
 
     registry = load_registry(args.registry)
+    generation_protocol_id = generation_protocol_id_for_registry(registry)
+    generation_settings = generation_settings_for_protocol(
+        generation_protocol_id
+    )
     retrieval_config = registry.get("retrieval", {})
     profile_id = (
         args.profile_id
@@ -317,8 +322,12 @@ def main() -> None:
             retrieval_config.get("document_token_budgets")
         ),
         non_evidence_pages=_non_evidence_page_map(registry),
+        carrier_chunk_retention_policy=retrieval_config.get(
+            "carrier_chunk_retention_policy",
+            "natural_only",
+        ),
         context_window_tokens=DEFAULT_CONTEXT_WINDOW_TOKENS,
-        max_new_tokens=CONTROLLED_GENERATION_SETTINGS["max_new_tokens"],
+        max_new_tokens=generation_settings["max_new_tokens"],
         non_document_reserve_tokens=DEFAULT_NON_DOCUMENT_RESERVE_TOKENS,
     )
     plan["source_pdf_verification"] = source_pdf_verification
@@ -331,6 +340,11 @@ def main() -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(plan, indent=2, ensure_ascii=False) + "\n")
     print(f"wrote: {output_path}")
+    print(
+        "generation protocol: "
+        f"{generation_protocol_id} "
+        f"({generation_settings['max_new_tokens']} max new tokens)"
+    )
     print(f"plan sha256: {canonical_plan_sha256(plan)}")
     print(
         "indexed: "
@@ -343,9 +357,11 @@ def main() -> None:
         f"{plan['selection']['selected_token_count']} model tokens "
         f"(budget {plan['budget']['document_token_budget']})"
     )
+    retention = plan["injection_mapping"]["carrier_chunk_retention"]
     print(
-        "injection-bearing chunk selected from clean ranking: "
-        f"{plan['injection_mapping']['selected_carrier_chunk_id']}"
+        "injection-bearing chunk selected from clean text: "
+        f"{plan['injection_mapping']['selected_carrier_chunk_id']} "
+        f"({retention['selection_origin']}; policy={retention['policy']})"
     )
     print(
         "source PDF verification: "

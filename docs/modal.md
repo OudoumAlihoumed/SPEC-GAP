@@ -101,6 +101,24 @@ Thinking content is saved for analysis but is not forwarded downstream. Only
 the visible final response and valid requested tool calls may reach the next
 agent.
 
+## Generation-budget versions
+
+Generation budgets are explicit protocol versions rather than silent runtime
+overrides:
+
+- `controlled_v1_2048` preserves the original 2,048-token pilot runs and their
+  historical artifact IDs.
+- `controlled_v2_5000` changes only `max_new_tokens` to 5,000. Its trajectory,
+  checkpoint, activation, and cost IDs include
+  `__gen_controlled_v2_5000`.
+
+The registry selects the protocol, and its retrieval plan must reserve the same
+output budget. The exact Qwen chat-template preflight must pass before a paid
+run. Definitive v2 analysis reruns every selected clean/injected condition;
+only rerunning previously truncated outputs would create selective-rerun bias.
+Any later turn that reaches 5,000 remains recorded as truncated and
+indeterminate rather than receiving an individual budget increase.
+
 ## Tool requests and action results
 
 The runner recognizes explicit Qwen `<tool_call>...</tool_call>` blocks. Every
@@ -128,14 +146,36 @@ The cost ledger is stored under:
 costs/<trajectory_id>/<thinking_mode>/step_<step_index>/<modal_input_id>.json
 ```
 
-The estimate does not replace Modal billing. Reconcile it with:
+The estimate does not replace Modal billing. Modal exposes two different
+authoritative values:
+
+- the granular **metered resource cost** for each App before credits and
+  reservations;
+- the workspace **billed cost** after cycle-level credits and adjustments.
+
+Generate the reproducible Scenario 1 reconciliation after the final billed
+hour has closed and Modal has had a few minutes to collect usage:
 
 ```bash
-modal billing report --for today --show-resources
-modal billing report --for today --show-resources --json
+uv run --extra modal python \
+  scripts/02_model_execution/08_reconcile_modal_billing.py \
+  --start 2026-07-28T00:00:00Z \
+  --billing-cycle 2026-07 \
+  --output-json results/scenario1/2026-07-31_modal_billing_reconciliation.json \
+  --output-csv results/scenario1/2026-07-31_modal_billing_reconciliation.csv \
+  --output-md results/scenario1/2026-07-31_modal_billing_reconciliation.md
 ```
 
-Billing reports may arrive a few minutes after a run.
+The script filters authoritative hourly rows using Modal's
+`project=spec-gap` App tag, deduplicates local per-turn estimates by Modal input
+ID, and stores both values without converting money to floating point. The
+workspace billed total is not allocated to individual Apps because Modal
+applies credits at the workspace cycle level.
+
+Paid single-trajectory and batch entry points also attach the domain,
+generation protocol, and run kind to each new App. These tags make future
+domain-level costs directly attributable. Historical Apps without those newer
+tags remain included through the stable `project=spec-gap` tag.
 
 ## Complete trajectory runner
 
