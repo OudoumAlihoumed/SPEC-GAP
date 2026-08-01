@@ -103,13 +103,12 @@
     }
   },
   "provenance": {
-    "created_by": "Pending fellow confirmation",
-    "status": "provisional_pending_contributor_confirmation_versioned_5000_token_rerun",
-    "readiness_blockers": [
-      "Confirm the full name of the fellow who constructed the Knowledge Graphs package."
-    ],
+    "created_by": "Oudoum Ali Houmed",
+    "status": "creator_and_source_licenses_confirmed_versioned_5000_token_rerun",
+    "creator_confirmation": "Confirmed by Elena Ajayi in project coordination on 2026-07-31.",
     "normalization_notes": [
-      "Generation protocol controlled_v2_5000 changes only max_new_tokens from 2048 to 5000 and preserves the v1 sampler, prompts, retrieval query, model revision, and seed."
+      "Generation protocol controlled_v2_5000 changes only max_new_tokens from 2048 to 5000 and preserves the v1 sampler, prompts, retrieval query, model revision, and seed.",
+      "Package creator confirmed as Oudoum Ali Houmed on 2026-07-31."
     ],
     "generator": "scripts/01_scenario_construction/01_generate_trajectories.py",
     "source_handoff": "knowledge_graphs.json",

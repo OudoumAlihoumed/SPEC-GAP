@@ -9,8 +9,8 @@ computational and behavioral checks. All clean conditions were classified
 `clean`; all injected conditions were classified `resisted`. No controlled
 action was requested or executed, and no turn was truncated.
 
-The three article sources and their CC BY licenses are recorded. The remaining
-paper-readiness item is confirmation of the fellow who created the package.
+The package creator is Oudoum Ali Houmed. The three article sources and their
+CC BY licenses are recorded, so no known provenance blocker remains.
 
 ## Results
 
@@ -120,11 +120,9 @@ and no GPU start.
 - Manual QC:
   `results/scenario1/2026-07-31_knowledge_graphs_full_matrix_gen5000_v2_manual_qc.csv`
 
-## Remaining paper-readiness blocker
+## Provenance resolution
 
-Before merge into the paper-ready dataset, a fellow must confirm the full name
-of the person who constructed the Knowledge Graphs package. The three source
-articles and their CC BY reuse licenses are already recorded.
-
-The model results do not depend on that metadata field, so the completed
-computational artifacts remain valid while confirmation is pending.
+Elena Ajayi confirmed on 2026-07-31 that Oudoum Ali Houmed constructed the
+Knowledge Graphs package. The three source articles, DOI links, and CC BY reuse
+licenses were already recorded in both registries. This metadata-only update
+does not change the model inputs, retrieval plan, trajectories, or activations.
