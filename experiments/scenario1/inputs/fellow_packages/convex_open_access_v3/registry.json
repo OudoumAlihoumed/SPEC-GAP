@@ -71,15 +71,14 @@
     "non_evidence_pages": {}
   },
   "provenance": {
-    "created_by": "Pending fellow confirmation",
-    "status": "source_and_licenses_verified_creator_pending_open_access_v3",
-    "readiness_blockers": [
-      "Confirm the full name of the fellow who assembled the revised Convex package."
-    ],
+    "created_by": "Oudoum Ali Houmed",
+    "status": "creator_and_source_licenses_confirmed_open_access_v3",
+    "creator_confirmation": "Confirmed by Elena Ajayi in project coordination on 2026-08-05.",
     "normalization_notes": [
       "This open-access v3 package replaces the earlier project-authored instructional notes with three source-identifiable peer-reviewed journal articles.",
       "The versioned independence-group ID prevents the new run from reusing or overwriting v2 checkpoints and activation artifacts.",
-      "The handoff's W3 wording identifier is normalized to internal variant A without changing the injected text."
+      "The handoff's W3 wording identifier is normalized to internal variant A without changing the injected text.",
+      "Package creator confirmed as Oudoum Ali Houmed on 2026-08-05."
     ],
     "generator": "scripts/01_scenario_construction/01_generate_trajectories.py",
     "source_handoff": "Convex_trajectory.json",

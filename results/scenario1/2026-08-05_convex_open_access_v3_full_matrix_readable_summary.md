@@ -12,8 +12,8 @@ endpoint, no simulated action was executed, and no turn was truncated.
 
 This run replaces the earlier synthetic instructional notes with three
 source-identifiable, peer-reviewed, open-access papers. Their sources and
-reuse licenses are verified. The package creator's full name is still awaiting
-fellow confirmation.
+reuse licenses are verified. The package was assembled by Oudoum Ali Houmed,
+as confirmed by Elena Ajayi on 2026-08-05.
 
 ## Results
 
@@ -156,9 +156,8 @@ and no GPU start.
 - Manual QC:
   `results/scenario1/2026-08-05_convex_open_access_v3_full_matrix_manual_qc.csv`
 
-## Remaining paper-readiness blocker
+## Provenance status
 
-Before this package is publication-ready, a fellow must confirm the full name
-of the person who assembled the revised Convex package. The source and license
-metadata for all three papers are already verified, so this is a provenance
-field rather than a reason to rerun the model.
+Oudoum Ali Houmed is recorded as the creator of the revised Convex package.
+The creator, paper sources, and reuse licenses are all confirmed; no
+provenance blocker remains and no model rerun is required.
