@@ -1,0 +1,73 @@
+domain_id,domain_label,held_out_match_group_id,thinking_mode,agent_id,agent_label,probe_name,probe_label,layer,n_predictions,n_trajectories,n_clean,n_injected,held_out_fold_auroc,brier,ece_10_bin
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,0,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,8,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,16,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,24,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,32,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,40,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,48,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,56,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,63,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,lat_contrast_pair_pca,LAT,0,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,lat_contrast_pair_pca,LAT,8,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,lat_contrast_pair_pca,LAT,16,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,lat_contrast_pair_pca,LAT,24,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,lat_contrast_pair_pca,LAT,32,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,lat_contrast_pair_pca,LAT,40,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,lat_contrast_pair_pca,LAT,48,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,lat_contrast_pair_pca,LAT,56,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,planner_1,Planner,lat_contrast_pair_pca,LAT,63,4,4,2,2,0.5,0.25,0.0
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,0,4,4,2,2,0.25,0.47539234208761944,0.45996131859582645
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,8,4,4,2,2,1.0,0.48308137280835667,0.48970280036269814
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,16,4,4,2,2,1.0,0.09252214661917182,0.2816479566099149
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,24,4,4,2,2,1.0,0.4983629521640408,0.4990706204989307
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,32,4,4,2,2,1.0,0.024506479977782943,0.1268212242690974
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,40,4,4,2,2,1.0,0.4557716471572432,0.4770633534139299
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,48,4,4,2,2,1.0,0.18810493203989928,0.2947264978180818
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,56,4,4,2,2,1.0,2.7113552628438873e-05,0.003817400776170687
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,63,4,4,2,2,1.0,0.00036215752151405806,0.010584599470146401
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,0,4,4,2,2,0.25,0.2524273585733318,0.005440821172024296
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,8,4,4,2,2,0.25,0.2551585972087979,0.025412387579640705
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,16,4,4,2,2,0.5,0.26364864238107166,0.06504032583915309
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,24,4,4,2,2,0.25,0.28262000010656313,0.1557199627216046
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,32,4,4,2,2,0.75,0.23004971575922187,0.024969664306728367
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,40,4,4,2,2,1.0,0.2122159763700738,0.4431313885212415
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,48,4,4,2,2,1.0,0.11954480781409116,0.23827144493769054
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,56,4,4,2,2,1.0,0.14848678768469695,0.22879921316647034
+convex,Convex,convex_open_access_v3,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,63,4,4,2,2,1.0,0.06838162964450671,0.1701678837267135
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,0,2,2,1,1,1.0,0.009739760453243474,0.09400035665076756
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,8,2,2,1,1,1.0,0.4772787143318559,0.48786955180313785
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,16,2,2,1,1,1.0,0.24678634017567197,0.3733817740443047
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,24,2,2,1,1,1.0,0.005822878069542713,0.06707756634365815
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,32,2,2,1,1,1.0,0.0011541543905051372,0.027516351351943174
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,40,2,2,1,1,1.0,0.005175871619624937,0.07146032293717414
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,48,2,2,1,1,1.0,0.10346221024685515,0.3160788488481666
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,56,2,2,1,1,1.0,0.10065971242411527,0.27389571541152524
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,63,2,2,1,1,1.0,0.3436788405106186,0.4268826233058341
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,0,2,2,1,1,1.0,0.17298703820391292,0.4137583150982288
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,8,2,2,1,1,1.0,0.09479062191711314,0.3060285809652359
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,16,2,2,1,1,1.0,0.1901516368342963,0.4348744010138096
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,24,2,2,1,1,0.0,0.29287000060579954,0.5357839496800973
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,32,2,2,1,1,1.0,0.277180972531353,0.1717536889641706
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,40,2,2,1,1,0.0,0.2905354400488777,0.14819452401071193
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,48,2,2,1,1,1.0,0.2629408860447676,0.12085537645636968
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,56,2,2,1,1,0.0,0.28610325925227276,0.12549559768800223
+convex,Convex,convex_open_access_v3,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,63,2,2,1,1,0.0,0.2856838314516084,0.05140012722938353
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,0,4,4,2,2,0.5,0.47874700164246203,0.4808482870470468
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,8,4,4,2,2,0.5,0.23627828519620497,0.3864934195734904
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,16,4,4,2,2,1.0,0.3414713468825611,0.4075195286878901
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,24,4,4,2,2,0.0,0.6091162678734056,0.7581522303375954
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,32,4,4,2,2,0.25,0.5013602231198053,0.4846046237841033
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,40,4,4,2,2,0.25,0.5236863154269464,0.6627485940318261
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,48,4,4,2,2,0.0,0.7644964953363363,0.8612422153487497
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,56,4,4,2,2,0.5,0.41484322513728605,0.5003900513531786
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,63,4,4,2,2,0.5,0.3018235600377602,0.40675416925499075
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,lat_contrast_pair_pca,LAT,0,4,4,2,2,1.0,0.23937406320135335,0.06054803975453915
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,lat_contrast_pair_pca,LAT,8,4,4,2,2,0.75,0.2344252062597752,0.2546001587382769
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,lat_contrast_pair_pca,LAT,16,4,4,2,2,0.75,0.24470068813825896,0.054486592736994466
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,lat_contrast_pair_pca,LAT,24,4,4,2,2,0.5,0.25405666574956054,0.26480666184116103
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,lat_contrast_pair_pca,LAT,32,4,4,2,2,0.5,0.2565037136488362,0.07867522236142233
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,lat_contrast_pair_pca,LAT,40,4,4,2,2,0.5,0.27338203563874885,0.5038908239059728
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,lat_contrast_pair_pca,LAT,48,4,4,2,2,0.5,0.26225670655924976,0.2972966454600414
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,lat_contrast_pair_pca,LAT,56,4,4,2,2,0.25,0.2599055852018316,0.22775774964866036
+convex,Convex,convex_open_access_v3,off,executor_1,Executor,lat_contrast_pair_pca,LAT,63,4,4,2,2,1.0,0.20202396898814148,0.23885117769715924

@@ -67,9 +67,9 @@ def test_save_paper_figures_in_vector_and_preview_formats(tmp_path):
     assert len(paths) == 9
     assert {path.suffix for path in paths} == {".png", ".svg", ".pdf"}
     assert {path.stem for path in paths} == {
-        "figure1_planner_negative_control",
-        "figure2_shared_input_comparison",
-        "appendix_full_layer_heatmap",
+        "scenario1_all_domains_planner_negative_control",
+        "scenario1_all_domains_shared_input_auroc_by_layer",
+        "scenario1_all_domains_checkpoint_qualification_heatmap",
     }
     assert all(path.is_file() and path.stat().st_size > 1000 for path in paths)
     for path in paths:

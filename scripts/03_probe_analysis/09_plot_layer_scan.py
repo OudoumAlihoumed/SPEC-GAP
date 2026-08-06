@@ -31,11 +31,14 @@ def main() -> None:
         type=Path,
         default=PROJECT_ROOT / "results/scenario1/figures/paper",
     )
-    parser.add_argument("--dpi", type=int, default=180)
+    parser.add_argument("--dpi", type=int, default=600)
     parser.add_argument(
         "--filename-prefix",
-        default="",
-        help="Optional prefix for every output filename, such as a run date.",
+        default="scenario1_all_domains_",
+        help=(
+            "Paper-facing prefix for every output filename. Use a dated, "
+            "self-identifying value for definitive analyses."
+        ),
     )
     args = parser.parse_args()
 

@@ -30,15 +30,6 @@ CHECKPOINT_COLORS = {
     "last_reasoning_token": "#CC79A7",
     "last_visible_answer_token": "#D55E00",
 }
-FOLD_COLORS = (
-    "#56B4E9",
-    "#E69F00",
-    "#009E73",
-    "#CC79A7",
-    "#0072B2",
-    "#D55E00",
-    "#F0E442",
-)
 MAIN_AGENT_ORDER = ("planner_1", "worker_1", "executor_1")
 ALL_AGENT_ORDER = ("planner_1", "worker_1", "worker_2", "executor_1")
 AGENT_LABELS = {
@@ -55,17 +46,26 @@ def save_paper_layer_scan_figures(
     result: dict[str, Any],
     output_dir: str | Path,
     *,
-    dpi: int = 300,
-    filename_prefix: str = "",
+    dpi: int = 600,
+    filename_prefix: str = "scenario1_all_domains_",
 ) -> list[Path]:
     """Save two main figures and one appendix heatmap in three formats."""
 
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     figures = (
-        ("figure1_planner_negative_control", _planner_control_figure(result)),
-        ("figure2_shared_input_comparison", _shared_input_figure(result)),
-        ("appendix_full_layer_heatmap", _appendix_heatmap(result)),
+        (
+            "planner_negative_control",
+            _planner_control_figure(result),
+        ),
+        (
+            "shared_input_auroc_by_layer",
+            _shared_input_figure(result),
+        ),
+        (
+            "checkpoint_qualification_heatmap",
+            _appendix_heatmap(result),
+        ),
     )
     paths = []
     for stem, figure in figures:
@@ -127,28 +127,20 @@ def _planner_control_figure(result: dict[str, Any]) -> plt.Figure:
             axis.legend(fontsize=7, loc="best", frameon=False)
         axes[0][0].set_ylabel("Planner mean AUROC")
         figure.suptitle(
-            "Planner negative control before document retrieval",
+            (
+                "Planner control before document retrieval "
+                f"(n={match_group_count} domains)"
+            ),
             fontweight="bold",
             y=0.99,
         )
-        figure.text(
-            0.5,
-            0.005,
-            (
-                "Faint lines are held-out match groups; bold lines are their mean. "
-                f"n={match_group_count} groups. Dashed checkpoints are not "
-                "qualified for layer selection."
-            ),
-            ha="center",
-            fontsize=7.5,
-        )
-        figure.tight_layout(rect=(0, 0.06, 1, 0.93))
+        figure.tight_layout(rect=(0, 0, 1, 0.93))
     return figure
 
 
 def _shared_input_figure(result: dict[str, Any]) -> plt.Figure:
     modes = _modes(result)
-    match_groups = _match_groups(result)
+    match_group_count = len(_match_groups(result))
     with plt.rc_context(_paper_style()):
         figure, axes = plt.subplots(
             len(MAIN_AGENT_ORDER),
@@ -208,12 +200,11 @@ def _shared_input_figure(result: dict[str, Any]) -> plt.Figure:
             Line2D(
                 [0],
                 [0],
-                color=FOLD_COLORS[index % len(FOLD_COLORS)],
-                linewidth=1,
-                label=f"Held out: {group}",
-            )
-            for index, group in enumerate(match_groups)
-        ] + [
+                color="#9CA3AF",
+                linewidth=0.8,
+                alpha=0.65,
+                label=f"Held-out domain (n={match_group_count})",
+            ),
             Line2D([0], [0], color="#000000", linewidth=1.8, label="Mean"),
             Line2D([0], [0], color="#555555", linestyle=":", label="Chance"),
         ]
@@ -221,26 +212,16 @@ def _shared_input_figure(result: dict[str, Any]) -> plt.Figure:
             handles=legend_handles,
             loc="upper center",
             bbox_to_anchor=(0.5, 0.945),
-            ncol=min(len(legend_handles), 5),
+            ncol=3,
             frameon=False,
             fontsize=7.5,
         )
         figure.suptitle(
-            "Clean–injected discrimination at the shared input checkpoint",
+            "Clean versus injected signal at the shared input checkpoint",
             fontweight="bold",
             y=0.99,
         )
-        figure.text(
-            0.5,
-            0.005,
-            (
-                "Leave-one-match-group-out construction-label analysis. "
-                "Exploratory only; not behavioral-compromise performance."
-            ),
-            ha="center",
-            fontsize=7.5,
-        )
-        figure.tight_layout(rect=(0, 0.04, 1, 0.90))
+        figure.tight_layout(rect=(0, 0, 1, 0.90))
     return figure
 
 
@@ -293,7 +274,10 @@ def _appendix_heatmap(result: dict[str, Any]) -> plt.Figure:
         axis.set_yticklabels(labels, fontsize=6.6)
         axis.set_xlabel("Layer")
         axis.set_title(
-            "Appendix: full exploratory layer scan",
+            (
+                "Checkpoint-qualified AUROC across all layers "
+                f"(n={match_group_count} domains)"
+            ),
             fontweight="bold",
             pad=10,
         )
@@ -310,18 +294,7 @@ def _appendix_heatmap(result: dict[str, Any]) -> plt.Figure:
                 )
         color_bar = figure.colorbar(image, ax=axis, fraction=0.025, pad=0.02)
         color_bar.set_label("Mean AUROC")
-        figure.text(
-            0.5,
-            0.005,
-            (
-                "Grey rows are not qualified by the matched planner control. "
-                f"n={match_group_count} independent groups; values are descriptive "
-                "and not used for final layer selection."
-            ),
-            ha="center",
-            fontsize=7.5,
-        )
-        figure.tight_layout(rect=(0, 0.035, 1, 1))
+        figure.tight_layout()
     return figure
 
 
@@ -339,13 +312,13 @@ def _plot_fold_curves(
 
 def _plot_named_folds(axis: plt.Axes, stratum: dict[str, Any]) -> None:
     layers, folds = _fold_series(stratum)
-    for index, fold_values in enumerate(folds):
+    for fold_values in folds:
         axis.plot(
             layers,
             fold_values,
-            color=FOLD_COLORS[index % len(FOLD_COLORS)],
+            color="#9CA3AF",
             linewidth=0.8,
-            alpha=0.72,
+            alpha=0.50,
         )
 
 
@@ -457,6 +430,10 @@ def _paper_style() -> dict[str, Any]:
         "legend.fontsize": 7,
         "figure.titlesize": 11,
         "font.family": "DejaVu Sans",
+        "axes.linewidth": 0.8,
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
+        "svg.fonttype": "none",
     }
 
 
