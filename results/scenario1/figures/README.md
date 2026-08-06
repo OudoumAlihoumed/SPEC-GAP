@@ -4,11 +4,25 @@ These plots are the reviewed visual outputs from the current Scenario 1
 construction-label analysis. They are tracked so collaborators can inspect,
 discuss, and reuse the same figures in the project blog and paper draft.
 
-The current sample contains two independent match groups. Every injected
-trajectory resisted, so these figures measure whether an injection was present;
-they do not measure successful behavioral compromise. Layer 40 is the
-prespecified reference layer. The full-layer plots are descriptive and do not
-select a best layer after seeing the results.
+## Current dated exploratory figures
+
+The newest scan contains nine independent match groups: AIHC, Finance, Neuro,
+Macro, Convex open-access v3, Knowledge Graphs, Petroleum, Policy, and Telecom.
+Its dated outputs are kept separate here:
+
+- [Planner negative control](2026-08-06_nine_domain_gen5000_v2/2026-08-06_nine_domain_gen5000_v2_figure1_planner_negative_control.png)
+- [Shared-input comparison](2026-08-06_nine_domain_gen5000_v2/2026-08-06_nine_domain_gen5000_v2_figure2_shared_input_comparison.png)
+- [Full-layer qualification heatmap](2026-08-06_nine_domain_gen5000_v2/2026-08-06_nine_domain_gen5000_v2_appendix_full_layer_heatmap.png)
+
+Every injected trajectory in this nine-domain sample resisted. These figures
+therefore measure whether an injection was present; they do not measure
+successful behavioral compromise. The full-layer curves are exploratory and
+must not be used to choose a final layer.
+
+The earlier dated three-domain bundle remains under
+`2026-07-30_aihc_finance_neuro_neutral_v1/`. The undated `paper/` bundle below
+is the still-earlier two-domain analysis. Both remain available for provenance
+and were not overwritten by the nine-domain scan.
 
 ## Main paper figures
 

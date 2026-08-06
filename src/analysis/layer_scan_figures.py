@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.patches import Rectangle  # noqa: E402
 
 
 CHECKPOINT_ORDER = (
@@ -62,6 +64,263 @@ def save_layer_scan_figures(
     _save_figure(control_figure, control_path, result=result, dpi=dpi)
     paths.append(control_path)
     return paths
+
+
+def save_activation_coverage_status_figure(
+    index_rows: list[dict[str, Any]],
+    result: dict[str, Any],
+    output_dir: str | Path,
+    *,
+    as_of_date: str,
+    dpi: int = 180,
+) -> Path:
+    """Save a dated coverage/status figure without replacing analysis figures."""
+
+    parsed_date = date.fromisoformat(as_of_date)
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+
+    match_groups = sorted({
+        str(row["match_group_id"])
+        for row in index_rows
+        if row.get("match_group_id")
+    })
+    group_label = match_groups[0].upper() if len(match_groups) == 1 else "SCENARIO 1"
+    group_slug = (
+        match_groups[0].lower().replace("_", "-")
+        if len(match_groups) == 1
+        else "scenario1"
+    )
+    path = destination / (
+        f"{as_of_date}_{group_slug}_activation_coverage_and_"
+        "layer_selection_status.png"
+    )
+
+    primary_rows = [
+        row for row in index_rows if row.get("thinking_mode") == "off"
+    ]
+    trajectory_ids = {
+        str(row["trajectory_id"])
+        for row in primary_rows
+        if row.get("trajectory_id")
+    }
+    model_turns = {
+        (str(row["trajectory_id"]), int(row["step_index"]))
+        for row in primary_rows
+        if row.get("trajectory_id") is not None
+        and row.get("step_index") is not None
+    }
+    layer_counts = {
+        len(row["layers"])
+        for row in primary_rows
+        if isinstance(row.get("layers"), list)
+    }
+    layer_count = max(layer_counts, default=0)
+
+    figure, (coverage_axis, status_axis) = plt.subplots(
+        1,
+        2,
+        figsize=(13.5, 6.8),
+        gridspec_kw={"width_ratios": (1.35, 1)},
+    )
+    _draw_trajectory_coverage(coverage_axis, primary_rows)
+    _draw_layer_selection_status(status_axis, result)
+
+    readable_date = (
+        f"{parsed_date.strftime('%B')} {parsed_date.day}, {parsed_date.year}"
+    )
+    figure.suptitle(
+        f"{group_label} activation coverage and layer-selection status",
+        fontsize=18,
+        fontweight="bold",
+        y=0.97,
+    )
+    figure.text(
+        0.5,
+        0.91,
+        f"Current as of {readable_date} · Qwen3-32B · primary thinking-off runs",
+        ha="center",
+        fontsize=11,
+        color="#4a5568",
+    )
+    figure.text(
+        0.28,
+        0.11,
+        (
+            f"{len(trajectory_ids)} trajectories  •  {len(model_turns)} model turns  •  "
+            f"{len(primary_rows)} indexed checkpoints  •  {layer_count} layers"
+        ),
+        ha="center",
+        fontsize=10,
+        color="#334155",
+    )
+    figure.text(
+        0.5,
+        0.025,
+        (
+            "Preliminary validation only. This figure reports extraction coverage "
+            "and analysis readiness—not probe performance."
+        ),
+        ha="center",
+        fontsize=10,
+        color="#334155",
+        fontstyle="italic",
+    )
+    figure.tight_layout(rect=(0.025, 0.14, 0.975, 0.87))
+    figure.savefig(
+        path,
+        dpi=dpi,
+        bbox_inches="tight",
+        metadata={
+            "Title": f"{group_label} activation coverage and layer-selection status",
+            "Author": "SPEC-GAP",
+            "Description": (
+                f"Dated Scenario 1 extraction coverage status as of {as_of_date}; "
+                "not a probe-performance result."
+            ),
+        },
+    )
+    plt.close(figure)
+    return path
+
+
+def _draw_trajectory_coverage(
+    axis: plt.Axes,
+    rows: list[dict[str, Any]],
+) -> None:
+    treatments = ("clean", "injected")
+    depths = ("2-hop", "3-hop")
+    available = {
+        (str(row.get("delegation_depth")), str(row.get("treatment")))
+        for row in rows
+        if row.get("local_available", True)
+    }
+    axis.set_xlim(0, 2)
+    axis.set_ylim(0, 2)
+    axis.set_xticks((0.5, 1.5), ("Clean", "Injected"))
+    axis.xaxis.tick_top()
+    axis.tick_params(axis="x", length=0, labelsize=11, pad=8)
+    axis.set_yticks((1.5, 0.5), depths)
+    axis.tick_params(axis="y", length=0, labelsize=11, pad=8)
+    for row_index, depth in enumerate(depths):
+        y = 1 - row_index
+        for column_index, treatment in enumerate(treatments):
+            present = (depth, treatment) in available
+            face_color = "#dcefe7" if present else "#f8dddd"
+            edge_color = "#2d7d70" if present else "#b44b4b"
+            axis.add_patch(
+                Rectangle(
+                    (column_index + 0.04, y + 0.07),
+                    0.92,
+                    0.86,
+                    facecolor=face_color,
+                    edgecolor=edge_color,
+                    linewidth=1.6,
+                )
+            )
+            axis.text(
+                column_index + 0.5,
+                y + 0.58,
+                "✓" if present else "—",
+                ha="center",
+                va="center",
+                fontsize=23,
+                fontweight="bold",
+                color=edge_color,
+            )
+            axis.text(
+                column_index + 0.5,
+                y + 0.32,
+                "saved" if present else "not available",
+                ha="center",
+                va="center",
+                fontsize=10,
+                color="#334155",
+            )
+    axis.set_title(
+        "Primary trajectory coverage",
+        fontsize=13,
+        fontweight="bold",
+        pad=42,
+    )
+    for spine in axis.spines.values():
+        spine.set_visible(False)
+    axis.set_aspect("equal")
+
+
+def _draw_layer_selection_status(
+    axis: plt.Axes,
+    result: dict[str, Any],
+) -> None:
+    match_group_count = len(result.get("match_groups", []))
+    required_group_count = 3
+    axis.barh(
+        [0],
+        [match_group_count],
+        height=0.34,
+        color="#2d7d70",
+        edgecolor="#24675e",
+    )
+    axis.axvline(
+        required_group_count,
+        color="#b44b4b",
+        linestyle="--",
+        linewidth=1.8,
+    )
+    axis.set_xlim(0, required_group_count + 0.45)
+    axis.set_ylim(-1.0, 0.8)
+    axis.set_yticks([])
+    axis.set_xticks(
+        range(required_group_count + 1),
+        [str(value) for value in range(required_group_count + 1)],
+    )
+    axis.set_xlabel("Independent match groups", fontsize=10)
+    axis.set_title(
+        "Readiness for layer selection",
+        fontsize=13,
+        fontweight="bold",
+        pad=18,
+    )
+    axis.text(
+        match_group_count / 2 if match_group_count else 0.08,
+        0,
+        str(match_group_count),
+        ha="center",
+        va="center",
+        color="white",
+        fontsize=12,
+        fontweight="bold",
+    )
+    axis.text(
+        required_group_count,
+        0.28,
+        "minimum: 3",
+        ha="center",
+        va="bottom",
+        color="#9f3e3e",
+        fontsize=9,
+        fontweight="bold",
+    )
+    axis.text(
+        (required_group_count + 0.45) / 2,
+        -0.55,
+        "LAYER SELECTION DEFERRED",
+        ha="center",
+        va="center",
+        fontsize=13,
+        fontweight="bold",
+        color="#9f3e3e",
+    )
+    axis.text(
+        (required_group_count + 0.45) / 2,
+        -0.73,
+        "Additional independent match groups are needed.",
+        ha="center",
+        va="center",
+        fontsize=10,
+        color="#334155",
+    )
+    axis.spines[["top", "right", "left"]].set_visible(False)
 
 
 def _mode_grid(result: dict[str, Any], mode: str) -> plt.Figure:
@@ -127,15 +386,32 @@ def _mode_grid(result: dict[str, Any], mode: str) -> plt.Figure:
     figure.text(
         0.5,
         0.008,
-        (
-            "Two independent match groups • leave-one-match-group-out • "
-            "not final performance • red panels failed the planner control"
-        ),
+        _figure_scope_note(result),
         ha="center",
         fontsize=9,
     )
     figure.tight_layout(rect=(0, 0.035, 1, 0.965))
     return figure
+
+
+def _figure_scope_note(result: dict[str, Any]) -> str:
+    match_groups = result.get("match_groups", [])
+    match_group_count = len(match_groups)
+    if match_group_count < 3:
+        group_name = (
+            str(match_groups[0]).upper()
+            if match_group_count == 1
+            else "two-group" if match_group_count == 2 else "limited-sample"
+        )
+        return (
+            f"Preliminary {group_name} validation only; layer selection deferred "
+            "pending additional match groups."
+        )
+    return (
+        f"{match_group_count} independent match groups • "
+        "leave-one-match-group-out • "
+        "not final performance • red panels failed the planner control"
+    )
 
 
 def _planner_control_figure(result: dict[str, Any]) -> plt.Figure:

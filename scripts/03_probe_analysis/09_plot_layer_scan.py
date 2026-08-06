@@ -32,10 +32,20 @@ def main() -> None:
         default=PROJECT_ROOT / "results/scenario1/figures/paper",
     )
     parser.add_argument("--dpi", type=int, default=180)
+    parser.add_argument(
+        "--filename-prefix",
+        default="",
+        help="Optional prefix for every output filename, such as a run date.",
+    )
     args = parser.parse_args()
 
     result = json.loads(args.input.read_text())
-    paths = save_paper_layer_scan_figures(result, args.output_dir, dpi=args.dpi)
+    paths = save_paper_layer_scan_figures(
+        result,
+        args.output_dir,
+        dpi=args.dpi,
+        filename_prefix=args.filename_prefix,
+    )
     print(json.dumps({
         "figure_count": len(paths),
         "figures": [path.as_posix() for path in paths],

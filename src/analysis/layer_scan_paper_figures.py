@@ -30,7 +30,15 @@ CHECKPOINT_COLORS = {
     "last_reasoning_token": "#CC79A7",
     "last_visible_answer_token": "#D55E00",
 }
-FOLD_COLORS = ("#56B4E9", "#E69F00")
+FOLD_COLORS = (
+    "#56B4E9",
+    "#E69F00",
+    "#009E73",
+    "#CC79A7",
+    "#0072B2",
+    "#D55E00",
+    "#F0E442",
+)
 MAIN_AGENT_ORDER = ("planner_1", "worker_1", "executor_1")
 ALL_AGENT_ORDER = ("planner_1", "worker_1", "worker_2", "executor_1")
 AGENT_LABELS = {
@@ -48,6 +56,7 @@ def save_paper_layer_scan_figures(
     output_dir: str | Path,
     *,
     dpi: int = 300,
+    filename_prefix: str = "",
 ) -> list[Path]:
     """Save two main figures and one appendix heatmap in three formats."""
 
@@ -61,7 +70,7 @@ def save_paper_layer_scan_figures(
     paths = []
     for stem, figure in figures:
         for suffix in FORMATS:
-            path = destination / f"{stem}.{suffix}"
+            path = destination / f"{filename_prefix}{stem}.{suffix}"
             _save(figure, path, result=result, dpi=dpi)
             paths.append(path)
         plt.close(figure)
@@ -70,6 +79,7 @@ def save_paper_layer_scan_figures(
 
 def _planner_control_figure(result: dict[str, Any]) -> plt.Figure:
     modes = _modes(result)
+    match_group_count = len(_match_groups(result))
     with plt.rc_context(_paper_style()):
         figure, axes = plt.subplots(
             1,
@@ -126,7 +136,8 @@ def _planner_control_figure(result: dict[str, Any]) -> plt.Figure:
             0.005,
             (
                 "Faint lines are held-out match groups; bold lines are their mean. "
-                "n=2 groups. Dashed checkpoints are not qualified for layer selection."
+                f"n={match_group_count} groups. Dashed checkpoints are not "
+                "qualified for layer selection."
             ),
             ha="center",
             fontsize=7.5,
@@ -137,6 +148,7 @@ def _planner_control_figure(result: dict[str, Any]) -> plt.Figure:
 
 def _shared_input_figure(result: dict[str, Any]) -> plt.Figure:
     modes = _modes(result)
+    match_groups = _match_groups(result)
     with plt.rc_context(_paper_style()):
         figure, axes = plt.subplots(
             len(MAIN_AGENT_ORDER),
@@ -193,8 +205,15 @@ def _shared_input_figure(result: dict[str, Any]) -> plt.Figure:
                 )
                 panel_index += 1
         legend_handles = [
-            Line2D([0], [0], color=FOLD_COLORS[0], linewidth=1, label="Held-out group 1"),
-            Line2D([0], [0], color=FOLD_COLORS[1], linewidth=1, label="Held-out group 2"),
+            Line2D(
+                [0],
+                [0],
+                color=FOLD_COLORS[index % len(FOLD_COLORS)],
+                linewidth=1,
+                label=f"Held out: {group}",
+            )
+            for index, group in enumerate(match_groups)
+        ] + [
             Line2D([0], [0], color="#000000", linewidth=1.8, label="Mean"),
             Line2D([0], [0], color="#555555", linestyle=":", label="Chance"),
         ]
@@ -202,7 +221,7 @@ def _shared_input_figure(result: dict[str, Any]) -> plt.Figure:
             handles=legend_handles,
             loc="upper center",
             bbox_to_anchor=(0.5, 0.945),
-            ncol=4,
+            ncol=min(len(legend_handles), 5),
             frameon=False,
             fontsize=7.5,
         )
@@ -226,6 +245,7 @@ def _shared_input_figure(result: dict[str, Any]) -> plt.Figure:
 
 
 def _appendix_heatmap(result: dict[str, Any]) -> plt.Figure:
+    match_group_count = len(_match_groups(result))
     ordered = []
     for mode in _modes(result):
         for checkpoint in CHECKPOINT_ORDER:
@@ -295,8 +315,8 @@ def _appendix_heatmap(result: dict[str, Any]) -> plt.Figure:
             0.005,
             (
                 "Grey rows are not qualified by the matched planner control. "
-                "n=2 independent groups; values are descriptive and not used for "
-                "final layer selection."
+                f"n={match_group_count} independent groups; values are descriptive "
+                "and not used for final layer selection."
             ),
             ha="center",
             fontsize=7.5,
@@ -399,6 +419,23 @@ def _modes(result: dict[str, Any]) -> list[str]:
         for stratum in result.get("strata", [])
         if stratum.get("status") == "completed"
     })
+
+
+def _match_groups(result: dict[str, Any]) -> list[str]:
+    completed = [
+        stratum
+        for stratum in result.get("strata", [])
+        if stratum.get("status") == "completed"
+    ]
+    for stratum in completed:
+        match_groups = stratum.get("match_groups")
+        if match_groups:
+            return [str(group) for group in match_groups]
+    count = max(
+        (int(stratum.get("match_group_count", 0)) for stratum in completed),
+        default=0,
+    )
+    return [f"group {index}" for index in range(1, count + 1)]
 
 
 def _standard_axis(axis: plt.Axes) -> None:

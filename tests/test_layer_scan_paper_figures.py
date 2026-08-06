@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 
 from src.analysis.layer_scan_paper_figures import (
     _control_state,
+    _match_groups,
     save_paper_layer_scan_figures,
 )
 
@@ -99,3 +100,12 @@ def test_control_state_distinguishes_pass_failure_and_uncalibrated_null():
         False,
         "Blocked by planner control",
     )
+
+
+def test_match_groups_uses_names_and_falls_back_to_count():
+    named = _paper_result()
+    named["strata"][0]["match_groups"] = ["aihc", "fin", "neuro"]
+    named["strata"][0]["match_group_count"] = 3
+    assert _match_groups(named) == ["aihc", "fin", "neuro"]
+
+    assert _match_groups(_paper_result()) == ["group 1", "group 2"]
