@@ -465,8 +465,8 @@ def plot_all_domain_figures(
                 value_field="mean_fold_auroc",
                 robustness_layers=robustness_layers,
                 primary_layer=primary_layer,
-                title=f"{AGENT_LABELS[agent]} (Thinking {mode.title()})",
-                subtitle="Mean AUROC across nine independently held-out domains",
+                title=f"{AGENT_LABELS[agent]}, thinking {mode}",
+                subtitle="Mean AUROC across nine held-out domains",
                 output_dir=output_dir / f"thinking_{mode}",
                 file_stem=file_stem,
                 formats=("png", "pdf", "svg"),
@@ -508,10 +508,9 @@ def plot_standalone_domain_figures(
                     robustness_layers=robustness_layers,
                     primary_layer=primary_layer,
                     title=(
-                        f"{domain_label}: {AGENT_LABELS[agent]} "
-                        f"(Thinking {mode.title()})"
+                        f"{domain_label}: {AGENT_LABELS[agent]}, thinking {mode}"
                     ),
-                    subtitle="AUROC within this independently held-out domain fold",
+                    subtitle="AUROC in this independently held-out domain fold",
                     output_dir=(
                         output_dir
                         / domain_file_label
@@ -546,23 +545,26 @@ def _plot_standalone_lines(
     import matplotlib.pyplot as plt
 
     plt.rcParams.update(_publication_style())
-    fig, axis = plt.subplots(figsize=(7.0, 4.5))
+    fig, axis = plt.subplots(figsize=(6.4, 4.0))
     primary_values: list[str] = []
     for probe in PROBE_LABELS:
         series = sorted(
             (row for row in rows if row["probe_name"] == probe),
             key=lambda row: row["layer"],
         )
+        layer_values = [int(row["layer"]) for row in series]
+        metric_values = [float(row[value_field]) for row in series]
         axis.plot(
-            [row["layer"] for row in series],
-            [row[value_field] for row in series],
+            layer_values,
+            metric_values,
             marker=PROBE_MARKERS[probe],
-            markersize=4.8,
+            markersize=4.2,
             markeredgewidth=0.7,
             linestyle=PROBE_LINESTYLES[probe],
-            linewidth=1.9,
+            linewidth=1.7,
             color=PROBE_COLORS[probe],
             label=PROBE_LABELS[probe],
+            zorder=3,
         )
         primary_row = next(
             (row for row in series if row["layer"] == primary_layer), None
@@ -572,8 +574,20 @@ def _plot_standalone_lines(
                 f"{PROBE_LABELS[probe]} = {primary_row[value_field]:.3f}"
             )
 
-    axis.axhline(0.5, color="#6B7280", linestyle=(0, (4, 3)), linewidth=1.0)
-    axis.axvline(primary_layer, color="#009E73", linestyle=":", linewidth=1.3)
+    axis.axhline(
+        0.5,
+        color="#B7BEC8",
+        linestyle=(0, (3, 3)),
+        linewidth=0.9,
+        zorder=0,
+    )
+    axis.axvline(
+        primary_layer,
+        color="#009E73",
+        linestyle=":",
+        linewidth=1.0,
+        zorder=2,
+    )
     axis.set_ylim(0.0, 1.02)
     axis.set_xlim(min(robustness_layers) - 1, max(robustness_layers) + 1)
     axis.set_xticks(robustness_layers)
@@ -582,53 +596,52 @@ def _plot_standalone_lines(
         "Mean held-out AUROC" if value_field == "mean_fold_auroc"
         else "Held-out fold AUROC"
     )
-    axis.grid(axis="y", color="#E5E7EB", linewidth=0.7)
+    axis.set_axisbelow(True)
+    axis.grid(axis="y", color="#ECEFF3", linewidth=0.65)
     axis.spines["top"].set_visible(False)
     axis.spines["right"].set_visible(False)
     axis.spines["left"].set_color("#374151")
     axis.spines["bottom"].set_color("#374151")
     axis.legend(
         loc="lower right",
-        frameon=True,
-        facecolor="white",
-        edgecolor="none",
-        framealpha=0.92,
+        frameon=False,
     )
-    fig.suptitle(title, x=0.13, y=0.975, ha="left", fontsize=13, weight="bold")
-    axis.set_title(subtitle, loc="left", fontsize=9.5, color="#4B5563", pad=10)
+    fig.text(0.12, 0.95, title, ha="left", fontsize=11, weight="bold")
+    fig.text(0.12, 0.89, subtitle, ha="left", fontsize=8, color="#4B5563")
     axis.text(
         0.02,
-        0.97,
-        f"Layer {primary_layer}: " + "; ".join(primary_values),
+        0.96,
+        f"Layer {primary_layer}: " + " | ".join(primary_values),
         transform=axis.transAxes,
         va="top",
-        fontsize=8.2,
+        fontsize=7.4,
+        color="#374151",
         bbox={
-            "boxstyle": "round,pad=0.35",
+            "boxstyle": "square,pad=0.18",
             "facecolor": "white",
-            "alpha": 0.92,
-            "edgecolor": "#D1D5DB",
+            "alpha": 0.86,
+            "edgecolor": "none",
         },
     )
     axis.text(
         62.5,
         0.515,
-        "Chance",
+        "Random = 0.5",
         ha="right",
         va="bottom",
-        fontsize=7.5,
+        fontsize=7,
         color="#6B7280",
     )
     axis.text(
         primary_layer + 0.8,
         0.03,
-        "Layer 40",
+        f"Layer {primary_layer}",
         rotation=90,
         va="bottom",
-        fontsize=7.5,
+        fontsize=7,
         color="#007A5E",
     )
-    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    fig.subplots_adjust(left=0.12, right=0.98, bottom=0.15, top=0.80)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     paths = []
@@ -654,13 +667,13 @@ def _publication_style() -> dict[str, object]:
     return {
         "font.family": "DejaVu Sans",
         "font.size": 9,
-        "axes.labelsize": 10,
+        "axes.labelsize": 9,
         "axes.linewidth": 0.8,
-        "xtick.labelsize": 8.5,
-        "ytick.labelsize": 8.5,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
         "xtick.major.width": 0.8,
         "ytick.major.width": 0.8,
-        "legend.fontsize": 8.5,
+        "legend.fontsize": 8,
         "pdf.fonttype": 42,
         "ps.fonttype": 42,
         "svg.fonttype": "none",

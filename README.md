@@ -536,7 +536,7 @@ metric. Filenames use underscores and contain no em dashes.
 
 | Directory | Contents |
 | --- | --- |
-| `results/scenario1/nine_domain_analysis/all_layer_analysis/figures/` | Planner control, shared-input comparison, and checkpoint qualification heatmap across all 64 layers. |
+| `results/scenario1/nine_domain_analysis/all_layer_analysis/figures/` | Planner control, shared-input comparison, and qualified last-input AUROC heatmap across all 64 layers. |
 | `results/scenario1/nine_domain_analysis/fixed_layer_analysis/figures/all_domains/` | One standalone figure per agent and thinking mode across nine held-out domains. |
 | `results/scenario1/nine_domain_analysis/fixed_layer_analysis/figures/by_domain/` | One standalone figure per domain, agent, and thinking mode. |
 | `results/scenario1/nine_domain_analysis/fixed_layer_analysis/tables/` | Aggregate metrics, domain-level metrics, and the portable activation tensor catalog. |
@@ -548,6 +548,14 @@ editable, and the 600 dpi PNG for quick review or raster-only workflows. The
 figures use a colorblind-safe palette, different line patterns and markers for
 the two probes, embedded vector fonts, restrained grid lines, and legends sized
 for a single-column paper figure.
+
+The faint AUROC 0.5 line is retained because it is the random-discrimination
+reference needed to interpret every curve. It is directly labeled and is not
+treated as another fitted baseline. The all-layer line figure uses the domain
+interquartile range instead of drawing nine overlapping fold curves. The
+heatmap includes only matched-control-qualified last-input checkpoints;
+uncalibrated generated-token checkpoints remain documented in the analysis
+data but are omitted from the visual.
 
 The raw `.pt` tensors keep their acquisition-time storage paths because those
 paths are recorded in trajectory provenance and verified by SHA-256 checksums.

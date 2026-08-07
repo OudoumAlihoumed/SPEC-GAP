@@ -69,7 +69,7 @@ def test_save_paper_figures_in_vector_and_preview_formats(tmp_path):
     assert {path.stem for path in paths} == {
         "scenario1_all_domains_planner_negative_control",
         "scenario1_all_domains_shared_input_auroc_by_layer",
-        "scenario1_all_domains_checkpoint_qualification_heatmap",
+        "scenario1_all_domains_qualified_last_input_auroc_heatmap",
     }
     assert all(path.is_file() and path.stat().st_size > 1000 for path in paths)
     for path in paths:
@@ -77,6 +77,8 @@ def test_save_paper_figures_in_vector_and_preview_formats(tmp_path):
             payload = path.read_text(encoding="utf-8")
             assert all(line == line.rstrip() for line in payload.splitlines())
             assert "<dc:date>" not in payload
+            if "heatmap" in path.stem:
+                assert "UNCALIBRATED" not in payload
         elif path.suffix == ".pdf":
             payload = path.read_bytes()
             assert b"CreationDate" not in payload
