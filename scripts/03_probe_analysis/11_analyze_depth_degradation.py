@@ -19,6 +19,11 @@ from src.analysis.depth_degradation import (  # noqa: E402
     tabular_result_rows,
     temporal_divergence_rows,
 )
+from src.analysis.paper_inputs import (  # noqa: E402
+    DEFAULT_PAPER_INPUT_POLICY,
+    load_paper_input_policy,
+    validate_paper_analysis_inputs,
+)
 
 
 def main() -> None:
@@ -37,9 +42,19 @@ def main() -> None:
     parser.add_argument("--confidence", type=float, default=0.95)
     parser.add_argument("--n-bins", type=int, default=10)
     parser.add_argument("--random-state", type=int, default=42)
+    parser.add_argument(
+        "--paper-input-policy",
+        type=Path,
+        default=PROJECT_ROOT / DEFAULT_PAPER_INPUT_POLICY,
+    )
     args = parser.parse_args()
 
     prediction_rows = load_prediction_jsonl(args.predictions)
+    paper_policy = load_paper_input_policy(args.paper_input_policy)
+    paper_input_selection = validate_paper_analysis_inputs(
+        prediction_rows,
+        paper_policy,
+    )
     selected_layers = _parse_layers(args.layers)
     if selected_layers is not None:
         prediction_rows = [
@@ -55,6 +70,7 @@ def main() -> None:
         n_bins=args.n_bins,
         random_state=args.random_state,
     )
+    result["paper_input_selection"] = paper_input_selection
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
 

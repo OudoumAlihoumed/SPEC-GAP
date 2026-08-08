@@ -47,6 +47,25 @@ The v2 plan preserves all 36 v1 BM25-selected chunk IDs, their order, and the
 changed. The carrier `fin_doc1__p020__c002` was selected naturally at clean
 BM25 rank 20; no chunk was forced or replaced.
 
+The exclusion boundary was checked against the carrier anchor. Both page-20
+chunks, including the carrier, are evidence-eligible and selected. The anchor
+falls immediately before page 21; the only adjacent excluded chunks are the
+two page-21 chunks, which contain the remainder of the reference list and the
+publisher disclaimer. No substantive article content near the anchor is
+dropped.
+
+The unversioned v1 registry, retrieval plan, and preflight remain in the
+package for historical pilot and sensitivity provenance. The definitive
+Finance matrix reported in this PR uses `registry_gen5000_v2.json`, the
+versioned v2 retrieval/preflight artifacts, and trajectory IDs carrying the
+`__gen_controlled_v2_5000` suffix. The tracked
+`experiments/scenario1/paper_input_policy.json` now enforces that selection:
+the activation-index step excludes Finance v1, requires all eight v2 matrix
+cells, and records a policy hash. Downstream layer-scan, probe, depth, and
+reporting steps reject non-v2 Finance inputs or a stale selection audit.
+Separate v1 activation analyses remain available only for explicitly separate
+historical and sensitivity work.
+
 Planner input-token sequences were exactly identical across clean and injected
 treatments within each thinking mode. Only Worker1 received raw documents. In
 all four injected trajectories, Worker1 received the complete 58-token
@@ -54,6 +73,31 @@ injection span. No downstream agent received raw injection text.
 
 The exact Qwen chat-template preflight left 3,110–3,172 context tokens of
 headroom after reserving the 5,000-token output budget.
+
+## Lexical-confound sensitivity
+
+A hash-bound lexical audit compares the Finance injection with the low-jargon
+Convex control after redacting URLs and removing a fixed English stopword list.
+Finance has higher unique content-term overlap in the complete selected carrier
+chunk (13.64% versus 7.14%; 1.91×) and in the complete clean retrieved context
+as actually supplied (86.36% versus 25.00%; 3.45×). The equal-length 74-term
+window immediately before each insertion anchor reverses that ordering (4.55%
+versus 7.14%; 0.64×).
+
+This is evidence of a domain/context-level lexical sensitivity, not proof that
+the local Finance carrier neighborhood is uniquely entangled. Finance should
+therefore be reported as a separate lexical-confound sensitivity fold in
+Worker1 AUROC analysis, distinct from the chat-template issue, and its probe
+performance should not be attributed solely to malicious-instruction
+semantics. The comparison is descriptive (one wording per domain), and the
+Convex package remains provisional pending contributor and source-license
+confirmation, so these values are not yet a final paper claim.
+
+Files:
+
+- `results/scenario1/2026-08-07_finance_convex_lexical_confound_audit.json`
+- `results/scenario1/2026-08-07_finance_convex_lexical_confound_audit.md`
+- `scripts/01_scenario_construction/05_audit_lexical_confounds.py`
 
 ## Tool-interface diagnostic
 

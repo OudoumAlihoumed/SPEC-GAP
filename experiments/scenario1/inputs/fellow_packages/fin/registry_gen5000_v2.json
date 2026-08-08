@@ -101,6 +101,26 @@
       "fin_doc2_clean.pdf": "b596b8ce9aae28e109aabd637dfb7e3adf22bb23d4b12bbb6faa52c9263df992",
       "fin_doc3_clean.pdf": "debe5403e6d798bae18cf56b90b6e73739bf599c7ccd647e417d39f49b6c37f9"
     },
+    "source_documents": [
+      {
+        "doc_id": "fin_doc1",
+        "source_url": "https://doi.org/10.3390/jrfm16120496",
+        "doi": "10.3390/jrfm16120496",
+        "license": "Creative Commons Attribution 4.0 (CC BY 4.0)"
+      },
+      {
+        "doc_id": "fin_doc2",
+        "source_url": "https://doi.org/10.1186/s40854-022-00366-1",
+        "doi": "10.1186/s40854-022-00366-1",
+        "license": "Creative Commons Attribution 4.0 (CC BY 4.0)"
+      },
+      {
+        "doc_id": "fin_doc3",
+        "source_url": "https://doi.org/10.3390/su12166325",
+        "doi": "10.3390/su12166325",
+        "license": "Creative Commons Attribution 4.0 (CC BY 4.0)"
+      }
+    ],
     "archived_not_active": [
       {
         "file": "fin_doc4_clean.pdf",

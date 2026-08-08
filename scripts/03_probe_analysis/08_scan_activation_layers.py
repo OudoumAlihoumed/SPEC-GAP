@@ -17,6 +17,11 @@ from src.analysis.layer_scan import (  # noqa: E402
     layer_scan_table,
     run_construction_layer_scan,
 )
+from src.analysis.paper_inputs import (  # noqa: E402
+    DEFAULT_PAPER_INPUT_POLICY,
+    load_paper_input_policy,
+    validate_paper_analysis_inputs,
+)
 from src.analysis.activation_controls import (  # noqa: E402
     activation_control_table,
     run_activation_control_audit,
@@ -64,16 +69,27 @@ def main() -> None:
         type=Path,
         default=PROJECT_ROOT / "results/scenario1/activation_control_pairs.csv",
     )
+    parser.add_argument(
+        "--paper-input-policy",
+        type=Path,
+        default=PROJECT_ROOT / DEFAULT_PAPER_INPUT_POLICY,
+    )
     parser.add_argument("--skip-checksums", action="store_true")
     parser.add_argument("--random-state", type=int, default=42)
     parser.add_argument("--max-iter", type=int, default=1000)
     args = parser.parse_args()
 
     index_rows = load_activation_index(args.index)
+    paper_policy = load_paper_input_policy(args.paper_input_policy)
+    paper_input_selection = validate_paper_analysis_inputs(
+        index_rows,
+        paper_policy,
+    )
     control_audit = run_activation_control_audit(
         index_rows,
         verify_checksums=not args.skip_checksums,
     )
+    control_audit["paper_input_selection"] = paper_input_selection
     args.control_output_json.parent.mkdir(parents=True, exist_ok=True)
     args.control_output_json.write_text(
         json.dumps(control_audit, indent=2, sort_keys=True) + "\n"
@@ -94,6 +110,7 @@ def main() -> None:
         random_state=args.random_state,
         max_iter=args.max_iter,
     )
+    result["paper_input_selection"] = paper_input_selection
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
 
