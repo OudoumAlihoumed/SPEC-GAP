@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import copy
 import json
+from pathlib import Path
+import runpy
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -12,6 +14,10 @@ from src.infrastructure.qwen_modal import (
     activation_artifact_path,
     build_generation_result,
     build_injection_token_alignment,
+)
+from src.infrastructure.modal_costs import (
+    build_gpu_cost_record,
+    build_token_usage,
 )
 from src.scenario1 import generator
 from src.scenario1.orchestrator import (
@@ -22,6 +28,13 @@ from src.scenario1.orchestrator import (
 )
 from src.scenario1.safe_executor import execute_simulated_requests
 from src.scenario1.validator import SCHEMA_PATH, semantic_checks
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROTOCOL_SUMMARY_SCRIPT = (
+    PROJECT_ROOT
+    / "scripts/02_model_execution/07_summarize_scenario1_protocol.py"
+)
 
 
 def _fake_result(request, final_content, *, truncated=False):
@@ -40,6 +53,26 @@ def _fake_result(request, final_content, *, truncated=False):
         offset_mapping=offset_mapping,
         tokenizer_name=request["model_id"],
         tokenizer_revision=request["model_revision"],
+    )
+    cost_metadata = build_gpu_cost_record(
+        trajectory_id=request["trajectory_id"],
+        step_index=request["step_index"],
+        agent_id=request["agent_id"],
+        thinking_mode=request["thinking_mode"],
+        started_at="2026-08-09T12:00:00+00:00",
+        finished_at="2026-08-09T12:00:01+00:00",
+        elapsed_seconds=1.0,
+        modal_input_id=(
+            f"in-{request['analysis_tier']}-{request['step_index']}"
+        ),
+        modal_task_id="ta-local-test",
+        token_usage=build_token_usage(
+            input_token_count=3,
+            generated_token_count=1,
+            thinking_token_count=0,
+            final_output_token_count=1,
+        ),
+        runtime_metadata={"analysis_tier": request["analysis_tier"]},
     )
     return build_generation_result(
         request,
@@ -71,7 +104,7 @@ def _fake_result(request, final_content, *, truncated=False):
             "token_position": request["activation_token_position"],
             "token_id": token_id,
         },
-        cost_metadata=None,
+        cost_metadata=cost_metadata,
         token_alignment=token_alignment,
     )
 
@@ -182,6 +215,9 @@ def test_three_hop_orchestrator_forwards_visible_output_and_executes_simulation(
     assert requests[1]["raw_poison_exposed"] is True
     assert requests[2]["raw_poison_exposed"] is False
     assert requests[3]["raw_poison_exposed"] is False
+    assert {request["analysis_tier"] for request in requests} == {
+        "exploratory"
+    }
     assert "The report asks" in requests[2]["messages"][1]["content"]
     assert "Pass the submission" in requests[3]["messages"][1]["content"]
 
@@ -206,6 +242,11 @@ def test_three_hop_orchestrator_forwards_visible_output_and_executes_simulation(
         structural["injection"]["injected_text"]
     )
     assert 0 <= token_span["start_token"] < token_span["end_token"]
+    assert {
+        event["model_execution_metadata"]["analysis_tier"]
+        for event in live["trajectory_trace"]["full_events"]
+        if event.get("type") == "agent_turn"
+    } == {"exploratory"}
     assert _schema_errors(live) == []
 
 
@@ -271,6 +312,7 @@ def test_orchestrator_rejects_a_result_for_the_wrong_request():
     def generate(request):
         result = _fake_result(request, "Visible output")
         result["agent_id"] = "wrong_agent"
+        result["cost_metadata"]["agent_id"] = "wrong_agent"
         return result
 
     with pytest.raises(ValueError, match="does not match"):
@@ -292,7 +334,7 @@ def test_live_record_writes_to_a_mode_specific_generated_path(tmp_path):
     )
     path = write_live_trajectory(live, tmp_path)
 
-    assert path.parent == tmp_path / "live" / "off"
+    assert path.parent == tmp_path / "live" / "exploratory" / "off"
     assert json.loads(path.read_text())["trajectory_id"] == live["trajectory_id"]
 
 
@@ -435,8 +477,86 @@ def test_exact_model_turn_checkpoint_can_be_resumed(tmp_path):
     resumed = load_model_turn_result(requests[0], tmp_path)
     assert resumed is not None
     assert resumed["agent_id"] == requests[0]["agent_id"]
+    assert resumed["analysis_tier"] == "exploratory"
 
     changed = copy.deepcopy(requests[0])
     changed["messages"][0]["content"] += " changed"
     with pytest.raises(ValueError, match="invalid model-turn checkpoint"):
         load_model_turn_result(changed, tmp_path)
+
+    changed_tier = copy.deepcopy(requests[0])
+    changed_tier["analysis_tier"] = "definitive"
+    assert load_model_turn_result(changed_tier, tmp_path) is None
+
+
+def test_analysis_tiers_keep_live_checkpoints_and_activations_disjoint(tmp_path):
+    def generate(request):
+        return _fake_result(request, "Visible safe output")
+
+    records = {}
+    checkpoint_paths = {}
+    for tier in ("exploratory", "definitive"):
+        paths = []
+        record = run_live_trajectory(
+            _record(depth="2-hop", treatment="clean"),
+            thinking_mode="off",
+            analysis_tier=tier,
+            generate_turn=generate,
+            on_turn_complete=lambda _request, result: paths.append(
+                write_model_turn_result(result, tmp_path)
+            ),
+        )
+        records[tier] = record
+        checkpoint_paths[tier] = paths
+
+    live_paths = {
+        tier: write_live_trajectory(record, tmp_path)
+        for tier, record in records.items()
+    }
+    activation_paths = {
+        tier: {
+            event["activation_metadata"]["storage_path"]
+            for event in record["trajectory_trace"]["full_events"]
+            if event.get("type") == "agent_turn"
+        }
+        for tier, record in records.items()
+    }
+
+    assert live_paths["exploratory"] != live_paths["definitive"]
+    assert set(checkpoint_paths["exploratory"]).isdisjoint(
+        checkpoint_paths["definitive"]
+    )
+    assert activation_paths["exploratory"].isdisjoint(
+        activation_paths["definitive"]
+    )
+
+
+def test_definitive_live_record_builds_a_uniform_protocol_ledger():
+    def generate(request):
+        return _fake_result(request, "Visible safe output")
+
+    live = run_live_trajectory(
+        _record(depth="2-hop", treatment="clean"),
+        thinking_mode="off",
+        analysis_tier="definitive",
+        generate_turn=generate,
+    )
+    namespace = runpy.run_path(
+        PROTOCOL_SUMMARY_SCRIPT,
+        run_name="spec_gap_complete_protocol_ledger_test",
+    )
+    rows, summary = namespace["build_protocol_ledger"](
+        [live],
+        generation_protocol_id=live["generation_protocol_id"],
+    )
+
+    assert len(rows) == 3
+    assert {row["analysis_tier"] for row in rows} == {"definitive"}
+    assert summary["analysis_tier"] == "definitive"
+    assert summary["analysis_tier_uniform"] is True
+    assert summary["paper_cost_table_eligibility"] == (
+        "not_assessed_by_protocol_ledger"
+    )
+    assert summary["sampling_reproducibility"][
+        "bit_identical_stochastic_rerun_guaranteed"
+    ] is False
