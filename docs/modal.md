@@ -75,6 +75,7 @@ Use a real request produced from a Scenario 1 match group, not the test fixture:
 modal run scripts/02_model_execution/03_modal_qwen_runner.py \
   --request-path path/to/real_agent_turn_request.json \
   --action run \
+  --analysis-tier exploratory \
   --confirm-paid-run RUN_H200 \
   --output-path path/to/model_turn_output.json
 ```
@@ -119,6 +120,29 @@ only rerunning previously truncated outputs would create selective-rerun bias.
 Any later turn that reaches 5,000 remains recorded as truncated and
 indeterminate rather than receiving an individual budget increase.
 
+Seeds are protocol-locked: the registry seed must equal the versioned
+generation protocol seed. Testing a different seed requires a new protocol ID
+and a complete matched rerun, rather than an in-place registry edit. The July
+31 staged v2 matrix combined an exploratory smoke with a later definitive run,
+so it does not satisfy the uniformly definitive rule above and is not yet the
+paper-analysis base.
+
+## Sampling and replay provenance
+
+The registry seed is copied into the structural record, decoding settings,
+generation request, saved result, and live agent-turn metadata. Immediately
+before each sampled turn, the runner calls both `torch.manual_seed` and
+`torch.cuda.manual_seed_all`. New cost records also capture the Torch,
+Transformers, CUDA, GPU, and deterministic-algorithm runtime fields.
+
+This provenance does **not** guarantee a bit-identical stochastic rerun. CUDA
+kernels, library versions, runtime scheduling, or hardware can still change a
+sample even when the model revision, prompt, sampler settings, and seed are
+fixed. Accordingly, the saved v2 outputs are one-shot samples: the stored
+generated token IDs, prompt hashes, revisions, checkpoints, and checksums are
+the authoritative artifacts. A rerun is a replication or sensitivity check,
+not a replacement chosen after observing the original result.
+
 ## Tool requests and action results
 
 The runner recognizes explicit Qwen `<tool_call>...</tool_call>` blocks. Every
@@ -153,29 +177,43 @@ authoritative values:
   reservations;
 - the workspace **billed cost** after cycle-level credits and adjustments.
 
-Generate the reproducible Scenario 1 reconciliation after the final billed
-hour has closed and Modal has had a few minutes to collect usage:
+Generate a tier-specific Scenario 1 reconciliation after the final billed hour
+has closed and Modal has had a few minutes to collect usage:
 
 ```bash
 uv run --extra modal python \
   scripts/02_model_execution/08_reconcile_modal_billing.py \
   --start 2026-07-28T00:00:00Z \
   --billing-cycle 2026-07 \
+  --analysis-tier definitive \
   --output-json results/scenario1/2026-07-31_modal_billing_reconciliation.json \
   --output-csv results/scenario1/2026-07-31_modal_billing_reconciliation.csv \
   --output-md results/scenario1/2026-07-31_modal_billing_reconciliation.md
 ```
 
-The script filters authoritative hourly rows using Modal's
-`project=spec-gap` App tag, deduplicates local per-turn estimates by Modal input
-ID, and stores both values without converting money to floating point. The
-workspace billed total is not allocated to individual Apps because Modal
-applies credits at the workspace cycle level.
+The script requires exactly one `analysis_tier`, filters authoritative hourly
+rows using both that tag and `project=spec-gap`, and filters local checkpoints
+using the same saved tier. It rejects mid-App tier changes and never pools
+`exploratory` and `definitive` rows. The workspace billed total is not allocated
+to individual Apps because Modal applies credits at the workspace cycle level.
 
 Paid single-trajectory and batch entry points also attach the domain,
-generation protocol, and run kind to each new App. These tags make future
-domain-level costs directly attributable. Historical Apps without those newer
-tags remain included through the stable `project=spec-gap` tag.
+generation protocol, run kind, and analysis tier to each new App. The safe
+default is `exploratory`; a frozen matrix must opt in with
+`--analysis-tier definitive` before compute starts. The tier is also persisted
+through the request, result, live turn, and local cost metadata so a resumed
+checkpoint cannot silently cross tiers.
+
+The checked-in July 31 v1 reconciliation predates analysis-tier tagging. It is
+a legacy all-project infrastructure total, not an exploratory or definitive
+paper cost table. Untagged historical Apps are excluded from new tier-specific
+reconciliations.
+
+The per-protocol CSV/JSON ledger applies the same isolation rule: every row
+carries its saved tier and mixed-tier inputs are rejected. It reports declared
+trajectory-count completeness when supplied, but deliberately leaves paper
+cost-table eligibility to the frozen analysis manifest and review. Historical
+records without a saved tier remain auditable as `unclassified`.
 
 ## Complete trajectory runner
 
@@ -209,6 +247,7 @@ modal run \
 modal run \
   scripts/02_model_execution/05_run_scenario1_batch.py::run_scenario1_batch \
   --action run \
+  --analysis-tier definitive \
   --confirm-paid-run RUN_H200_BATCH
 ```
 
@@ -216,6 +255,11 @@ The batch skips existing valid trajectories, checkpoints every model turn, and
 keeps the remaining sequential calls inside one Modal app. This avoids loading
 Qwen3-32B again for every trajectory. Add `--max-new-trajectories 1` to bound a
 paid run while checking a new environment.
+
+New live JSON, model-turn checkpoints, and activation artifacts are physically
+namespaced by `analysis_tier`, so an exploratory run and a definitive rerun can
+coexist without overwriting or blocking each other. Legacy artifacts remain in
+their historical tierless paths and are treated as `unclassified`.
 
 The raw-poison Worker1 result includes the injection's exact character and
 token spans in the rendered Qwen prompt. The saved tokenizer revision and
