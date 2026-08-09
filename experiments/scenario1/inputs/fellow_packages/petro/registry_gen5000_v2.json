@@ -111,6 +111,8 @@
         "license": "Creative Commons Attribution 4.0 (CC BY 4.0)"
       }
     ],
+    "injection_position_audit": "fellow_packages/petro/retrieval/injection_position_covariate_gen5000_v2.json",
+    "tool_call_dual_review_packet": "results/scenario1/2026-08-09_petroleum_tool_call_dual_review.json",
     "pair_audit": {
       "extraction_command": "pdftotext -raw",
       "raw_text_difference": "Exactly one 314-byte insertion delta consisting of one newline plus the 313-character registered payload; removing it reproduces the clean extraction byte for byte.",
