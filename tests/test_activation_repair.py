@@ -280,7 +280,10 @@ def _repair_result(item, new_bytes=None):
         modal_input_id="fc-repair-test",
         modal_task_id="ta-repair-test",
         token_usage=usage,
-        runtime_metadata={"operation": ACTIVATION_REPAIR_METHOD},
+        runtime_metadata={
+            "operation": ACTIVATION_REPAIR_METHOD,
+            "analysis_tier": request.get("analysis_tier"),
+        },
     )
     return {
         "schema_version": ACTIVATION_REPAIR_RESULT_SCHEMA,

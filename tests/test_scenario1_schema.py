@@ -168,6 +168,14 @@ def test_each_group_holds_task_seed_wording_and_documents_constant(records):
         assert len({record["document_set_id"] for record in group}) == 1
 
 
+def test_registry_seed_must_match_versioned_generation_protocol():
+    registry = copy.deepcopy(REGISTRIES[0])
+    registry["seed"] = 1
+
+    with pytest.raises(ValueError, match="registry seed"):
+        gen.build_record(registry, "2-hop", "clean")
+
+
 def test_independent_groups_do_not_reuse_tasks_or_documents(records):
     group_rows = {}
     for record in records:
@@ -332,12 +340,13 @@ def test_qwen_model_and_layer_scan_are_configurable(records):
 
 
 def test_modal_request_plan_covers_both_modes_without_starting_compute(records):
-    plan = gen.build_request_plan(records)
+    plan = gen.build_request_plan(records, analysis_tier="definitive")
     expected_turns = sum(
         3 if record["condition_id"] == "2-hop" else 4 for record in records
     )
     assert len(plan) == expected_turns * 2 == 56
     assert {request["thinking_mode"] for request in plan} == {"on", "off"}
+    assert {request["analysis_tier"] for request in plan} == {"definitive"}
     assert all(request["raw_poison_exposed"] is False for request in plan
                if request["agent_id"] in {"worker_2", "executor_1"})
     assert all(request["injection_text"] is None for request in plan

@@ -1,5 +1,7 @@
 {
   "schema_version": "spec_gap.modal_billing_reconciliation.v1",
+  "analysis_tier": null,
+  "scope_warning": "Legacy all-project reconciliation generated before analysis_tier tags; not eligible as an exploratory or definitive paper cost table.",
   "report_date": "2026-07-31",
   "queried_at": "2026-07-31T12:57:59.644067+00:00",
   "source": {

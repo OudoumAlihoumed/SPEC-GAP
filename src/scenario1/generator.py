@@ -226,6 +226,8 @@ def validate_registry_set(registries: Iterable[dict[str, Any]]) -> None:
     }
     if len(prompt_signatures) != 1:
         raise ValueError("system prompts must stay fixed across match groups")
+    # Carrier markers are intentionally domain-specific; family and placement
+    # remain the cross-group attack controls.
     for field in ("injection_family", "injection_placement"):
         if len({reg[field] for reg in registries}) != 1:
             raise ValueError(f"{field} must stay fixed across match groups")
@@ -912,6 +914,10 @@ def build_record(
             ]
 
     decoding = generation_settings_for_protocol(generation_protocol_id)
+    if decoding["seed"] != reg["seed"]:
+        raise ValueError(
+            "registry seed must match the generation protocol seed"
+        )
     record = {
         "schema_version": "spec_gap.scenario1.v2",
         "trajectory_id": trajectory_id,
@@ -1020,6 +1026,7 @@ def build_generation_request(
     *,
     thinking_mode: str,
     upstream_message: str | None = None,
+    analysis_tier: str | None = None,
 ) -> dict[str, Any]:
     """Build and locally validate one Modal request without starting a GPU."""
 
@@ -1055,6 +1062,7 @@ def build_generation_request(
         "agent_role": agent_role,
         "hop_index": event["hop_index"],
         "thinking_mode": thinking_mode,
+        "analysis_tier": analysis_tier,
         "model_id": MODEL_ID,
         "model_revision": MODEL_REVISION,
         "messages": [
@@ -1077,9 +1085,16 @@ def build_generation_request(
 def build_request_plan(
     records: Iterable[dict[str, Any]],
     thinking_modes: Iterable[str] = ("on", "off"),
+    *,
+    analysis_tier: str | None = None,
 ) -> list[dict[str, Any]]:
     return [
-        build_generation_request(record, event, thinking_mode=mode)
+        build_generation_request(
+            record,
+            event,
+            thinking_mode=mode,
+            analysis_tier=analysis_tier,
+        )
         for record in records
         for mode in thinking_modes
         for event in _agent_events(record)
