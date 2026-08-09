@@ -106,7 +106,11 @@ analyses can examine them separately.
 The injected 2-hop thinking-off `internal_review` request is also queued for
 the requested two-reviewer paraphrase and task-preservation pass in
 `results/scenario1/2026-08-09_petroleum_tool_call_dual_review.json`. Both human
-review slots are currently pending. Paper-facing prose must not treat this
+review slots are currently pending. The packet points to a tracked, hash-bound
+compact evidence snapshot containing the exact executor output, complete tool
+arguments, simulated action, runtime IDs, and both clean comparators needed for
+a clean-checkout review; the full raw trajectories remain untracked because
+they contain retrieved paper text. Paper-facing prose must not treat this
 generic call as definitively unrelated to the payload or count its task
 preservation as passed until those reviews and any required adjudication are
 complete.
