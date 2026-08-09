@@ -1,5 +1,10 @@
 # Scenario 1 Modal billing reconciliation — 2026-07-31
 
+Legacy scope notice: this report predates `analysis_tier` tags and pools all
+Apps carrying `project=spec-gap`. It is an all-project infrastructure total,
+not an exploratory or definitive paper cost table. New reconciliations require
+one tier and exclude untagged Apps.
+
 ## Authoritative totals
 
 - Modal-metered SPEC-GAP resource cost: `$17.93903620`

@@ -74,6 +74,9 @@ def _trajectory(
                 "agent_id": "worker_1",
                 "agent_role": "worker",
                 "hop_index": 1,
+                # Keep both synthetic protocols in one selected tier here to
+                # verify that the paper policy still rejects a misfiled v1.
+                "model_execution_metadata": {"analysis_tier": "definitive"},
                 "input": {
                     "rendered_prompt_hash": f"prompt-{trajectory_id}",
                     "input_token_ids": [1, 2, 3],
@@ -86,7 +89,9 @@ def _trajectory(
                 },
                 "activation_metadata": {
                     "storage_status": "materialized",
-                    "storage_path": f"activations/{trajectory_id}/{mode}/step_001.pt",
+                    "storage_path": (
+                        f"activations/definitive/{trajectory_id}/{mode}/step_001.pt"
+                    ),
                     "artifact_format_version": "spec_gap.activation_positions.v1",
                     "layers_extracted": [0, 1],
                     "checkpoint_positions": [{
@@ -216,7 +221,9 @@ def test_activation_index_cli_filters_v1_and_records_policy_audit(tmp_path):
         *_finance_matrix("controlled_v1_2048"),
         *_finance_matrix("controlled_v2_5000"),
     ]:
-        mode_dir = trajectory_root / record["model"]["thinking_mode"]
+        mode_dir = (
+            trajectory_root / "definitive" / record["model"]["thinking_mode"]
+        )
         mode_dir.mkdir(parents=True, exist_ok=True)
         (mode_dir / f"{record['trajectory_id']}.json").write_text(
             json.dumps(record),
@@ -233,6 +240,8 @@ def test_activation_index_cli_filters_v1_and_records_policy_audit(tmp_path):
             str(trajectory_root),
             "--artifact-root",
             str(tmp_path),
+            "--analysis-tier",
+            "definitive",
             "--output",
             str(output),
             "--summary-output",

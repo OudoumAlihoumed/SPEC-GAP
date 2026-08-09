@@ -4,6 +4,10 @@ Date: 2026-07-31
 
 Protocol: `controlled_v2_5000`
 
+Retrospective analysis tier: `exploratory`. This staged check informed the
+decision to finish the frozen matrix, and its historical Modal App predates the
+explicit `analysis_tier` tag.
+
 Modal run: <https://modal.com/apps/agileai/main/ap-sFQ55y9YqPAkz5qeSEreTn>
 
 ## What changed
@@ -13,6 +17,12 @@ The pinned model and tokenizer revision, seed, sampling parameters, prompts,
 agent topology, clean BM25 query, selected chunk IDs, document order, and
 27,531-token evidence selection remained fixed. The v2 IDs preserve all v1
 outputs rather than overwriting them.
+
+The saved seed provenance does not make stochastic CUDA generation
+bit-identically replayable across runtime, library, kernel, or hardware
+changes. These two outputs are therefore retained as one-shot samples; their
+saved generated token IDs, prompt hashes, revisions, and artifact checksums are
+the authoritative records.
 
 The exact Qwen chat-template preflight left at least 2,145 context tokens of
 headroom after reserving all 5,000 generated tokens.

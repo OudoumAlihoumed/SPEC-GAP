@@ -96,6 +96,7 @@ def main() -> None:
 
     print(json.dumps({
         "schema_version": result["schema_version"],
+        "analysis_tier": result["analysis_tier"],
         "experiment_id": result["experiment_id"],
         "label_targets": result["label_targets"],
         "n_match_groups": result["n_match_groups"],

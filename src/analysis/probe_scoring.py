@@ -17,12 +17,13 @@ import numpy as np
 
 from src.extraction.saved_activations import (
     load_probe_activation_batch,
+    normalize_index_analysis_tier,
 )
 from src.probes.lat_baseline import ContrastPairLATProbe
 from src.probes.linear_probe import make_probe_pipeline
 
 
-PER_STEP_SCORE_SCHEMA = "spec_gap.per_step_probe_score.v1"
+PER_STEP_SCORE_SCHEMA = "spec_gap.per_step_probe_score.v2"
 EVALUATION_METHOD = "leave_one_match_group_out"
 SUPPORTED_CHECKPOINT = "last_input_token"
 PROBE_NAMES = ("goldowsky_dill_logistic", "lat_contrast_pair_pca")
@@ -52,10 +53,14 @@ def load_match_group_designs(path: str | Path) -> dict[str, MatchGroupDesign]:
     try:
         payload = json.loads(source.read_text())
     except (OSError, json.JSONDecodeError) as error:
-        raise ValueError(f"Cannot load Scenario 1 manifest {source}: {error}") from error
+        raise ValueError(
+            f"Cannot load Scenario 1 manifest {source}: {error}"
+        ) from error
     trajectories = payload.get("trajectories") if isinstance(payload, dict) else None
     if not isinstance(trajectories, list) or not trajectories:
-        raise ValueError("Scenario 1 manifest must contain a non-empty trajectories list.")
+        raise ValueError(
+            "Scenario 1 manifest must contain a non-empty trajectories list."
+        )
 
     designs: dict[str, MatchGroupDesign] = {}
     for index, entry in enumerate(trajectories):
@@ -168,16 +173,20 @@ def generate_per_step_probe_scores(
                 for probe_name, (probabilities, fit_status) in probe_outputs.items():
                     for batch_index, probability in zip(test_indices, probabilities):
                         metadata = batch.metadata[int(batch_index)]
-                        score_rows.append(_score_row(
-                            metadata,
-                            score=float(probability),
-                            probe_name=probe_name,
-                            layer=int(layer),
-                            label_target=label_target,
-                            held_out_group=held_out_group,
-                            fit_status=fit_status,
-                            design=match_group_designs[str(metadata["match_group_id"])],
-                        ))
+                        score_rows.append(
+                            _score_row(
+                                metadata,
+                                score=float(probability),
+                                probe_name=probe_name,
+                                layer=int(layer),
+                                label_target=label_target,
+                                held_out_group=held_out_group,
+                                fit_status=fit_status,
+                                design=match_group_designs[
+                                    str(metadata["match_group_id"])
+                                ],
+                            )
+                        )
 
     return sorted(score_rows, key=_score_row_sort_key)
 
@@ -187,9 +196,16 @@ def summarize_per_step_probe_scores(rows: Sequence[dict[str, Any]]) -> dict[str,
 
     if not rows:
         raise ValueError("At least one per-step probe score is required.")
+    analysis_tiers = {
+        normalize_index_analysis_tier(row.get("analysis_tier") or "unclassified")
+        for row in rows
+    }
+    if len(analysis_tiers) != 1:
+        raise ValueError("Per-step probe scores must contain one analysis tier.")
     return {
         "schema_version": PER_STEP_SCORE_SCHEMA,
         "artifact_kind": "held_out_per_step_probe_scores",
+        "analysis_tier": next(iter(analysis_tiers)),
         "claim_scope": (
             "Construction-label diagnostic only. The scores are not generated model "
             "responses or behavioral ground truth."
@@ -199,9 +215,9 @@ def summarize_per_step_probe_scores(rows: Sequence[dict[str, Any]]) -> dict[str,
         "label_targets": sorted({str(row["label_target"]) for row in rows}),
         "score_rows": len(rows),
         "trajectories": len({str(row["trajectory_id"]) for row in rows}),
-        "agent_steps": len({
-            (str(row["trajectory_id"]), int(row["hop_index"])) for row in rows
-        }),
+        "agent_steps": len(
+            {(str(row["trajectory_id"]), int(row["hop_index"])) for row in rows}
+        ),
         "match_groups": sorted({str(row["match_group_id"]) for row in rows}),
         "thinking_modes": sorted({str(row["thinking_mode"]) for row in rows}),
         "probes": sorted({str(row["probe_name"]) for row in rows}),
@@ -332,6 +348,9 @@ def _score_row(
         "schema_version": PER_STEP_SCORE_SCHEMA,
         "artifact_kind": "held_out_probe_score",
         "claim_scope": "construction_label_diagnostic",
+        "analysis_tier": normalize_index_analysis_tier(
+            metadata.get("analysis_tier") or "unclassified"
+        ),
         "trajectory_id": str(metadata["trajectory_id"]),
         "match_group_id": str(metadata["match_group_id"]),
         "domain_id": str(metadata["domain_id"]),
@@ -371,10 +390,18 @@ def _validate_index_design(
     *,
     label_target: str,
 ) -> None:
+    analysis_tiers = {
+        normalize_index_analysis_tier(row.get("analysis_tier") or "unclassified")
+        for row in rows
+    }
+    if len(analysis_tiers) != 1:
+        raise ValueError("Activation-index rows must contain one analysis tier.")
     observed_groups = {str(row.get("match_group_id")) for row in rows}
     missing_designs = sorted(observed_groups - set(match_group_designs))
     if missing_designs:
-        raise ValueError(f"Manifest metadata is missing match groups: {missing_designs}")
+        raise ValueError(
+            f"Manifest metadata is missing match groups: {missing_designs}"
+        )
     for index, row in enumerate(rows):
         if row.get("labels", {}).get(label_target) not in (0, 1):
             raise ValueError(
@@ -383,7 +410,9 @@ def _validate_index_design(
         if row.get("thinking_mode") not in {"off", "on"}:
             raise ValueError(f"Activation-index row {index} has invalid thinking_mode.")
         if row.get("delegation_depth") not in {"2-hop", "3-hop"}:
-            raise ValueError(f"Activation-index row {index} has invalid delegation_depth.")
+            raise ValueError(
+                f"Activation-index row {index} has invalid delegation_depth."
+            )
         if row.get("treatment") not in {"clean", "injected"}:
             raise ValueError(f"Activation-index row {index} has invalid treatment.")
 
