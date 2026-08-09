@@ -252,6 +252,7 @@ Build and verify the activation index:
 
 ```bash
 python scripts/03_probe_analysis/07_build_activation_index.py \
+  --analysis-tier definitive \
   --artifact-root . \
   --require-local \
   --verify-checksums
@@ -345,8 +346,14 @@ and is not treated as a calibrated probability.
 Generate the final figures and tables:
 
 ```bash
-python scripts/03_probe_analysis/12_plot_probe_analysis.py
+python scripts/03_probe_analysis/12_plot_probe_analysis.py \
+  --analysis-tier definitive
 ```
+
+The selected tier is retained in the activation index, per-step scores, depth
+results, reporting snapshot, and final manifest. Each stage rejects mixed tiers
+or a mismatch with its upstream artifacts. Historical artifacts without tier
+metadata remain reproducible but are explicitly classified as `unclassified`.
 
 Rebuild the paper figures, selected public assets, and result manifest with one
 CPU-only command:

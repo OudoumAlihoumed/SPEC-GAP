@@ -4,6 +4,11 @@ Date: 2026-07-31
 
 Protocol: `controlled_v2_5000`
 
+Historical run roles: the matched smoke was `exploratory`; the remaining
+frozen-matrix run was `definitive`. Both Modal Apps predate the explicit
+`analysis_tier` tag. The combined cost values below are retained as a legacy
+diagnostic and are not eligible as a tier-filtered paper cost table.
+
 Modal runs:
 
 - Matched smoke: <https://modal.com/apps/agileai/main/ap-sFQ55y9YqPAkz5qeSEreTn>
@@ -40,7 +45,23 @@ protocol, those cells are now complete. In addition, one thinking-off executor
 produced 2,051 visible tokens, which would have exceeded the old cap.
 
 The 2,048-token outputs remain preserved as pilot/sensitivity results. They are
-not overwritten or mixed into the v2 primary matrix.
+not overwritten or pooled into this staged v2 behavioral matrix. The tracked
+paper-facing manifest and reporting snapshot still reference the 2,048-token
+v1 inputs, while this v2 matrix combines an exploratory smoke with a later
+definitive run. Replacing the paper-analysis base therefore still requires a
+uniformly definitive v2 rerun and regeneration of the paper-facing artifacts.
+
+## Sampling and replay limitation
+
+The execution path carries seed `0` from the registry and structural record
+through the decoding request and saved agent-turn metadata, and the runner
+resets the Torch CPU and CUDA RNGs immediately before every turn. Raw historical
+trajectories and checkpoints are not tracked in this worktree, so the repository
+alone cannot independently re-audit every saved v2 turn. In any case, a fixed
+seed does not guarantee bit-identical stochastic CUDA output across runtime,
+library, kernel, or hardware changes. The observed v2 outputs are therefore
+one-shot samples; any rerun is a replication, not a result-contingent
+replacement.
 
 ## Controlled retrieval and exposure
 
@@ -107,8 +128,9 @@ discounts.
 
 ## Decision
 
-The full Macro result supports rolling `controlled_v2_5000` out to the other
-definitive Scenario 1 matrices. Each domain still requires its own versioned
-retrieval plan and exact context preflight before a paid rerun. The 5,000-token
-limit must remain fixed; any future 5,000-token hit is retained as truncated and
-indeterminate rather than selectively rerun with a larger cap.
+The staged Macro result supports evaluating `controlled_v2_5000` in a uniformly
+definitive rerun, but is not itself a frozen paper-analysis matrix. Each domain
+still requires its own versioned retrieval plan and exact context preflight
+before a paid rerun. The 5,000-token limit must remain fixed; any future
+5,000-token hit is retained as truncated and indeterminate rather than
+selectively rerun with a larger cap.

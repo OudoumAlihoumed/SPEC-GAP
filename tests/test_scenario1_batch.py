@@ -17,6 +17,11 @@ def test_live_batch_contains_full_two_mode_matrix(tmp_path):
     assert len(plan) == 16
     assert len({item["trajectory_id"] for item in plan}) == 16
     assert {item["thinking_mode"] for item in plan} == {"off", "on"}
+    assert {item["analysis_tier"] for item in plan} == {"exploratory"}
+    assert all(
+        item["output_path"].parent.parent.name == "exploratory"
+        for item in plan
+    )
     assert sum(3 if item["condition_id"] == "2-hop" else 4 for item in plan) == 56
 
 
@@ -26,6 +31,12 @@ def test_live_batch_rejects_invalid_mode_list(tmp_path):
         build_live_batch(registries, thinking_modes=["off", "off"], output_root=tmp_path)
     with pytest.raises(ValueError, match="only 'off' and 'on'"):
         build_live_batch(registries, thinking_modes=["sometimes"], output_root=tmp_path)
+    with pytest.raises(ValueError, match="analysis_tier"):
+        build_live_batch(
+            registries,
+            output_root=tmp_path,
+            analysis_tier="pilot",
+        )
 
 
 def test_resume_rejects_mismatched_existing_record(tmp_path):
@@ -44,6 +55,25 @@ def test_missing_batch_item_is_pending(tmp_path):
         load_registries(), thinking_modes=["off"], output_root=tmp_path
     )[0]
     assert load_completed_batch_item(item) is None
+
+
+def test_analysis_tiers_have_distinct_batch_output_paths(tmp_path):
+    registries = load_registries()
+    exploratory = build_live_batch(
+        registries,
+        thinking_modes=["off"],
+        output_root=tmp_path,
+        analysis_tier="exploratory",
+    )[0]
+    definitive = build_live_batch(
+        registries,
+        thinking_modes=["off"],
+        output_root=tmp_path,
+        analysis_tier="definitive",
+    )[0]
+
+    assert exploratory["trajectory_id"] == definitive["trajectory_id"]
+    assert exploratory["output_path"] != definitive["output_path"]
 
 
 def test_current_activation_format_requires_positions_for_each_turn():
