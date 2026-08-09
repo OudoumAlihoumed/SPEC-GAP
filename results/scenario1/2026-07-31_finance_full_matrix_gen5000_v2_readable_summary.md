@@ -81,8 +81,7 @@ open-access package after redacting URLs and removing a fixed English stopword
 list. Finance has higher unique content-term overlap in the complete selected
 carrier chunk (13.64% versus 3.57%; 3.82×), in the equal-length 164-term window
 immediately before each insertion anchor (13.64% versus 3.57%; 3.82×), and in
-the complete clean retrieved context as actually supplied (86.36% versus
-32.14%; 2.69×).
+the complete selected clean source-chunk context (86.36% versus 32.14%; 2.69×).
 
 This is evidence of both local-carrier and broader domain/context lexical
 sensitivity. Finance should therefore be reported as a separate

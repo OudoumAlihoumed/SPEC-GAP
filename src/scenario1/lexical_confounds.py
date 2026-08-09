@@ -4,7 +4,7 @@ The audit compares an injection span with three clean-text views:
 
 * the complete selected carrier chunk that receives the injection;
 * a length-matched lexical window immediately before the insertion anchor; and
-* the complete clean retrieved context supplied to Worker1.
+* the complete selected clean source-chunk text included for Worker1.
 
 URLs and common English function words are removed from the content metrics so
 that endpoint syntax and ordinary prose do not masquerade as domain overlap.
@@ -648,7 +648,10 @@ def render_lexical_confound_markdown(audit: dict[str, Any]) -> str:
     labels = (
         ("Complete selected carrier chunk", "full_carrier_chunk"),
         ("Length-matched pre-anchor window", "matched_pre_anchor_window"),
-        ("Complete selected clean context", "full_selected_clean_context"),
+        (
+            "Complete selected clean source-chunk context",
+            "full_selected_clean_context",
+        ),
     )
     rows = []
     for label, key in labels:
@@ -695,7 +698,7 @@ def render_lexical_confound_markdown(audit: dict[str, Any]) -> str:
     ):
         interpretation = (
             f"`{focus}` has higher overlap for the complete carrier chunk "
-            "and the complete retrieved context as actually supplied. "
+            "and the complete selected clean source-chunk context. "
             "However, it does not have higher overlap in the equal-length "
             "text immediately adjacent to the insertion anchor. This "
             "supports a domain-level sensitivity but does not establish an "

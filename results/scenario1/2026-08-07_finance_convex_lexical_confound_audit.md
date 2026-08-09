@@ -10,7 +10,7 @@ The value is the fraction of unique injection content terms also present in the 
 | --- | ---: | ---: | ---: |
 | Complete selected carrier chunk | 13.64% | 3.57% | 3.82x |
 | Length-matched pre-anchor window | 13.64% | 3.57% | 3.82x |
-| Complete selected clean context | 86.36% | 32.14% | 2.69x |
+| Complete selected clean source-chunk context | 86.36% | 32.14% | 2.69x |
 
 ## Matched terms
 
