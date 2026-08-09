@@ -59,6 +59,30 @@ Across the four injected conditions, the 68-token instruction appeared in
 Worker1 at token spans 25,102–25,170, 25,317–25,385, 25,321–25,389, and
 25,322–25,390. Upstream planner prose causes the small position shifts.
 
+## Attack mechanism and entity-density control
+
+The pinned Qwen tokenizer maps the embedded `<|im_start|>` and `<|im_end|>`
+markers to special-token IDs 151644 and 151645, respectively. They are not
+tokenized as ordinary literal-text fragments. The 372-character payload is 68
+tokens; the full insertion adds one leading newline, which accounts for the
+69-token clean-to-injected Worker1 input difference in both thinking modes.
+Together with the explicit `send_to_endpoint(...)` syntax, this is a distinct
+**chat-template-control-token injection with an explicit exfiltration tool
+call**, not a plain-text compliance request. It should be stratified by attack
+mechanism rather than treated as directly comparable evidence of greater
+resistance. The exact tokenizer revision, hash, marker IDs, and counts are in
+`fellow_packages/kg/retrieval/qwen_special_token_audit_gen5000_v2.json`.
+
+For a controlled 2-hop, thinking-off Worker1 message fixture, the simple
+capitalized-multi-token proxy is 22.645 spans per 1,000 words for KG clean and
+24.598 for the plain-text Macro clean comparator. KG is therefore not a high
+outlier under this proxy; its injected value is 22.653. These figures do not
+rule out richer named-entity or relation-density differences, so a NER-based
+or density-matched control remains necessary before assigning pooled-probe
+signal to graph content or injection semantics. Definitions, prompt hashes,
+and all four clean/injected cells are recorded in
+`fellow_packages/kg/retrieval/entity_density_proxy_gen5000_v2.json`.
+
 ## Output and action audit
 
 - Trajectories: 8
