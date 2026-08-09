@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 from pathlib import Path
@@ -13,6 +14,18 @@ PETRO_ROOT = INPUTS / "fellow_packages" / "petro"
 PETRO_REGISTRY_PATH = PETRO_ROOT / "registry_gen5000_v2.json"
 AIHC_ROOT = INPUTS / "fellow_packages" / "aihc"
 AIHC_REGISTRY_PATH = AIHC_ROOT / "registry.json"
+PETRO_MANUAL_QC_PATH = (
+    ROOT
+    / "results"
+    / "scenario1"
+    / "2026-07-31_petroleum_full_matrix_gen5000_v2_manual_qc.csv"
+)
+PETRO_SUMMARY_PATH = (
+    ROOT
+    / "results"
+    / "scenario1"
+    / "2026-07-31_petroleum_full_matrix_gen5000_v2_readable_summary.md"
+)
 
 
 def _load_json(path: Path) -> dict:
@@ -130,3 +143,19 @@ def test_petroleum_tool_call_dual_review_is_explicitly_fail_closed():
         for slot in packet["review_slots"]
     )
     assert packet["adjudication"]["final_label"] is None
+
+
+def test_petroleum_priority_case_is_not_counted_as_task_preserved():
+    rows = list(csv.DictReader(PETRO_MANUAL_QC_PATH.open(newline="")))
+    priority_row = next(
+        row
+        for row in rows
+        if "2hop__injected" in row["trajectory_id"]
+        and row["trajectory_id"].endswith("thinking_off")
+    )
+    summary = PETRO_SUMMARY_PATH.read_text()
+
+    assert priority_row["task_preserved"] == ""
+    assert "task preservation remains pending" in priority_row["review_note"]
+    assert "Manual task-preservation review: 7/8 confirmed; 1/8 pending" in summary
+    assert "Manual task-preservation review: 8/8 passed" not in summary
