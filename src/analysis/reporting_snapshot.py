@@ -8,8 +8,12 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
 
+from src.analysis.depth_degradation import depth_result_analysis_tier
+from src.infrastructure.modal_billing import ANALYSIS_TIERS, validate_analysis_tier
+
 
 REPORTING_SNAPSHOT_SCHEMA = "spec_gap.scenario1_reporting_snapshot.v1"
+REPORTING_ANALYSIS_TIERS = frozenset({*ANALYSIS_TIERS, "unclassified"})
 REPORTING_LAYER = 40
 REFERENCE_LAYERS = {32, 40, 48}
 PROBE_NAMES = {"goldowsky_dill_logistic", "lat_contrast_pair_pca"}
@@ -45,6 +49,8 @@ def build_reporting_snapshot(
     )
 
     compact_all_layer = {
+        "schema_version": all_layer_result.get("schema_version"),
+        "analysis_tier": depth_result_analysis_tier(all_layer_result),
         "claim_scope": all_layer_result["claim_scope"],
         "data_manifest_hash": all_layer_result.get("data_manifest_hash"),
         "experiment_id": all_layer_result["experiment_id"],
@@ -62,8 +68,14 @@ def build_reporting_snapshot(
             for row in all_layer_result["depth_metrics"]
         ],
     }
+    analysis_tier = reporting_sources_analysis_tier(
+        model_configs,
+        score_rows,
+        (reference_result, all_layer_result),
+    )
     snapshot = {
         "schema_version": REPORTING_SNAPSHOT_SCHEMA,
+        "analysis_tier": analysis_tier,
         "analysis_revision": analysis_revision,
         "reporting_revision": reporting_revision,
         "source_artifacts": source_artifacts,
@@ -71,10 +83,12 @@ def build_reporting_snapshot(
         "sample": {
             "match_groups": int(reference_result["n_match_groups"]),
             "trajectory_runs": len(unique_trajectories),
-            "agent_turns": len({
-                (str(row["trajectory_id"]), int(row["hop_index"]))
-                for row in score_rows
-            }),
+            "agent_turns": len(
+                {
+                    (str(row["trajectory_id"]), int(row["hop_index"]))
+                    for row in score_rows
+                }
+            ),
             "behavioral_outcomes": dict(sorted(outcome_counts.items())),
             "unsafe_action_executed_count": outcome_counts.get("executed", 0),
         },
@@ -114,7 +128,9 @@ def validate_reporting_snapshot(snapshot: dict[str, Any]) -> None:
         raise ValueError("Reporting snapshot requires model configuration metadata.")
     modes = {config.get("thinking_mode") for config in configs}
     if modes != THINKING_MODES:
-        raise ValueError("Model configurations must cover thinking off and thinking on.")
+        raise ValueError(
+            "Model configurations must cover thinking off and thinking on."
+        )
     decoding = [config.get("decoding_settings") for config in configs]
     if decoding[1:] != decoding[:-1]:
         raise ValueError("Thinking modes must use the same decoding settings.")
@@ -126,6 +142,16 @@ def validate_reporting_snapshot(snapshot: dict[str, Any]) -> None:
         raise ValueError("Reporting snapshot requires reference and all-layer results.")
     if not isinstance(rows, list) or not rows:
         raise ValueError("Reporting snapshot requires compact per-step scores.")
+    source_tier = reporting_sources_analysis_tier(
+        configs,
+        rows,
+        (reference, all_layer),
+    )
+    declared_tier = snapshot.get("analysis_tier", source_tier)
+    if normalize_reporting_analysis_tier(declared_tier) != source_tier:
+        raise ValueError(
+            "Reporting snapshot analysis_tier does not match its model and score inputs."
+        )
     if reference.get("label_targets") != ["injection_present"]:
         raise ValueError("Reference result must use the construction label.")
     if all_layer.get("label_targets") != ["injection_present"]:
@@ -184,3 +210,61 @@ def sha256_file(path: str | Path) -> str:
     """Return the SHA-256 digest of a local reporting input."""
 
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def normalize_reporting_analysis_tier(value: str) -> str:
+    """Return one explicit tier used by reporting inputs."""
+
+    if value == "unclassified":
+        return value
+    return validate_analysis_tier(value)
+
+
+def reporting_sources_analysis_tier(
+    model_configs: Iterable[dict[str, Any]],
+    score_rows: Iterable[dict[str, Any]],
+    depth_results: Iterable[dict[str, Any]],
+) -> str:
+    """Require every input to the reporting snapshot to identify one tier."""
+
+    config_tiers = {
+        normalize_reporting_analysis_tier(config.get("analysis_tier") or "unclassified")
+        for config in model_configs
+    }
+    score_tiers = {
+        normalize_reporting_analysis_tier(row.get("analysis_tier") or "unclassified")
+        for row in score_rows
+    }
+    result_tiers = {depth_result_analysis_tier(result) for result in depth_results}
+    if len(config_tiers) != 1 or len(score_tiers) != 1:
+        raise ValueError("Reporting inputs must each contain one analysis tier.")
+    if len(result_tiers) != 1:
+        raise ValueError(
+            "Reference and all-layer depth results must use one analysis tier."
+        )
+    if config_tiers != score_tiers or config_tiers != result_tiers:
+        raise ValueError(
+            "Reporting model provenance, probe scores, and depth results use "
+            "different analysis tiers."
+        )
+    return next(iter(config_tiers))
+
+
+def reporting_snapshot_analysis_tier(snapshot: dict[str, Any]) -> str:
+    """Return the declared or backward-compatible inferred snapshot tier."""
+
+    source_tier = reporting_sources_analysis_tier(
+        snapshot.get("model_configs", []),
+        snapshot.get("per_step_rows", []),
+        (
+            snapshot.get("reference_result", {}),
+            snapshot.get("all_layer_result", {}),
+        ),
+    )
+    declared_tier = snapshot.get("analysis_tier", source_tier)
+    normalized = normalize_reporting_analysis_tier(declared_tier)
+    if normalized != source_tier:
+        raise ValueError(
+            "Reporting snapshot analysis_tier does not match its model and score inputs."
+        )
+    return normalized

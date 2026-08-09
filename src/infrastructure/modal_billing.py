@@ -14,13 +14,14 @@ from typing import Any, Iterable
 
 
 BILLING_RECONCILIATION_SCHEMA_VERSION = (
-    "spec_gap.modal_billing_reconciliation.v1"
+    "spec_gap.modal_billing_reconciliation.v2"
 )
 BASE_BILLING_TAGS = {
     "project": "spec-gap",
     "component": "qwen3-inference",
     "scenario": "scenario1",
 }
+ANALYSIS_TIERS = frozenset({"exploratory", "definitive"})
 
 
 def as_decimal(value: Any, field: str) -> Decimal:
@@ -41,11 +42,23 @@ def decimal_text(value: Decimal) -> str:
     return format(value, "f")
 
 
+def validate_analysis_tier(value: str) -> str:
+    """Return one explicit paper-analysis tier for a Modal run."""
+
+    if not isinstance(value, str) or value.strip() not in ANALYSIS_TIERS:
+        raise ValueError(
+            "analysis_tier must be one of "
+            f"{sorted(ANALYSIS_TIERS)}"
+        )
+    return value.strip()
+
+
 def scenario1_billing_tags(
     *,
     domain_ids: Iterable[str],
     generation_protocol_ids: Iterable[str],
     run_kind: str,
+    analysis_tier: str,
 ) -> dict[str, str]:
     """Build stable Modal App tags for future cost attribution."""
 
@@ -63,11 +76,13 @@ def scenario1_billing_tags(
         )
     if not isinstance(run_kind, str) or not run_kind.strip():
         raise ValueError("run_kind must be a non-empty string")
+    tier = validate_analysis_tier(analysis_tier)
     return {
         **BASE_BILLING_TAGS,
         "domains": ",".join(domains),
         "generation_protocols": ",".join(protocols),
         "run_kind": run_kind.strip(),
+        "analysis_tier": tier,
     }
 
 
@@ -108,6 +123,8 @@ def aggregate_billing_rows(
             "tags": dict(row.get("tags") or {}),
             "hourly_row_count": 0,
         })
+        # Mid-run metadata changes, including retagging, are integrity errors
+        # by design.
         if current["description"] != row.get("description"):
             raise ValueError(f"description changed within App {object_id}")
         if current["environment"] != row.get("environment"):
