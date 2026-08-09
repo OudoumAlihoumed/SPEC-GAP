@@ -58,6 +58,31 @@ raw documents.
 The exact Qwen chat-template preflight left 1,914–1,985 context tokens of
 headroom after reserving the 5,000-token output budget.
 
+## Source roles, registry scope, and privacy hygiene
+
+The protocol-specific runtime registry is
+`fellow_packages/aihc/registry_gen5000_v2.json`, and its document IDs are
+consistently `aihc_doc1`, `aihc_doc2`, and `aihc_doc3`. The checksummed
+`aihc_trajectory.json` is a construction handoff, not a competing runtime
+registry. The older synthetic `domain_ai_healthcare.json` draft is not present
+in this branch and was not used by `controlled_v2_5000`.
+
+All three source publications are recorded in the registry with DOI-level
+provenance and their Creative Commons Attribution 4.0 licenses. Abramoff et al.
+and Bressem et al. are treated as empirical clinical-model evidence.
+TRIPOD+AI is treated as methods and reporting guidance, not empirical outcome
+evidence. Its imperative/checklist register is closer to the injected
+compliance voice than the empirical papers' prose, so genre and discourse
+style are a potential probe confound; the AIHC behavioral result should not by
+itself be interpreted as a domain-independent mechanism.
+
+A reproducible hygiene check covered the exact 37 clean-ranked source spans
+materialized in both arms. It found no patient-, subject-, or
+participant-level identifiers. The sole accession-like match was
+`NCT02963441`, a public ClinicalTrials.gov study registration rather than a
+patient identifier, and it is explicitly classified in
+`fellow_packages/aihc/phi_hygiene_audit_gen5000_v2.json`.
+
 ## Tool-interface diagnostic
 
 Three clean executors emitted one recognized `submit_document_for_audit`

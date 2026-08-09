@@ -28,6 +28,7 @@
       "file": "fellow_packages/aihc/documents/aihc_doc1_clean.txt",
       "clean_source_pdf": "aihc_doc1_clean.pdf",
       "injected_source_pdf": "aihc_doc1_inj.pdf",
+      "evidence_role": "empirical_clinical_validation_evidence",
       "role": "injection_carrier"
     },
     {
@@ -36,6 +37,7 @@
       "title": "Comparing CNN architectures for chest radiograph classification — Bressem et al. 2020",
       "file": "fellow_packages/aihc/documents/aihc_doc2_clean.txt",
       "source_pdf": "aihc_doc2_clean.pdf",
+      "evidence_role": "empirical_model_comparison_evidence",
       "role": "benign"
     },
     {
@@ -44,6 +46,7 @@
       "title": "TRIPOD+AI reporting guidelines for clinical prediction models — Collins et al. 2024",
       "file": "fellow_packages/aihc/documents/aihc_doc3_clean.txt",
       "source_pdf": "aihc_doc3_clean.pdf",
+      "evidence_role": "methods_and_reporting_guidance",
       "role": "benign"
     }
   ],
@@ -96,6 +99,19 @@
     "source_handoff": "aihc_trajectory.json",
     "source_drive_folder": "drive-download-20260729T202621Z-1-001",
     "source_handoff_sha256": "4b6b7370cd209e403e82f7ad53454f0129a36e36e0000adeccc014fc795ab4c9",
+    "registry_resolution": {
+      "authoritative_runtime_registry": "fellow_packages/aihc/registry_gen5000_v2.json",
+      "runtime_document_ids": [
+        "aihc_doc1",
+        "aihc_doc2",
+        "aihc_doc3"
+      ],
+      "source_handoff_role": "aihc_trajectory.json is the checksummed source handoff used to construct this package; it is not loaded as a runtime registry.",
+      "legacy_synthetic_registry": {
+        "path": "experiments/scenario1/inputs/domain_ai_healthcare.json",
+        "status": "obsolete_unmerged_draft_not_present_or_used_by_controlled_v2_5000"
+      }
+    },
     "normalization_notes": [
       "Generation protocol controlled_v2_5000 changes only max_new_tokens from 2048 to 5000 and preserves the v1 sampler, prompts, retrieval query, model revision, seed, selected chunks, and render order."
     ],
@@ -104,6 +120,33 @@
       "aihc_doc1_inj.pdf": "1bece9190185c550d4f570a2ad238e58335ef726bec1d53d41f0eb90c5f4ccd9",
       "aihc_doc2_clean.pdf": "f297b573c21916ffa5abcb70ef970409a1465a3c1f26e4ec6af962cd5c4a38af",
       "aihc_doc3_clean.pdf": "2897b1b4bd46a4e288807b0b4c84d17ba8f4159a8de2a7c34d758a5024d1ddc6"
+    },
+    "source_documents": [
+      {
+        "doc_id": "aihc_doc1",
+        "source_url": "https://doi.org/10.1038/s41746-018-0040-6",
+        "doi": "10.1038/s41746-018-0040-6",
+        "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "doc_id": "aihc_doc2",
+        "source_url": "https://doi.org/10.1038/s41598-020-70479-z",
+        "doi": "10.1038/s41598-020-70479-z",
+        "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "doc_id": "aihc_doc3",
+        "source_url": "https://doi.org/10.1136/bmj-2023-078378",
+        "doi": "10.1136/bmj-2023-078378",
+        "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/"
+      }
+    ],
+    "privacy_hygiene": {
+      "audit_file": "fellow_packages/aihc/phi_hygiene_audit_gen5000_v2.json",
+      "status": "passed_with_public_study_identifier_classified"
     },
     "text_extractor": "pdftotext -raw"
   }
