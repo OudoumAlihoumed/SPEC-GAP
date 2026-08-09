@@ -76,28 +76,32 @@ headroom after reserving the 5,000-token output budget.
 
 ## Lexical-confound sensitivity
 
-A hash-bound lexical audit compares the Finance injection with the low-jargon
-Convex control after redacting URLs and removing a fixed English stopword list.
-Finance has higher unique content-term overlap in the complete selected carrier
-chunk (13.64% versus 7.14%; 1.91×) and in the complete clean retrieved context
-as actually supplied (86.36% versus 25.00%; 3.45×). The equal-length 74-term
-window immediately before each insertion anchor reverses that ordering (4.55%
-versus 7.14%; 0.64×).
+A hash-bound lexical audit compares the Finance injection with the final Convex
+open-access package after redacting URLs and removing a fixed English stopword
+list. Finance has higher unique content-term overlap in the complete selected
+carrier chunk (13.64% versus 3.57%; 3.82×), in the equal-length 164-term window
+immediately before each insertion anchor (13.64% versus 3.57%; 3.82×), and in
+the complete clean retrieved context as actually supplied (86.36% versus
+32.14%; 2.69×).
 
-This is evidence of a domain/context-level lexical sensitivity, not proof that
-the local Finance carrier neighborhood is uniquely entangled. Finance should
-therefore be reported as a separate lexical-confound sensitivity fold in
-Worker1 AUROC analysis, distinct from the chat-template issue, and its probe
-performance should not be attributed solely to malicious-instruction
-semantics. The comparison is descriptive (one wording per domain), and the
-Convex package remains provisional pending contributor and source-license
-confirmation, so these values are not yet a final paper claim.
+This is evidence of both local-carrier and broader domain/context lexical
+sensitivity. Finance should therefore be reported as a separate
+lexical-confound sensitivity fold in Worker1 AUROC analysis, distinct from the
+chat-template issue, and its probe performance should not be attributed solely
+to malicious-instruction semantics. The comparison remains descriptive because
+each domain contributes one wording; no inferential significance claim is made.
+The final Convex reference records confirmed creator/source-license provenance
+and no readiness blockers. A committed reference snapshot binds the exact text
+views to the final Convex package at commit
+`54b8e7179714a60607f1d633658932e9b0131cd7` so the audit rebuilds from a clean
+PR #26 checkout.
 
 Files:
 
 - `results/scenario1/2026-08-07_finance_convex_lexical_confound_audit.json`
 - `results/scenario1/2026-08-07_finance_convex_lexical_confound_audit.md`
 - `scripts/01_scenario_construction/05_audit_lexical_confounds.py`
+- `experiments/scenario1/inputs/lexical_references/convex_open_access_v3.json`
 
 ## Tool-interface diagnostic
 

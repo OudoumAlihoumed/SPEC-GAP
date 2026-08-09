@@ -18,9 +18,10 @@ import json
 import math
 import re
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from src.scenario1.retrieval import (
     canonical_plan_sha256,
@@ -31,6 +32,7 @@ from src.scenario1.retrieval import (
 
 
 LEXICAL_CONFOUND_AUDIT_SCHEMA = "spec_gap.lexical_confound_audit.v1"
+LEXICAL_PACKAGE_SNAPSHOT_SCHEMA = "spec_gap.lexical_package_snapshot.v1"
 
 _WORD_RE = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
 _URL_RE = re.compile(r"https?://[^\s<>()\[\]{}\"']+")
@@ -72,6 +74,10 @@ class LexicalPackage:
     injection_text: str
     carrier_text: str
     selected_context_text: str
+    source_snapshot_path: str | None = None
+    source_snapshot_sha256: str | None = None
+    source_commit: str | None = None
+    source_documents: tuple[dict[str, str], ...] = ()
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -203,6 +209,16 @@ def load_lexical_package(
     readiness_blockers = tuple(
         blocker for blocker in raw_blockers if isinstance(blocker, str)
     )
+    raw_source_documents = provenance.get("source_documents", [])
+    source_documents = tuple(
+        {
+            field: value
+            for field in ("doc_id", "source_url", "doi", "license")
+            if isinstance((value := item.get(field)), str)
+        }
+        for item in raw_source_documents
+        if isinstance(item, dict)
+    )
 
     domain_id = registry.get("domain_id")
     if not isinstance(domain_id, str) or not domain_id:
@@ -227,7 +243,175 @@ def load_lexical_package(
         injection_text=injection_text,
         carrier_text=carrier_text,
         selected_context_text="\n".join(selected_context_parts),
+        source_documents=source_documents,
     )
+
+
+def build_lexical_package_snapshot(
+    package: LexicalPackage,
+    *,
+    source_commit: str,
+) -> dict[str, Any]:
+    """Serialize the exact validated text views needed by the lexical audit."""
+
+    if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
+        raise ValueError("source_commit must be a full lowercase Git SHA")
+    return {
+        "schema_version": LEXICAL_PACKAGE_SNAPSHOT_SCHEMA,
+        "source_commit": source_commit,
+        "package": {
+            "domain_id": package.domain_id,
+            "registry_path": package.registry_path,
+            "registry_sha256": package.registry_sha256,
+            "retrieval_plan_path": package.retrieval_plan_path,
+            "retrieval_plan_sha256": package.retrieval_plan_sha256,
+            "provenance_status": package.provenance_status,
+            "readiness_blockers": list(package.readiness_blockers),
+            "carrier_chunk_id": package.carrier_chunk_id,
+            "carrier_chunk_token_count": package.carrier_chunk_token_count,
+            "carrier_chunk_text_sha256": package.carrier_chunk_text_sha256,
+            "injection_payload_sha256": package.injection_payload_sha256,
+            "selected_chunk_count": package.selected_chunk_count,
+            "selected_context_text_sha256": sha256_text(
+                package.selected_context_text
+            ),
+            "source_documents": list(package.source_documents),
+            "injection_text": package.injection_text,
+            "carrier_text": package.carrier_text,
+            "selected_context_text": package.selected_context_text,
+        },
+    }
+
+
+def _package_from_snapshot_data(
+    snapshot: dict[str, Any],
+    *,
+    snapshot_path: Path | None,
+    project_root: Path | None,
+) -> LexicalPackage:
+    if snapshot.get("schema_version") != LEXICAL_PACKAGE_SNAPSHOT_SCHEMA:
+        raise ValueError("unsupported lexical-package snapshot schema")
+    source_commit = snapshot.get("source_commit")
+    if not isinstance(source_commit, str) or re.fullmatch(
+        r"[0-9a-f]{40}", source_commit
+    ) is None:
+        raise ValueError("snapshot source_commit must be a full lowercase Git SHA")
+    data = snapshot.get("package")
+    if not isinstance(data, dict):
+        raise ValueError("snapshot package must be an object")
+
+    required_strings = (
+        "domain_id",
+        "registry_path",
+        "registry_sha256",
+        "retrieval_plan_path",
+        "retrieval_plan_sha256",
+        "carrier_chunk_id",
+        "carrier_chunk_text_sha256",
+        "injection_payload_sha256",
+        "selected_context_text_sha256",
+        "injection_text",
+        "carrier_text",
+        "selected_context_text",
+    )
+    for field in required_strings:
+        if not isinstance(data.get(field), str) or not data[field]:
+            raise ValueError(f"snapshot package field {field} must be non-empty")
+    for field in (
+        "registry_sha256",
+        "retrieval_plan_sha256",
+        "carrier_chunk_text_sha256",
+        "injection_payload_sha256",
+        "selected_context_text_sha256",
+    ):
+        if re.fullmatch(r"[0-9a-f]{64}", data[field]) is None:
+            raise ValueError(f"snapshot package field {field} is not SHA-256")
+    for field in ("carrier_chunk_token_count", "selected_chunk_count"):
+        if not isinstance(data.get(field), int) or data[field] <= 0:
+            raise ValueError(f"snapshot package field {field} must be positive")
+    blockers = data.get("readiness_blockers")
+    if not isinstance(blockers, list) or not all(
+        isinstance(item, str) for item in blockers
+    ):
+        raise ValueError("snapshot readiness_blockers must be strings")
+    source_documents = data.get("source_documents")
+    if not isinstance(source_documents, list) or not source_documents:
+        raise ValueError("snapshot source_documents must be a non-empty list")
+    for document in source_documents:
+        if not isinstance(document, dict) or not all(
+            isinstance(document.get(field), str) and document[field]
+            for field in ("doc_id", "source_url", "license")
+        ):
+            raise ValueError(
+                "snapshot source documents require IDs, URLs, and licenses"
+            )
+    provenance_status = data.get("provenance_status")
+    if provenance_status is not None and not isinstance(provenance_status, str):
+        raise ValueError("snapshot provenance_status must be text or null")
+
+    text_hashes = {
+        "carrier_text": "carrier_chunk_text_sha256",
+        "injection_text": "injection_payload_sha256",
+        "selected_context_text": "selected_context_text_sha256",
+    }
+    for text_field, hash_field in text_hashes.items():
+        if sha256_text(data[text_field]) != data[hash_field]:
+            raise ValueError(f"snapshot {text_field} no longer matches its hash")
+
+    return LexicalPackage(
+        domain_id=data["domain_id"],
+        registry_path=data["registry_path"],
+        registry_sha256=data["registry_sha256"],
+        retrieval_plan_path=data["retrieval_plan_path"],
+        retrieval_plan_sha256=data["retrieval_plan_sha256"],
+        provenance_status=provenance_status,
+        readiness_blockers=tuple(blockers),
+        carrier_chunk_id=data["carrier_chunk_id"],
+        carrier_chunk_token_count=data["carrier_chunk_token_count"],
+        carrier_chunk_text_sha256=data["carrier_chunk_text_sha256"],
+        injection_payload_sha256=data["injection_payload_sha256"],
+        selected_chunk_count=data["selected_chunk_count"],
+        injection_text=data["injection_text"],
+        carrier_text=data["carrier_text"],
+        selected_context_text=data["selected_context_text"],
+        source_snapshot_path=(
+            _display_path(snapshot_path, project_root)
+            if snapshot_path is not None
+            else None
+        ),
+        source_snapshot_sha256=(
+            _file_sha256(snapshot_path) if snapshot_path is not None else None
+        ),
+        source_commit=source_commit,
+        source_documents=tuple(dict(document) for document in source_documents),
+    )
+
+
+def load_lexical_package_snapshot(
+    snapshot_path: str | Path,
+    *,
+    project_root: str | Path | None = None,
+) -> LexicalPackage:
+    """Load a hash-checked, self-contained lexical reference snapshot."""
+
+    path = Path(snapshot_path)
+    root = Path(project_root) if project_root is not None else None
+    return _package_from_snapshot_data(
+        _read_json(path),
+        snapshot_path=path,
+        project_root=root,
+    )
+
+
+def canonical_package_snapshot_json(snapshot: dict[str, Any]) -> str:
+    """Return stable JSON after validating every embedded text hash."""
+
+    _package_from_snapshot_data(
+        snapshot,
+        snapshot_path=None,
+        project_root=None,
+    )
+    return json.dumps(snapshot, indent=2, sort_keys=True) + "\n"
 
 
 def _overlap_metrics(
@@ -292,23 +476,30 @@ def _view_metrics(
     matched_window_content = [
         term for term in matched_window_all if term not in _STOPWORDS
     ]
+    inputs = {
+        "registry": package.registry_path,
+        "registry_sha256": package.registry_sha256,
+        "retrieval_plan": package.retrieval_plan_path,
+        "retrieval_plan_sha256": package.retrieval_plan_sha256,
+        "provenance_status": package.provenance_status,
+        "readiness_blockers": list(package.readiness_blockers),
+        "carrier_chunk_id": package.carrier_chunk_id,
+        "carrier_chunk_model_token_count": package.carrier_chunk_token_count,
+        "carrier_chunk_text_sha256": package.carrier_chunk_text_sha256,
+        "injection_payload_sha256": package.injection_payload_sha256,
+        "selected_context_text_sha256": sha256_text(
+            package.selected_context_text
+        ),
+        "selected_chunk_count": package.selected_chunk_count,
+        "source_documents": list(package.source_documents),
+    }
+    if package.source_snapshot_path is not None:
+        inputs["reference_snapshot"] = package.source_snapshot_path
+        inputs["reference_snapshot_sha256"] = package.source_snapshot_sha256
+        inputs["source_commit"] = package.source_commit
     return {
         "domain_id": package.domain_id,
-        "inputs": {
-            "registry": package.registry_path,
-            "registry_sha256": package.registry_sha256,
-            "retrieval_plan": package.retrieval_plan_path,
-            "retrieval_plan_sha256": package.retrieval_plan_sha256,
-            "provenance_status": package.provenance_status,
-            "readiness_blockers": list(package.readiness_blockers),
-            "carrier_chunk_id": package.carrier_chunk_id,
-            "carrier_chunk_model_token_count": (
-                package.carrier_chunk_token_count
-            ),
-            "carrier_chunk_text_sha256": package.carrier_chunk_text_sha256,
-            "injection_payload_sha256": package.injection_payload_sha256,
-            "selected_chunk_count": package.selected_chunk_count,
-        },
+        "inputs": inputs,
         "all_lexical_terms": {
             "full_carrier_chunk": _overlap_metrics(
                 injection_all,
@@ -481,21 +672,87 @@ def render_lexical_confound_markdown(audit: dict[str, Any]) -> str:
         "matched_pre_anchor_window"
     ]
     reference_inputs = domains[reference]["inputs"]
+    focus_higher = {
+        key: comparison[key]["difference"] > 0
+        for key in (
+            "full_carrier_chunk",
+            "matched_pre_anchor_window",
+            "full_selected_clean_context",
+        )
+    }
+    if all(focus_higher.values()):
+        interpretation = (
+            f"`{focus}` has higher overlap in all three clean-text views, "
+            "including the equal-length text immediately adjacent to the "
+            "insertion anchor. This supports treating both the local carrier "
+            "neighborhood and the broader domain context as lexical-confound "
+            "sensitivities."
+        )
+    elif (
+        focus_higher["full_carrier_chunk"]
+        and focus_higher["full_selected_clean_context"]
+        and not focus_higher["matched_pre_anchor_window"]
+    ):
+        interpretation = (
+            f"`{focus}` has higher overlap for the complete carrier chunk "
+            "and the complete retrieved context as actually supplied. "
+            "However, it does not have higher overlap in the equal-length "
+            "text immediately adjacent to the insertion anchor. This "
+            "supports a domain-level sensitivity but does not establish an "
+            "unusually entangled local carrier neighborhood."
+        )
+    else:
+        interpretation = (
+            "The direction of overlap differs across clean-text views, so "
+            "the audit does not support a single context-independent lexical "
+            "ordering."
+        )
     blockers = reference_inputs.get("readiness_blockers") or []
     provenance_note = ""
-    if reference_inputs.get("provenance_status") or blockers:
+    provenance_status = reference_inputs.get("provenance_status")
+    if blockers:
         blocker_text = (
             "; ".join(blocker.rstrip(".") for blocker in blockers)
-            if blockers
-            else "none recorded"
         )
         provenance_note = (
             "\n## Reference-package status\n\n"
             f"The `{reference}` package status is "
-            f"`{reference_inputs.get('provenance_status') or 'unspecified'}`. "
+            f"`{provenance_status or 'unspecified'}`. "
             f"Recorded blockers: {blocker_text}. These measurements are a "
             "diagnostic comparison, not a final paper claim, until that "
             "package's provenance is cleared.\n"
+        )
+    elif provenance_status:
+        provenance_note = (
+            "\n## Reference-package status\n\n"
+            f"The `{reference}` package status is `{provenance_status}` and "
+            "records no readiness blockers. The comparison remains "
+            "descriptive because each domain contributes one injection "
+            "wording, not because reference provenance is pending.\n"
+        )
+    snapshot_note = ""
+    snapshot_command = ""
+    if reference_inputs.get("reference_snapshot"):
+        snapshot_note = (
+            " A committed, hash-checked reference snapshot contains the "
+            "exact derived text views needed to reproduce the comparison "
+            f"from source commit `{reference_inputs['source_commit']}`."
+        )
+        focus_inputs = domains[focus]["inputs"]
+        snapshot_command = (
+            "\nFrom a clean checkout, rebuild both committed outputs with:\n\n"
+            "```bash\n"
+            "python scripts/01_scenario_construction/"
+            "05_audit_lexical_confounds.py \\\n"
+            f"  --focus-registry {focus_inputs['registry']} \\\n"
+            f"  --focus-plan {focus_inputs['retrieval_plan']} \\\n"
+            "  --reference-snapshot "
+            f"{reference_inputs['reference_snapshot']} \\\n"
+            "  --out-json results/scenario1/"
+            "2026-08-07_finance_convex_lexical_confound_audit.json \\\n"
+            "  --out-markdown results/scenario1/"
+            "2026-08-07_finance_convex_lexical_confound_audit.md\n"
+            "```\n"
         )
 
     return (
@@ -524,25 +781,19 @@ def render_lexical_confound_markdown(audit: dict[str, Any]) -> str:
         f"- `{reference}` matched window: "
         f"{', '.join(reference_window['matched_terms']) or 'none'}\n\n"
         "## Interpretation\n\n"
-        f"`{focus}` has higher overlap for the complete carrier chunk and "
-        "the complete retrieved context as actually supplied. However, it "
-        "does not have higher "
-        "overlap in the equal-length text immediately adjacent to the "
-        "insertion anchor. The evidence therefore supports treating Finance "
-        "as a domain-level lexical-confound sensitivity fold when interpreting "
-        "Worker1 AUROC, but it does not establish that the local carrier "
-        "neighborhood alone is unusually entangled. Report the Finance fold "
-        "separately and avoid attributing its probe performance solely to "
-        "malicious-instruction semantics. PR #35 should carry this as a "
-        "domain-level sensitivity flag distinct from the chat-template "
-        "issue.\n"
+        f"{interpretation} Report the Finance fold separately and avoid "
+        "attributing its probe performance solely to malicious-instruction "
+        "semantics. PR #35 should carry this as a lexical sensitivity flag "
+        "distinct from the chat-template issue.\n"
         "\nThe audit is descriptive: each domain contributes one injection "
         "wording, so no inferential significance claim is made.\n"
         + provenance_note
         + "\n## Reproducibility\n\n"
         "The companion JSON records the registry, retrieval-plan, carrier-"
-        "chunk, and injection hashes; both retrieval plans are validated "
-        "against their clean source slices before metrics are computed.\n"
+        "chunk, injection, and selected-context hashes; source retrieval "
+        "plans are validated against their clean source slices before "
+        f"metrics are computed.{snapshot_note}\n"
+        + snapshot_command
     )
 
 

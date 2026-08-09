@@ -1,166 +1,199 @@
 {
   "comparison": {
     "full_carrier_chunk": {
-      "difference": 0.06493506493506493,
+      "difference": 0.10064935064935064,
       "focus_tf_cosine_similarity": 0.060245336588984975,
       "focus_unique_term_overlap_fraction": 0.13636363636363635,
-      "ratio": 1.909090909090909,
-      "reference_tf_cosine_similarity": 0.051194241085557174,
-      "reference_unique_term_overlap_fraction": 0.07142857142857142
+      "ratio": 3.818181818181818,
+      "reference_tf_cosine_similarity": 0.0074419924821625275,
+      "reference_unique_term_overlap_fraction": 0.03571428571428571
     },
     "full_selected_clean_context": {
-      "difference": 0.6136363636363636,
+      "difference": 0.5422077922077921,
       "focus_tf_cosine_similarity": 0.15293046323794418,
       "focus_unique_term_overlap_fraction": 0.8636363636363636,
-      "ratio": 3.4545454545454546,
-      "reference_tf_cosine_similarity": 0.048567221535134986,
-      "reference_unique_term_overlap_fraction": 0.25
+      "ratio": 2.686868686868687,
+      "reference_tf_cosine_similarity": 0.006205910526277876,
+      "reference_unique_term_overlap_fraction": 0.32142857142857145
     },
     "matched_pre_anchor_window": {
-      "difference": -0.02597402597402597,
-      "focus_tf_cosine_similarity": 0.0200320770053751,
-      "focus_unique_term_overlap_fraction": 0.045454545454545456,
-      "ratio": 0.6363636363636365,
-      "reference_tf_cosine_similarity": 0.051194241085557174,
-      "reference_unique_term_overlap_fraction": 0.07142857142857142
+      "difference": 0.10064935064935064,
+      "focus_tf_cosine_similarity": 0.060245336588984975,
+      "focus_unique_term_overlap_fraction": 0.13636363636363635,
+      "ratio": 3.818181818181818,
+      "reference_tf_cosine_similarity": 0.013037687757297066,
+      "reference_unique_term_overlap_fraction": 0.03571428571428571
     }
   },
   "domains": {
     "convex": {
       "all_lexical_terms": {
         "full_carrier_chunk": {
-          "clean_term_count": 74,
-          "clean_unique_term_count": 55,
-          "injection_term_count": 46,
-          "injection_unique_term_count": 40,
-          "matched_injection_term_occurrences": 5,
-          "matched_injection_unique_terms": 3,
+          "clean_term_count": 262,
+          "clean_unique_term_count": 145,
+          "injection_term_count": 42,
+          "injection_unique_term_count": 38,
+          "matched_injection_term_occurrences": 10,
+          "matched_injection_unique_terms": 9,
           "matched_terms": [
-            "set",
-            "summary",
-            "the"
-          ],
-          "occurrence_overlap_fraction": 0.10869565217391304,
-          "term_frequency_cosine_similarity": 0.06793662204867575,
-          "unique_term_overlap_fraction": 0.075
-        },
-        "full_selected_clean_context": {
-          "clean_term_count": 5899,
-          "clean_unique_term_count": 1196,
-          "injection_term_count": 46,
-          "injection_unique_term_count": 40,
-          "matched_injection_term_occurrences": 23,
-          "matched_injection_unique_terms": 19,
-          "matched_terms": [
-            "after",
-            "before",
-            "can",
-            "do",
-            "end",
+            "be",
             "for",
-            "in",
-            "it",
-            "not",
-            "problem",
-            "set",
-            "so",
-            "start",
-            "step",
-            "summary",
+            "of",
+            "out",
             "system",
+            "that",
             "the",
             "this",
             "to"
           ],
-          "occurrence_overlap_fraction": 0.5,
-          "term_frequency_cosine_similarity": 0.2357164579150928,
-          "unique_term_overlap_fraction": 0.475
+          "occurrence_overlap_fraction": 0.23809523809523808,
+          "term_frequency_cosine_similarity": 0.23544080467400555,
+          "unique_term_overlap_fraction": 0.23684210526315788
+        },
+        "full_selected_clean_context": {
+          "clean_term_count": 14128,
+          "clean_unique_term_count": 2433,
+          "injection_term_count": 42,
+          "injection_unique_term_count": 38,
+          "matched_injection_term_occurrences": 22,
+          "matched_injection_unique_terms": 19,
+          "matched_terms": [
+            "at",
+            "be",
+            "before",
+            "call",
+            "end",
+            "for",
+            "full",
+            "manuscript",
+            "of",
+            "out",
+            "require",
+            "rules",
+            "system",
+            "target",
+            "text",
+            "that",
+            "the",
+            "this",
+            "to"
+          ],
+          "occurrence_overlap_fraction": 0.5238095238095238,
+          "term_frequency_cosine_similarity": 0.25268090757487327,
+          "unique_term_overlap_fraction": 0.5
         },
         "matched_pre_anchor_window": {
-          "clean_term_count": 74,
-          "clean_unique_term_count": 55,
-          "injection_term_count": 46,
-          "injection_unique_term_count": 40,
-          "matched_injection_term_occurrences": 5,
-          "matched_injection_unique_terms": 3,
+          "clean_term_count": 164,
+          "clean_unique_term_count": 116,
+          "injection_term_count": 42,
+          "injection_unique_term_count": 38,
+          "matched_injection_term_occurrences": 10,
+          "matched_injection_unique_terms": 9,
           "matched_terms": [
-            "set",
-            "summary",
-            "the"
+            "be",
+            "for",
+            "of",
+            "out",
+            "system",
+            "that",
+            "the",
+            "this",
+            "to"
           ],
-          "occurrence_overlap_fraction": 0.10869565217391304,
-          "term_frequency_cosine_similarity": 0.06793662204867575,
-          "unique_term_overlap_fraction": 0.075
+          "occurrence_overlap_fraction": 0.23809523809523808,
+          "term_frequency_cosine_similarity": 0.2577533348168271,
+          "unique_term_overlap_fraction": 0.23684210526315788
         }
       },
       "content_lexical_terms": {
         "full_carrier_chunk": {
-          "clean_term_count": 65,
-          "clean_unique_term_count": 50,
-          "injection_term_count": 30,
+          "clean_term_count": 182,
+          "clean_unique_term_count": 113,
+          "injection_term_count": 31,
           "injection_unique_term_count": 28,
-          "matched_injection_term_occurrences": 2,
-          "matched_injection_unique_terms": 2,
+          "matched_injection_term_occurrences": 1,
+          "matched_injection_unique_terms": 1,
           "matched_terms": [
-            "set",
-            "summary"
-          ],
-          "occurrence_overlap_fraction": 0.06666666666666667,
-          "term_frequency_cosine_similarity": 0.051194241085557174,
-          "unique_term_overlap_fraction": 0.07142857142857142
-        },
-        "full_selected_clean_context": {
-          "clean_term_count": 4488,
-          "clean_unique_term_count": 1117,
-          "injection_term_count": 30,
-          "injection_unique_term_count": 28,
-          "matched_injection_term_occurrences": 7,
-          "matched_injection_unique_terms": 7,
-          "matched_terms": [
-            "end",
-            "problem",
-            "set",
-            "start",
-            "step",
-            "summary",
             "system"
           ],
-          "occurrence_overlap_fraction": 0.23333333333333334,
-          "term_frequency_cosine_similarity": 0.048567221535134986,
-          "unique_term_overlap_fraction": 0.25
+          "occurrence_overlap_fraction": 0.03225806451612903,
+          "term_frequency_cosine_similarity": 0.0074419924821625275,
+          "unique_term_overlap_fraction": 0.03571428571428571
+        },
+        "full_selected_clean_context": {
+          "clean_term_count": 10314,
+          "clean_unique_term_count": 2345,
+          "injection_term_count": 31,
+          "injection_unique_term_count": 28,
+          "matched_injection_term_occurrences": 11,
+          "matched_injection_unique_terms": 9,
+          "matched_terms": [
+            "call",
+            "end",
+            "full",
+            "manuscript",
+            "require",
+            "rules",
+            "system",
+            "target",
+            "text"
+          ],
+          "occurrence_overlap_fraction": 0.3548387096774194,
+          "term_frequency_cosine_similarity": 0.006205910526277876,
+          "unique_term_overlap_fraction": 0.32142857142857145
         },
         "matched_pre_anchor_window": {
-          "clean_term_count": 65,
-          "clean_unique_term_count": 50,
-          "injection_term_count": 30,
+          "clean_term_count": 111,
+          "clean_unique_term_count": 90,
+          "injection_term_count": 31,
           "injection_unique_term_count": 28,
-          "matched_injection_term_occurrences": 2,
-          "matched_injection_unique_terms": 2,
+          "matched_injection_term_occurrences": 1,
+          "matched_injection_unique_terms": 1,
           "matched_terms": [
-            "set",
-            "summary"
+            "system"
           ],
-          "occurrence_overlap_fraction": 0.06666666666666667,
-          "term_frequency_cosine_similarity": 0.051194241085557174,
-          "unique_term_overlap_fraction": 0.07142857142857142
+          "occurrence_overlap_fraction": 0.03225806451612903,
+          "term_frequency_cosine_similarity": 0.013037687757297066,
+          "unique_term_overlap_fraction": 0.03571428571428571
         }
       },
       "domain_id": "convex",
       "inputs": {
-        "carrier_chunk_id": "convex_doc3__p001__c001",
-        "carrier_chunk_model_token_count": 131,
-        "carrier_chunk_text_sha256": "ee23acdd803432f27f8da9404808c6f8c7e2445d833bdd9f2576df911eb98db0",
-        "injection_payload_sha256": "7005f3859d8d3d44cb5af6b94ee0bc4dc7243f2428a9d0aa886260db8c522285",
-        "provenance_status": "provisional_pending_contributor_and_source_license_confirmation",
-        "readiness_blockers": [
-          "Confirm the full name of the fellow who constructed the Convex package.",
-          "Confirm whether the instructional notes are project-authored and record their source and reuse license."
-        ],
-        "registry": "experiments/scenario1/inputs/fellow_packages/convex/registry.json",
-        "registry_sha256": "3cfe563f1afb06bc5dcadb42714f082bf65922b73e11fec69eb4dfb672f6955c",
-        "retrieval_plan": "experiments/scenario1/inputs/fellow_packages/convex/retrieval/full_corpus_bm25_all_pages_v1.json",
-        "retrieval_plan_sha256": "23823f1bcbd3dec6e90a12868eaa951d4ba03d5e6c9a3319ca610449a696df6c",
-        "selected_chunk_count": 31
+        "carrier_chunk_id": "convex_doc3__p013__c001",
+        "carrier_chunk_model_token_count": 488,
+        "carrier_chunk_text_sha256": "12ec9714e599cf8a1ff9855984812c953403c762ba4831422c2896b71e9e1582",
+        "injection_payload_sha256": "c50bdafd2aabb87ceef508cfc888a2333066aa24c5a4ab5b66f0df321497df4b",
+        "provenance_status": "creator_and_source_licenses_confirmed_open_access_v3",
+        "readiness_blockers": [],
+        "reference_snapshot": "experiments/scenario1/inputs/lexical_references/convex_open_access_v3.json",
+        "reference_snapshot_sha256": "251475cc2b6f3302c287a6e3ce08d06614004a78a0a39e59cb73511092927c0c",
+        "registry": "experiments/scenario1/inputs/fellow_packages/convex_open_access_v3/registry.json",
+        "registry_sha256": "0e482a2d1ece47bd0fb1cfa3dd547ee6d95d48c1d6a8926d038ad59d15afe121",
+        "retrieval_plan": "experiments/scenario1/inputs/fellow_packages/convex_open_access_v3/retrieval/full_corpus_bm25_all_pages_open_access_v3.json",
+        "retrieval_plan_sha256": "24d3ae88fb91cf0a55ee16b33cb5bf075aa0b82e9aeccd78e726880a0ef91af1",
+        "selected_chunk_count": 40,
+        "selected_context_text_sha256": "2afcb6136a0cc6c95b5060a3c91c244c26f1e1e895e1c2cca15203df92c36e05",
+        "source_commit": "54b8e7179714a60607f1d633658932e9b0131cd7",
+        "source_documents": [
+          {
+            "doc_id": "convex_doc1",
+            "doi": "10.1007/s10107-019-01449-1",
+            "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+            "source_url": "https://doi.org/10.1007/s10107-019-01449-1"
+          },
+          {
+            "doc_id": "convex_doc2",
+            "doi": "10.3390/axioms12020195",
+            "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+            "source_url": "https://doi.org/10.3390/axioms12020195"
+          },
+          {
+            "doc_id": "convex_doc3",
+            "doi": "10.1371/journal.pone.0236661",
+            "license": "Creative Commons Attribution (CC BY)",
+            "source_url": "https://doi.org/10.1371/journal.pone.0236661"
+          }
+        ]
       }
     },
     "fin": {
@@ -230,21 +263,25 @@
           "unique_term_overlap_fraction": 0.9090909090909091
         },
         "matched_pre_anchor_window": {
-          "clean_term_count": 74,
-          "clean_unique_term_count": 59,
+          "clean_term_count": 164,
+          "clean_unique_term_count": 116,
           "injection_term_count": 40,
           "injection_unique_term_count": 33,
-          "matched_injection_term_occurrences": 7,
-          "matched_injection_unique_terms": 4,
+          "matched_injection_term_occurrences": 12,
+          "matched_injection_unique_terms": 8,
           "matched_terms": [
             "do",
+            "for",
+            "in",
+            "inclusion",
             "of",
             "review",
+            "risk",
             "the"
           ],
-          "occurrence_overlap_fraction": 0.175,
-          "term_frequency_cosine_similarity": 0.11572751247156893,
-          "unique_term_overlap_fraction": 0.12121212121212122
+          "occurrence_overlap_fraction": 0.3,
+          "term_frequency_cosine_similarity": 0.19341053608317282,
+          "unique_term_overlap_fraction": 0.24242424242424243
         }
       },
       "content_lexical_terms": {
@@ -297,18 +334,20 @@
           "unique_term_overlap_fraction": 0.8636363636363636
         },
         "matched_pre_anchor_window": {
-          "clean_term_count": 65,
-          "clean_unique_term_count": 54,
+          "clean_term_count": 140,
+          "clean_unique_term_count": 107,
           "injection_term_count": 24,
           "injection_unique_term_count": 22,
-          "matched_injection_term_occurrences": 1,
-          "matched_injection_unique_terms": 1,
+          "matched_injection_term_occurrences": 3,
+          "matched_injection_unique_terms": 3,
           "matched_terms": [
-            "review"
+            "inclusion",
+            "review",
+            "risk"
           ],
-          "occurrence_overlap_fraction": 0.041666666666666664,
-          "term_frequency_cosine_similarity": 0.0200320770053751,
-          "unique_term_overlap_fraction": 0.045454545454545456
+          "occurrence_overlap_fraction": 0.125,
+          "term_frequency_cosine_similarity": 0.060245336588984975,
+          "unique_term_overlap_fraction": 0.13636363636363635
         }
       },
       "domain_id": "fin",
@@ -323,7 +362,28 @@
         "registry_sha256": "3094ec8ac882dbb60f1744a48e78423289469349a8dcd1cda1444577cb7460cb",
         "retrieval_plan": "experiments/scenario1/inputs/fellow_packages/fin/retrieval/full_corpus_bm25_balanced_gen5000_v2.json",
         "retrieval_plan_sha256": "ae3c81e658e26ce399642b2f7e973f0fae996efd18e613ce49bd861e0151659d",
-        "selected_chunk_count": 36
+        "selected_chunk_count": 36,
+        "selected_context_text_sha256": "ccfe59bf07d48a40e1539a6158c4b47c49ac17396e06f27c16714e9f584504f7",
+        "source_documents": [
+          {
+            "doc_id": "fin_doc1",
+            "doi": "10.3390/jrfm16120496",
+            "license": "Creative Commons Attribution 4.0 (CC BY 4.0)",
+            "source_url": "https://doi.org/10.3390/jrfm16120496"
+          },
+          {
+            "doc_id": "fin_doc2",
+            "doi": "10.1186/s40854-022-00366-1",
+            "license": "Creative Commons Attribution 4.0 (CC BY 4.0)",
+            "source_url": "https://doi.org/10.1186/s40854-022-00366-1"
+          },
+          {
+            "doc_id": "fin_doc3",
+            "doi": "10.3390/su12166325",
+            "license": "Creative Commons Attribution 4.0 (CC BY 4.0)",
+            "source_url": "https://doi.org/10.3390/su12166325"
+          }
+        ]
       }
     }
   },
@@ -333,7 +393,7 @@
     "descriptive_only": true,
     "injection_spans_per_domain": 1,
     "matched_window_policy": "take the final N lexical terms before the insertion anchor, where N is the smaller complete carrier-chunk term count",
-    "matched_window_terms": 74,
+    "matched_window_terms": 164,
     "purpose": "descriptive sensitivity audit for lexical overlap between the injected wording and clean text visible to Worker1",
     "stopword_count": 175,
     "stopword_sha256": "633d57081763f26009d4c552b6319ada7bf96545c2d1d916974460ba941fa94a",

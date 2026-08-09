@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,6 +15,7 @@ from src.scenario1.lexical_confounds import (
     canonical_audit_json,
     lexical_terms,
     load_lexical_package,
+    load_lexical_package_snapshot,
     render_lexical_confound_markdown,
     validate_audit_numbers,
 )
@@ -38,6 +41,18 @@ AUDIT_RESULT = (
     / "results"
     / "scenario1"
     / "2026-08-07_finance_convex_lexical_confound_audit.json"
+)
+AUDIT_MARKDOWN = AUDIT_RESULT.with_suffix(".md")
+REFERENCE_SNAPSHOT = (
+    INPUTS_ROOT
+    / "lexical_references"
+    / "convex_open_access_v3.json"
+)
+AUDIT_SCRIPT = (
+    PROJECT_ROOT
+    / "scripts"
+    / "01_scenario_construction"
+    / "05_audit_lexical_confounds.py"
 )
 
 
@@ -155,20 +170,85 @@ def test_loader_rejects_injection_that_no_longer_matches_plan(tmp_path: Path):
 
 
 def test_committed_finance_convex_audit_records_the_metric_sensitivity():
-    audit = json.loads(AUDIT_RESULT.read_text(encoding="utf-8"))
+    finance = load_lexical_package(
+        FINANCE_REGISTRY,
+        FINANCE_PLAN,
+        inputs_root=INPUTS_ROOT,
+        project_root=PROJECT_ROOT,
+    )
+    convex = load_lexical_package_snapshot(
+        REFERENCE_SNAPSHOT,
+        project_root=PROJECT_ROOT,
+    )
+    rebuilt = build_lexical_confound_audit(finance, convex)
+    committed_text = AUDIT_RESULT.read_text(encoding="utf-8")
+    audit = json.loads(committed_text)
+
+    assert canonical_audit_json(rebuilt) == committed_text
     validate_audit_numbers(audit)
 
     comparison = audit["comparison"]
     assert comparison["full_carrier_chunk"]["ratio"] == pytest.approx(
-        1.909090909090909
+        3.818181818181818
     )
     assert comparison["matched_pre_anchor_window"]["ratio"] == pytest.approx(
-        0.6363636363636365
+        3.818181818181818
     )
     assert comparison["full_selected_clean_context"]["ratio"] == pytest.approx(
-        3.4545454545454546
+        2.686868686868687
     )
     assert audit["method"]["descriptive_only"] is True
     assert audit["domains"]["convex"]["inputs"]["provenance_status"] == (
-        "provisional_pending_contributor_and_source_license_confirmation"
+        "creator_and_source_licenses_confirmed_open_access_v3"
     )
+    assert audit["domains"]["convex"]["inputs"]["source_commit"] == (
+        "54b8e7179714a60607f1d633658932e9b0131cd7"
+    )
+    reference_inputs = audit["domains"]["convex"]["inputs"]
+    assert reference_inputs["registry"].startswith("experiments/scenario1/")
+    assert reference_inputs["retrieval_plan"].startswith(
+        "experiments/scenario1/"
+    )
+    assert len(reference_inputs["source_documents"]) == 3
+    assert all(
+        "Creative Commons" in document["license"]
+        for document in reference_inputs["source_documents"]
+    )
+
+
+def test_reference_snapshot_rejects_changed_derived_text(tmp_path: Path):
+    snapshot = json.loads(REFERENCE_SNAPSHOT.read_text(encoding="utf-8"))
+    snapshot["package"]["injection_text"] += " changed"
+    changed_snapshot = tmp_path / "changed_snapshot.json"
+    changed_snapshot.write_text(json.dumps(snapshot), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="injection_text no longer matches"):
+        load_lexical_package_snapshot(changed_snapshot)
+
+
+def test_clean_checkout_cli_rebuilds_committed_audit(tmp_path: Path):
+    out_json = tmp_path / "audit.json"
+    out_markdown = tmp_path / "audit.md"
+    subprocess.run(
+        [
+            sys.executable,
+            str(AUDIT_SCRIPT),
+            "--focus-registry",
+            str(FINANCE_REGISTRY),
+            "--focus-plan",
+            str(FINANCE_PLAN),
+            "--reference-snapshot",
+            str(REFERENCE_SNAPSHOT),
+            "--out-json",
+            str(out_json),
+            "--out-markdown",
+            str(out_markdown),
+        ],
+        cwd=PROJECT_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert out_json.read_text() == AUDIT_RESULT.read_text()
+    assert out_markdown.read_text() == AUDIT_MARKDOWN.read_text()
