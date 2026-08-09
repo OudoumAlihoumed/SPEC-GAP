@@ -9,7 +9,7 @@
   "method": {
     "payload_tokenization": "tokenizers.Tokenizer.from_file(...).encode(payload, add_special_tokens=False)",
     "runtime_rendering_path": "AutoTokenizer.apply_chat_template(..., tokenize=True) in src/infrastructure/modal_qwen_runner.py",
-    "document_context": "Sum of clean materialized selected-document characters divided by retrieval_trace.selected_token_count"
+    "document_context": "Sum both characters and tokenizer token counts over the exact selected clean source-chunk slices; retrieved-chunk headers and inter-chunk separators are excluded from both quantities"
   },
   "special_token_probe": {
     "embedded_markers": {
@@ -47,16 +47,16 @@
   },
   "selected_document_context": {
     "convex": {
-      "characters": 89872,
+      "characters": 86865,
       "tokens": 27813,
-      "characters_per_token": 3.231295,
-      "tokens_per_100_characters": 30.947347
+      "characters_per_token": 3.12318,
+      "tokens_per_100_characters": 32.01865
     },
     "macro": {
-      "characters": 113320,
+      "characters": 110725,
       "tokens": 27531,
-      "characters_per_token": 4.116087,
-      "tokens_per_100_characters": 24.294917
+      "characters_per_token": 4.02183,
+      "tokens_per_100_characters": 24.864303
     }
   },
   "preflight_input_token_delta": {
@@ -64,5 +64,5 @@
     "convex_thinking_on_injected_minus_clean": 72,
     "note": "The full insertion includes one leading newline in addition to the 71-token payload."
   },
-  "interpretation": "The Convex payload is not token-heavier per character than the Macro payload, but the selected Convex document context is token-heavier because of its mathematical texture. Payload-span and whole-prompt controls must use the corresponding ratio rather than treating character length as token length."
+  "interpretation": "The Convex payload is not token-heavier per character than the Macro payload, but the selected clean Convex source-chunk context is token-heavier because of its mathematical texture. Payload-span and whole-prompt controls must use the corresponding ratio rather than treating character length as token length."
 }

@@ -86,12 +86,14 @@ plain-text Macro payload is 352 characters and 69 tokens, or 5.101 characters
 per token. Thus the Convex payload itself is slightly **token-lighter** per
 character, not token-heavier.
 
-The surrounding selected document context shows the opposite pattern:
-Convex uses 30.947 tokens per 100 characters versus Macro's 24.295, consistent
+The surrounding selected clean source-chunk context shows the opposite pattern:
+Convex uses 32.019 tokens per 100 characters versus Macro's 24.864, consistent
 with the mathematical source texture producing a larger token footprint.
-Payload-span controls should use the payload ratios; whole-prompt controls
-should use the document-context ratios. Exact hashes, counts, marker IDs, and
-definitions are recorded in
+Characters and tokens are computed over the same source slices, excluding
+retrieval headers and inter-chunk separators from both quantities. Payload-span
+controls should use the payload ratios; whole-prompt controls should use the
+source-context ratios. Exact hashes, counts, marker IDs, and definitions are
+recorded in
 `fellow_packages/convex_open_access_v3/retrieval/token_footprint_audit_open_access_v3.json`.
 
 ## Output and action audit
@@ -125,6 +127,11 @@ That automated classification is not a substitute for the requested
 two-reviewer paraphrase-risk pass. The 3-hop injected thinking-on call and its
 clean comparators are prioritized in
 `results/scenario1/2026-08-09_convex_open_access_v3_tool_call_dual_review.json`.
+That packet points to a tracked, hash-bound compact evidence snapshot containing
+the exact executor reasoning, visible output, complete structured tool
+arguments, simulated actions, runtime IDs, and matched comparator needed for a
+clean-checkout review; the full raw trajectories remain untracked because they
+contain retrieved paper text.
 Both human review slots are currently pending, so paper-facing prose must not
 treat the generic injected call as definitively unrelated to the payload until
 the two reviews and any required adjudication are complete.
