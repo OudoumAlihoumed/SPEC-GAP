@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from src.infrastructure.qwen_modal import ACTIVATION_ARTIFACT_FORMAT
+from src.infrastructure.modal_billing import validate_analysis_tier
 from src.scenario1.generator import build_record
 from src.scenario1.validator import validate_payload
 
@@ -65,9 +66,11 @@ def build_live_batch(
     *,
     thinking_modes: Iterable[str] = THINKING_MODES,
     output_root: str | Path,
+    analysis_tier: str = "exploratory",
 ) -> list[dict[str, Any]]:
     """Return the deterministic live-run plan for the supplied registries."""
 
+    analysis_tier = validate_analysis_tier(analysis_tier)
     modes = list(thinking_modes)
     if not modes or len(modes) != len(set(modes)):
         raise ValueError("thinking modes must be a non-empty unique list")
@@ -88,10 +91,17 @@ def build_live_batch(
                 items.append({
                     "trajectory_id": live_id,
                     "thinking_mode": mode,
+                    "analysis_tier": analysis_tier,
                     "condition_id": condition["condition_id"],
                     "treatment": condition["treatment"],
                     "structural_record": structural,
-                    "output_path": root / "live" / mode / f"{live_id}.json",
+                    "output_path": (
+                        root
+                        / "live"
+                        / analysis_tier
+                        / mode
+                        / f"{live_id}.json"
+                    ),
                 })
     return items
 
@@ -126,6 +136,15 @@ def load_completed_batch_item(item: dict[str, Any]) -> dict[str, Any] | None:
         raise ValueError(f"cannot resume from {path}: record is not a real model run")
     if record.get("model", {}).get("thinking_mode") != item["thinking_mode"]:
         raise ValueError(f"cannot resume from {path}: thinking mode does not match")
+    turn_tiers = {
+        event.get("model_execution_metadata", {}).get("analysis_tier")
+        for event in record["trajectory_trace"]["full_events"]
+        if event.get("type") == "agent_turn"
+    }
+    if turn_tiers != {item["analysis_tier"]}:
+        raise ValueError(
+            f"cannot resume from {path}: analysis tier does not match"
+        )
     if not has_current_activation_format(record):
         return None
     return record

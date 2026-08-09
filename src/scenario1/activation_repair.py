@@ -15,6 +15,7 @@ from pathlib import Path, PurePosixPath
 import re
 from typing import Any, Iterable
 
+from src.infrastructure.modal_billing import ANALYSIS_TIERS
 from src.infrastructure.modal_costs import validate_gpu_cost_record
 from src.infrastructure.qwen_modal import (
     ACTIVATION_ARTIFACT_FORMAT,
@@ -111,6 +112,7 @@ def build_activation_repair_request(
         "step_index": result["step_index"],
         "agent_id": result["agent_id"],
         "thinking_mode": result["thinking_mode"],
+        "analysis_tier": result["analysis_tier"],
         "model_revision": result["model_revision"],
         "input_token_ids": list(result["input_token_ids"]),
         "input_token_ids_sha256": token_ids_sha256(result["input_token_ids"]),
@@ -154,6 +156,11 @@ def validate_activation_repair_request(payload: Any) -> dict[str, Any]:
     mode = request.get("thinking_mode")
     if mode not in {"off", "on"}:
         raise RequestValidationError("thinking_mode must be 'off' or 'on'")
+    analysis_tier = request.get("analysis_tier")
+    if analysis_tier is not None and analysis_tier not in ANALYSIS_TIERS:
+        raise RequestValidationError(
+            f"analysis_tier must be one of {sorted(ANALYSIS_TIERS)}"
+        )
     step_index = request.get("step_index")
     if (
         not isinstance(step_index, int)
@@ -180,8 +187,11 @@ def validate_activation_repair_request(payload: Any) -> dict[str, Any]:
         ):
             raise RequestValidationError(f"{field} must be a SHA-256 digest")
 
+    path_parts = ["activations"]
+    if analysis_tier is not None:
+        path_parts.append(analysis_tier)
     expected_path = PurePosixPath(
-        "activations",
+        *path_parts,
         request["trajectory_id"],
         mode,
         f"step_{step_index:03d}.pt",
@@ -344,12 +354,12 @@ def build_activation_repair_plan(
     saved_root = Path(checkpoint_root)
     from src.scenario1.validator import validate_payload
 
-    live_paths = sorted(live_root.glob("*/*.json"))
+    live_paths = sorted(live_root.rglob("*.json"))
     if not live_paths:
         raise ValueError(f"No live trajectory JSON files found under {live_root}.")
 
     plan = []
-    seen: set[tuple[str, int]] = set()
+    seen: set[tuple[str, str, int]] = set()
     for live_path in live_paths:
         record = _load_json_object(live_path, "live trajectory")
         errors = validate_payload(record)
@@ -364,14 +374,30 @@ def build_activation_repair_plan(
             for event in record["trajectory_trace"]["full_events"]
             if event.get("type") == "agent_turn"
         ]
+        turn_tiers = {
+            event.get("model_execution_metadata", {}).get("analysis_tier")
+            for event in turns
+        }
+        if len(turn_tiers) != 1:
+            raise ValueError(
+                f"Live trajectory {live_path} mixes analysis tiers."
+            )
+        analysis_tier = next(iter(turn_tiers))
+        checkpoint_base = saved_root
+        if analysis_tier is not None:
+            checkpoint_base /= str(analysis_tier)
         for event in turns:
             step_index = int(event["step_index"])
-            key = (trajectory_id, step_index)
+            key = (
+                str(analysis_tier or "unclassified"),
+                trajectory_id,
+                step_index,
+            )
             if key in seen:
                 raise ValueError(f"Duplicate repair-plan key {key!r}.")
             seen.add(key)
             checkpoint_path = (
-                saved_root
+                checkpoint_base
                 / trajectory_id
                 / mode
                 / f"step_{step_index:03d}.json"
@@ -407,6 +433,7 @@ def build_activation_repair_plan(
                 "step_index": step_index,
                 "agent_id": event["agent_id"],
                 "thinking_mode": mode,
+                "analysis_tier": analysis_tier or "unclassified",
                 "matched_pair_id": record["matched_pair_id"],
                 "treatment": record["treatment"],
                 "status": status,
@@ -417,6 +444,7 @@ def build_activation_repair_plan(
     return sorted(
         plan,
         key=lambda item: (
+            item["analysis_tier"],
             item["thinking_mode"],
             item["matched_pair_id"],
             item["treatment"],
@@ -709,6 +737,8 @@ def validate_activation_repair_result(
         or cost["token_usage"]["generated_tokens"] != 0
         or cost.get("runtime_metadata", {}).get("operation")
         != ACTIVATION_REPAIR_METHOD
+        or cost.get("runtime_metadata", {}).get("analysis_tier")
+        != normalized_request.get("analysis_tier")
     ):
         raise ValueError("repair cost metadata is inconsistent")
     result["cost_metadata"] = cost

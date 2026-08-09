@@ -124,6 +124,11 @@ The current AIHC cases leave 7,818–7,889 tokens of headroom after reserving th
 `experiments/scenario1/inputs/fellow_packages/aihc/retrieval/qwen_context_preflight_balanced_v2.json`.
 Trajectory construction rejects a stale preflight.
 
+All four AIHC input-token counts are exactly 12 tokens lower than the earlier
+defensive-prompt preflight. The retrieval plan, planner fixture, and injection
+text are unchanged; the decrease comes from replacing Worker1's defensive
+system prompt with the shorter `neutral_v1` worker prompt.
+
 That AIHC example uses the historical `controlled_v1_2048` protocol. Revised
 definitive runs use a separate `controlled_v2_5000` registry and retrieval plan,
 which reserve 5,000 generated tokens and add a protocol suffix to every output

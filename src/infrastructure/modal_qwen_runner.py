@@ -8,6 +8,7 @@ Modal compute. A paid H200 run requires the explicit confirmation string
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import json
 import os
 import time
@@ -24,11 +25,15 @@ from src.infrastructure.qwen_modal import (
     build_activation_checkpoint_plan,
     build_generation_result,
     build_injection_token_alignment,
+    initialize_torch_sampling_rng,
     split_thinking_text,
     validate_context_window,
     validate_generation_request,
 )
-from src.infrastructure.modal_billing import BASE_BILLING_TAGS
+from src.infrastructure.modal_billing import (
+    BASE_BILLING_TAGS,
+    validate_analysis_tier,
+)
 from src.infrastructure.modal_costs import (
     build_gpu_cost_record,
     build_token_usage,
@@ -424,6 +429,7 @@ class Qwen3Runner:
                 "app_name": APP_NAME,
                 "model_name": MODEL_ID,
                 "model_revision": self.model_metadata["resolved_revision"],
+                "analysis_tier": request.get("analysis_tier"),
                 "modal_environment": os.getenv("MODAL_ENVIRONMENT"),
                 "modal_cloud_provider": os.getenv("MODAL_CLOUD_PROVIDER"),
                 "modal_region": os.getenv("MODAL_REGION"),
@@ -467,8 +473,7 @@ class Qwen3Runner:
                 f"loaded revision is {resolved_revision!r}"
             )
 
-        torch.manual_seed(settings["seed"])
-        torch.cuda.manual_seed_all(settings["seed"])
+        initialize_torch_sampling_rng(torch, settings["seed"])
 
         template_kwargs = {
             "conversation": request["messages"],
@@ -716,6 +721,16 @@ class Qwen3Runner:
                 "app_name": APP_NAME,
                 "model_name": MODEL_ID,
                 "model_revision": self.model_metadata["resolved_revision"],
+                "analysis_tier": request["analysis_tier"],
+                "torch_version": str(torch.__version__),
+                "transformers_version": importlib.metadata.version(
+                    "transformers"
+                ),
+                "cuda_version": str(torch.version.cuda),
+                "cuda_device_name": torch.cuda.get_device_name(0),
+                "deterministic_algorithms_enabled": (
+                    torch.are_deterministic_algorithms_enabled()
+                ),
                 "modal_environment": os.getenv("MODAL_ENVIRONMENT"),
                 "modal_cloud_provider": os.getenv("MODAL_CLOUD_PROVIDER"),
                 "modal_region": os.getenv("MODAL_REGION"),
@@ -752,10 +767,13 @@ def main(
     output_path: str = "",
     model_revision: str = MODEL_REVISION,
     confirm_paid_run: str = "",
+    analysis_tier: str = "exploratory",
 ) -> None:
     """Validate by default; remote download and H200 execution are explicit."""
 
+    analysis_tier = validate_analysis_tier(analysis_tier)
     payload = json.loads(Path(request_path).read_text())
+    payload["analysis_tier"] = analysis_tier
     request = validate_generation_request(payload)
 
     if action == "validate":
@@ -772,6 +790,11 @@ def main(
             "H200 execution requires --confirm-paid-run RUN_H200"
         )
 
+    app.set_tags({
+        **BASE_BILLING_TAGS,
+        "run_kind": "single_model_turn",
+        "analysis_tier": analysis_tier,
+    })
     result = Qwen3Runner().generate_agent_turn.remote(request)
     rendered = json.dumps(result, indent=2) + "\n"
     if output_path:

@@ -11,6 +11,10 @@ import sys
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.infrastructure.modal_billing import (  # noqa: E402
+    ANALYSIS_TIERS,
+    BASE_BILLING_TAGS,
+)
 from src.infrastructure.modal_qwen_runner import Qwen3Runner, app  # noqa: E402
 from src.scenario1.activation_repair import (  # noqa: E402
     apply_activation_repair_result,
@@ -143,6 +147,17 @@ def repair_prompt_activations(
     if not selected:
         print("Nothing to repair in the selected scope.", flush=True)
         return
+
+    selected_tiers = {item["analysis_tier"] for item in selected}
+    if len(selected_tiers) != 1:
+        raise ValueError("one repair run cannot mix analysis tiers")
+    selected_tier = next(iter(selected_tiers))
+    if selected_tier in ANALYSIS_TIERS:
+        app.set_tags({
+            **BASE_BILLING_TAGS,
+            "run_kind": "activation_repair",
+            "analysis_tier": selected_tier,
+        })
 
     runner = Qwen3Runner()
     summaries = []
