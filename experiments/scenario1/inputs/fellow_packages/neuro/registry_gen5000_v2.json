@@ -105,6 +105,22 @@
     "source_handoff": "neuro_trajectory.json",
     "source_drive_folder": "scenario_1_and_7 2",
     "source_handoff_sha256": "15bf44bfd796832f912aca31cbf13fbd0d8b173013bffb2001f59ec0b5c37c87",
+    "registry_resolution": {
+      "authoritative_runtime_registry": "fellow_packages/neuro/registry_gen5000_v2.json",
+      "runtime_document_ids": [
+        "neuro_doc1",
+        "neuro_doc2",
+        "neuro_doc3"
+      ],
+      "authoritative_carrier_doc_id": "neuro_doc1",
+      "carrier_proof": "The source handoff, runtime registry, retrieval plan, and selected carrier chunk neuro_doc1__p012__c002 all identify neuro_doc1.",
+      "source_handoff_role": "neuro_trajectory.json is the checksummed source handoff used to construct this package; it is not loaded as a second runtime registry.",
+      "legacy_synthetic_registry": {
+        "path": "experiments/scenario1/inputs/domain_neuroscience.json",
+        "status": "obsolete_unmerged_draft_not_present_or_used_by_controlled_v2_5000",
+        "id_note": "Its synthetic neuro_doc_03 is not the publication-backed neuro_doc3 and does not identify the v2 carrier."
+      }
+    },
     "normalization_notes": [
       "Generation protocol controlled_v2_5000 changes only max_new_tokens from 2048 to 5000 and preserves the v1 sampler, prompts, retrieval query, model revision, seed, selected chunks, and render order."
     ],
@@ -119,7 +135,8 @@
         "doc_id": "neuro_doc1",
         "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11536028/",
         "doi": "10.1016/j.ebiom.2024.105405",
-        "license": "CC BY 4.0"
+        "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/"
       },
       {
         "doc_id": "neuro_doc2",
@@ -132,9 +149,13 @@
         "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12590577/",
         "doi": "10.1002/alz.70828",
         "license": "Creative Commons Attribution-NonCommercial-NoDerivs License",
-        "usage_note": "Keep the document unchanged and restrict reuse to non-commercial research under the source license."
+        "usage_note": "Keep the document unchanged and restrict reuse to non-commercial research under the source license.",
+        "repository_license_boundary": "This third-party document remains under its source license and is not relicensed under the repository's MIT License.",
+        "redistribution_decision": "Retained as an attributed, unchanged-content plain-text format shift for non-commercial research; the injection carrier is neuro_doc1, not this NoDerivatives work."
       }
     ],
+    "package_license_notice": "fellow_packages/neuro/README.md",
+    "carrier_neighborhood_audit": "fellow_packages/neuro/retrieval/carrier_neighborhood_gen5000_v2.json",
     "pair_audit": {
       "extraction_command": "pdftotext -raw",
       "raw_text_difference": "One 291-character insertion plus the page-break newline introduced at the insertion point.",
