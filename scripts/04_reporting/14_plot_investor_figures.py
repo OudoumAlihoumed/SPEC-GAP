@@ -24,10 +24,8 @@ from src.analysis.figure_export import (  # noqa: E402
 from src.analysis.reporting_snapshot import load_reporting_snapshot  # noqa: E402
 
 
-OUTPUT_DIR = ROOT / "docs" / "assets"
-SNAPSHOT_PATH = (
-    ROOT / "docs" / "data" / "scenario1" / "reporting_snapshot.json"
-)
+OUTPUT_DIR = ROOT / "results" / "presentation"
+SNAPSHOT_PATH = ROOT / "results" / "scenario1" / "reporting_snapshot.json"
 FORMATS = ("png", "svg", "pdf")
 
 NAVY = "#102A43"
@@ -228,10 +226,9 @@ def runway_to_live_figure(snapshot: dict[str, Any] | None = None) -> plt.Figure:
 
     snapshot = snapshot or load_reporting_snapshot(SNAPSHOT_PATH)
     sample = snapshot["sample"]
-    layer_count = len({
-        int(row["layer"])
-        for row in snapshot["all_layer_result"]["depth_metrics"]
-    })
+    layer_count = len(
+        {int(row["layer"]) for row in snapshot["all_layer_result"]["depth_metrics"]}
+    )
 
     figure, axis = _canvas(
         "From Runway signal testing to live exploit-chain evaluation",

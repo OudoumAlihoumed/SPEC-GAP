@@ -10,9 +10,7 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-REPORTING_SNAPSHOT = (
-    PROJECT_ROOT / "docs/data/scenario1/reporting_snapshot.json"
-)
+REPORTING_SNAPSHOT = PROJECT_ROOT / "results/scenario1/reporting_snapshot.json"
 REPORTING_STAGES = (
     (
         PROJECT_ROOT / "scripts/03_probe_analysis/12_plot_probe_analysis.py",

@@ -7,9 +7,7 @@ import runpy
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_PATH = (
-    PROJECT_ROOT / "scripts/04_reporting/15_build_reporting_bundle.py"
-)
+SCRIPT_PATH = PROJECT_ROOT / "scripts/04_reporting/15_build_reporting_bundle.py"
 
 
 def _script_namespace() -> dict:
@@ -29,7 +27,7 @@ def test_reporting_commands_follow_data_dependencies():
     assert all(command[0] == "python-test" for command in commands)
     assert commands[0][2:] == (
         "--snapshot-input",
-        str(PROJECT_ROOT / "docs/data/scenario1/reporting_snapshot.json"),
+        str(PROJECT_ROOT / "results/scenario1/reporting_snapshot.json"),
     )
 
 
@@ -63,3 +61,20 @@ def test_public_figure_scripts_normalize_svg_whitespace(tmp_path):
         namespace["_normalize_svg"](svg)
 
         assert svg.read_text(encoding="utf-8") == "<svg>\n  <path />\n</svg>\n"
+
+
+def test_public_and_presentation_figures_use_separate_output_directories():
+    pipeline = runpy.run_path(
+        PROJECT_ROOT / "scripts/04_reporting/13_plot_pipeline_overview.py",
+        run_name="spec_gap_pipeline_output",
+    )
+    presentation = runpy.run_path(
+        PROJECT_ROOT / "scripts/04_reporting/14_plot_investor_figures.py",
+        run_name="spec_gap_presentation_output",
+    )
+
+    assert pipeline["OUTPUT_DIR"] == PROJECT_ROOT / "docs" / "assets"
+    assert presentation["OUTPUT_DIR"] == PROJECT_ROOT / "results" / "presentation"
+    assert presentation["SNAPSHOT_PATH"] == (
+        PROJECT_ROOT / "results" / "scenario1" / "reporting_snapshot.json"
+    )

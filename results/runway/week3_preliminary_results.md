@@ -58,7 +58,7 @@ The supported conclusion is narrow: the runway found a modest in-distribution co
 
 ### Reproducibility note
 
-A local Weeks 1–2 rerun exposed that the original PCA step did not receive an explicit `random_state`. The implementation now propagates the experiment seed into PCA, and repeated local reruns are byte-identical after excluding the generation timestamp. Some layer-level values move under the seeded rerun; for example, layer-16 LSO mean AUROC is 0.630 rather than the Colab run's 0.585. The qualitative conclusion remains weak and high-variance, but the Colab table above should be treated as the historical run rather than silently mixed with the seeded rerun. The deterministic comparison is stored in `reports/week1_week2_baseline_comparison.json`.
+A local Weeks 1–2 rerun exposed that the original PCA step did not receive an explicit `random_state`. The implementation now propagates the experiment seed into PCA, and repeated local reruns are byte-identical after excluding the generation timestamp. Some layer-level values move under the seeded rerun; for example, layer-16 LSO mean AUROC is 0.630 rather than the Colab run's 0.585. The qualitative conclusion remains weak and high-variance, but the Colab table above should be treated as the historical run rather than silently mixed with the seeded rerun. The deterministic comparison is stored in `results/runway/week1_week2_baseline_comparison.json`.
 
 ## Fellowship status at Week 3
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+import runpy
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +35,70 @@ def test_root_readme_is_the_only_readme() -> None:
         and not {".git", ".pytest_cache", ".venv"}.intersection(path.parts)
     )
     assert readmes == ["README.md"]
+
+
+def test_root_readme_stays_a_concise_canonical_landing_page() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert len(readme.splitlines()) <= 240
+    for heading in (
+        "## Current status",
+        "## Quick start",
+        "## Repository structure",
+        "## Results and claim boundary",
+        "## Reference guides",
+    ):
+        assert heading in readme
+    assert "docs/data/" not in readme
+    assert "results/scenario1/reporting_snapshot.json" in readme
+
+    local_links = (
+        target.split("#", maxsplit=1)[0]
+        for target in re.findall(r"\]\(([^)]+)\)", readme)
+        if not target.startswith(("http://", "https://", "#"))
+    )
+    assert all((ROOT / target).exists() for target in local_links)
+
+
+def test_generated_and_historical_outputs_use_results_directories() -> None:
+    assert not (ROOT / "reports").exists()
+    assert not (ROOT / "data" / ".gitkeep").exists()
+    assert (ROOT / "results/runway/week1_week2_baseline_comparison.json").is_file()
+    assert (ROOT / "results/scenario1/reporting_snapshot.json").is_file()
+
+    presentation = ROOT / "results" / "presentation"
+    assert {path.name for path in presentation.iterdir()} == {
+        f"{stem}.{suffix}"
+        for stem in (
+            "investor_behavioral_boundary",
+            "investor_primary_metrics",
+            "investor_runway_to_live",
+        )
+        for suffix in ("pdf", "png", "svg")
+    }
+    assert not list((ROOT / "docs" / "assets").glob("investor_*"))
+
+    historical_notebook = json.loads(
+        (ROOT / "notebooks" / "03_analysis.ipynb").read_text(encoding="utf-8")
+    )
+    notebook_source = "".join(
+        line for cell in historical_notebook["cells"] for line in cell.get("source", [])
+    )
+    assert 'os.makedirs("reports"' not in notebook_source
+    assert 'os.makedirs("results/runway"' in notebook_source
+
+    runway_scripts = {
+        "93_run_baselines.py": "week1_week2_baseline_comparison.json",
+        "94_run_lat_baseline.py": "week1_week2_lat_baseline_results.json",
+    }
+    for script_name, output_name in runway_scripts.items():
+        namespace = runpy.run_path(
+            ROOT / "scripts" / "90_runway_reproduction" / script_name,
+            run_name=f"spec_gap_{script_name}",
+        )
+        assert namespace["DEFAULT_OUTPUT_PATH"] == (
+            ROOT / "results" / "runway" / output_name
+        )
 
 
 def test_renamed_text_files_explain_identity_date_and_purpose() -> None:

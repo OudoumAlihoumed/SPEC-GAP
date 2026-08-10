@@ -73,7 +73,7 @@ def main() -> None:
     parser.add_argument(
         "--snapshot-output",
         type=Path,
-        default=(PROJECT_ROOT / "docs/data/scenario1/reporting_snapshot.json"),
+        default=(PROJECT_ROOT / "results/scenario1/reporting_snapshot.json"),
         help="Compact public snapshot written when raw analysis outputs are used.",
     )
     parser.add_argument(

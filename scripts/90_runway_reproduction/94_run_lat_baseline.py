@@ -16,17 +16,27 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_OUTPUT_PATH = (
+    PROJECT_ROOT / "results" / "runway" / "week1_week2_lat_baseline_results.json"
+)
+
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.analysis.runway_artifacts import (  # noqa: E402
     find_artifact_root,
     load_runway_artifacts,
 )
-from src.probes.lat_baseline import evaluate_lat_all_layers, lat_results_to_dict
+from src.probes.lat_baseline import (  # noqa: E402
+    evaluate_lat_all_layers,
+    lat_results_to_dict,
+)
 
 
-def run_lat_baseline(artifact_root: Path | None = None, output_path: Path | None = None) -> dict:
-    repo_root = Path(__file__).resolve().parents[2]
+def run_lat_baseline(
+    artifact_root: Path | None = None, output_path: Path | None = None
+) -> dict:
+    repo_root = PROJECT_ROOT
     artifact_root = artifact_root or find_artifact_root(repo_root)
     activations, labels, scenario_ids = load_runway_artifacts(artifact_root)
 
@@ -59,12 +69,15 @@ def run_lat_baseline(artifact_root: Path | None = None, output_path: Path | None
     }
 
     if output_path is None:
-        output_path = repo_root / "reports" / "week1_week2_lat_baseline_results.json"
+        output_path = DEFAULT_OUTPUT_PATH
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(output, indent=2))
     print(f"LAT baseline results saved to {output_path}")
 
-    best_layer = max(output["stratified_cv"], key=lambda layer: output["stratified_cv"][layer]["auroc_mean"])
+    best_layer = max(
+        output["stratified_cv"],
+        key=lambda layer: output["stratified_cv"][layer]["auroc_mean"],
+    )
     best = output["stratified_cv"][best_layer]
     print(
         f"Best stratified LAT layer: {best_layer} "
