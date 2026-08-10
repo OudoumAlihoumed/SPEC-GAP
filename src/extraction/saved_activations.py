@@ -18,10 +18,12 @@ import numpy as np
 import torch
 from torch import Tensor
 
+from src.infrastructure.modal_billing import ANALYSIS_TIERS, validate_analysis_tier
 from src.infrastructure.qwen_modal import ACTIVATION_ARTIFACT_FORMAT
 
 
-ACTIVATION_INDEX_SCHEMA = "spec_gap.activation_index.v2"
+ACTIVATION_INDEX_SCHEMA = "spec_gap.activation_index.v3"
+ACTIVATION_INDEX_ANALYSIS_TIERS = frozenset({*ANALYSIS_TIERS, "unclassified"})
 CHECKPOINT_NAMES = {
     "last_input_token",
     "last_reasoning_token",
@@ -58,7 +60,9 @@ def load_trajectory_records(paths: Iterable[str | Path]) -> list[dict[str, Any]]
     """Load trajectory JSON objects in deterministic path order."""
 
     records: list[dict[str, Any]] = []
-    for path in sorted((Path(path) for path in paths), key=lambda item: item.as_posix()):
+    for path in sorted(
+        (Path(path) for path in paths), key=lambda item: item.as_posix()
+    ):
         try:
             payload = json.loads(path.read_text())
         except (OSError, json.JSONDecodeError) as error:
@@ -71,9 +75,63 @@ def load_trajectory_records(paths: Iterable[str | Path]) -> list[dict[str, Any]]
     return records
 
 
+def normalize_index_analysis_tier(value: str) -> str:
+    """Return one explicit tier accepted by activation-analysis artifacts."""
+
+    if value == "unclassified":
+        return value
+    return validate_analysis_tier(value)
+
+
+def trajectory_analysis_tier(record: dict[str, Any]) -> str:
+    """Return the one tier recorded across a trajectory's model turns.
+
+    Historical trajectories predate tier tagging and are explicitly classified
+    as ``unclassified``. A record with mixed or invalid turn metadata fails
+    closed so downstream activation analysis cannot silently combine tiers.
+    """
+
+    trajectory_id = str(record.get("trajectory_id") or "<unknown>")
+    trace = record.get("trajectory_trace")
+    events = trace.get("full_events", []) if isinstance(trace, dict) else []
+    turns = [
+        event
+        for event in events
+        if isinstance(event, dict) and event.get("type") == "agent_turn"
+    ]
+    if not turns:
+        raise ValueError(f"Trajectory {trajectory_id!r} has no agent turns.")
+
+    tiers: set[str] = set()
+    for turn in turns:
+        metadata = turn.get("model_execution_metadata")
+        raw_tier = metadata.get("analysis_tier") if isinstance(metadata, dict) else None
+        tiers.add(
+            "unclassified"
+            if raw_tier is None
+            else normalize_index_analysis_tier(raw_tier)
+        )
+    if len(tiers) != 1:
+        raise ValueError(f"Trajectory {trajectory_id!r} mixes analysis tiers.")
+    return next(iter(tiers))
+
+
+def trajectory_paths_for_analysis_tier(
+    trajectory_root: str | Path,
+    analysis_tier: str,
+) -> list[Path]:
+    """Select only the storage namespace belonging to one explicit tier."""
+
+    root = Path(trajectory_root)
+    tier = normalize_index_analysis_tier(analysis_tier)
+    pattern = "*/*.json" if tier == "unclassified" else f"{tier}/*/*.json"
+    return sorted(root.glob(pattern))
+
+
 def build_activation_index(
     records: Iterable[dict[str, Any]],
     *,
+    analysis_tier: str,
     artifact_root: str | Path,
     require_local: bool = False,
     verify_checksums: bool = False,
@@ -85,11 +143,18 @@ def build_activation_index(
     paths already begin with ``activations/``.
     """
 
+    expected_tier = normalize_index_analysis_tier(analysis_tier)
     root = Path(artifact_root).resolve()
     rows: list[dict[str, Any]] = []
-    seen: set[tuple[str, int, str]] = set()
+    seen: set[tuple[str, str, int, str]] = set()
     for record in records:
         trajectory_id = _required_string(record, "trajectory_id")
+        record_tier = trajectory_analysis_tier(record)
+        if record_tier != expected_tier:
+            raise ValueError(
+                f"Trajectory {trajectory_id!r} has analysis tier {record_tier!r}; "
+                f"expected {expected_tier!r}."
+            )
         model = _required_mapping(record, "model", trajectory_id)
         labels = _required_mapping(record, "evaluation_labels", trajectory_id)
         action_channel = _required_mapping(labels, "action_channel", trajectory_id)
@@ -106,9 +171,7 @@ def build_activation_index(
             raise ValueError(f"Trajectory {trajectory_id!r} has no agent turns.")
 
         for turn in turns:
-            activation = _required_mapping(
-                turn, "activation_metadata", trajectory_id
-            )
+            activation = _required_mapping(turn, "activation_metadata", trajectory_id)
             if activation.get("storage_status") != "materialized":
                 raise ValueError(
                     f"Trajectory {trajectory_id!r} step {turn.get('step_index')} "
@@ -134,8 +197,10 @@ def build_activation_index(
                 _verify_checksum(local_path, checksum)
 
             layers = activation.get("layers_extracted")
-            if not isinstance(layers, list) or not layers or not all(
-                isinstance(layer, int) for layer in layers
+            if (
+                not isinstance(layers, list)
+                or not layers
+                or not all(isinstance(layer, int) for layer in layers)
             ):
                 raise ValueError(
                     f"Trajectory {trajectory_id!r} step {turn.get('step_index')} "
@@ -173,9 +238,7 @@ def build_activation_index(
                     f"Trajectory {trajectory_id!r} step {turn.get('step_index')} "
                     "must contain output metadata."
                 )
-            rendered_prompt_hash = _required_string(
-                turn_input, "rendered_prompt_hash"
-            )
+            rendered_prompt_hash = _required_string(turn_input, "rendered_prompt_hash")
             input_token_ids = _required_token_ids(
                 turn_input,
                 "input_token_ids",
@@ -194,7 +257,9 @@ def build_activation_index(
                     raise ValueError("checkpoint_positions entries must be objects.")
                 checkpoint = _required_string(checkpoint_metadata, "name")
                 if checkpoint not in CHECKPOINT_NAMES:
-                    raise ValueError(f"Unsupported activation checkpoint {checkpoint!r}.")
+                    raise ValueError(
+                        f"Unsupported activation checkpoint {checkpoint!r}."
+                    )
                 shape = shapes.get(checkpoint)
                 if (
                     not isinstance(shape, list)
@@ -206,71 +271,82 @@ def build_activation_index(
                         f"Invalid shape for {trajectory_id!r} step "
                         f"{turn.get('step_index')} checkpoint {checkpoint!r}."
                     )
-                key = (trajectory_id, int(turn["step_index"]), checkpoint)
+                key = (
+                    record_tier,
+                    trajectory_id,
+                    int(turn["step_index"]),
+                    checkpoint,
+                )
                 if key in seen:
                     raise ValueError(f"Duplicate activation-index key {key!r}.")
                 seen.add(key)
-                rows.append({
-                    "schema_version": ACTIVATION_INDEX_SCHEMA,
-                    "trajectory_id": trajectory_id,
-                    "step_index": int(turn["step_index"]),
-                    "agent_id": _required_string(turn, "agent_id"),
-                    "agent_role": _required_string(turn, "agent_role"),
-                    "hop_index": int(turn["hop_index"]),
-                    "model_name": _required_string(model, "model_name"),
-                    "model_revision": _required_string(model, "model_revision"),
-                    "thinking_mode": _required_string(model, "thinking_mode"),
-                    "delegation_depth": _required_string(record, "delegation_depth"),
-                    "treatment": _required_string(record, "treatment"),
-                    "match_group_id": _required_string(
-                        record, "independence_group_id"
-                    ),
-                    "matched_pair_id": _required_string(record, "matched_pair_id"),
-                    "domain_id": _required_string(record, "domain_id"),
-                    "task_family_id": _required_string(record, "task_family_id"),
-                    "document_set_id": _required_string(record, "document_set_id"),
-                    "outcome_class": _required_string(labels, "outcome_class"),
-                    "rendered_prompt_hash": rendered_prompt_hash,
-                    "input_token_count": len(input_token_ids),
-                    "input_token_ids_sha256": _token_ids_sha256(input_token_ids),
-                    "generated_token_count": len(generated_token_ids),
-                    "generated_token_ids_sha256": _token_ids_sha256(
-                        generated_token_ids
-                    ),
-                    "finish_reason": turn_output.get("finish_reason"),
-                    "generation_truncated": turn_output.get("truncated"),
-                    "thinking_complete": turn_output.get("thinking_complete"),
-                    "labels": {
-                        "injection_present": _binary_or_none(
-                            labels.get("injection_present"),
-                            field="injection_present",
+                rows.append(
+                    {
+                        "schema_version": ACTIVATION_INDEX_SCHEMA,
+                        "analysis_tier": record_tier,
+                        "trajectory_id": trajectory_id,
+                        "step_index": int(turn["step_index"]),
+                        "agent_id": _required_string(turn, "agent_id"),
+                        "agent_role": _required_string(turn, "agent_role"),
+                        "hop_index": int(turn["hop_index"]),
+                        "model_name": _required_string(model, "model_name"),
+                        "model_revision": _required_string(model, "model_revision"),
+                        "thinking_mode": _required_string(model, "thinking_mode"),
+                        "delegation_depth": _required_string(
+                            record, "delegation_depth"
                         ),
-                        "unsafe_action_executed": _binary_or_none(
-                            action_channel.get("unsafe_action_executed"),
-                            field="unsafe_action_executed",
+                        "treatment": _required_string(record, "treatment"),
+                        "match_group_id": _required_string(
+                            record, "independence_group_id"
                         ),
-                        "output_adoption": _binary_or_none(
-                            behavioral_channel.get("output_adoption"),
-                            field="output_adoption",
+                        "matched_pair_id": _required_string(record, "matched_pair_id"),
+                        "domain_id": _required_string(record, "domain_id"),
+                        "task_family_id": _required_string(record, "task_family_id"),
+                        "document_set_id": _required_string(record, "document_set_id"),
+                        "outcome_class": _required_string(labels, "outcome_class"),
+                        "rendered_prompt_hash": rendered_prompt_hash,
+                        "input_token_count": len(input_token_ids),
+                        "input_token_ids_sha256": _token_ids_sha256(input_token_ids),
+                        "generated_token_count": len(generated_token_ids),
+                        "generated_token_ids_sha256": _token_ids_sha256(
+                            generated_token_ids
                         ),
-                    },
-                    "checkpoint": checkpoint,
-                    "checkpoint_forward_scope": forward_scopes.get(checkpoint),
-                    "checkpoint_position": dict(checkpoint_metadata),
-                    "layers": list(layers),
-                    "shape": list(shape),
-                    "dtype": activation.get("layer_metadata", {}).get("dtype"),
-                    "artifact_format_version": activation.get(
-                        "artifact_format_version"
-                    ),
-                    "remote_storage_path": storage_path,
-                    "local_path": local_path.as_posix(),
-                    "local_available": local_available,
-                    "checksum_sha256": checksum,
-                })
+                        "finish_reason": turn_output.get("finish_reason"),
+                        "generation_truncated": turn_output.get("truncated"),
+                        "thinking_complete": turn_output.get("thinking_complete"),
+                        "labels": {
+                            "injection_present": _binary_or_none(
+                                labels.get("injection_present"),
+                                field="injection_present",
+                            ),
+                            "unsafe_action_executed": _binary_or_none(
+                                action_channel.get("unsafe_action_executed"),
+                                field="unsafe_action_executed",
+                            ),
+                            "output_adoption": _binary_or_none(
+                                behavioral_channel.get("output_adoption"),
+                                field="output_adoption",
+                            ),
+                        },
+                        "checkpoint": checkpoint,
+                        "checkpoint_forward_scope": forward_scopes.get(checkpoint),
+                        "checkpoint_position": dict(checkpoint_metadata),
+                        "layers": list(layers),
+                        "shape": list(shape),
+                        "dtype": activation.get("layer_metadata", {}).get("dtype"),
+                        "artifact_format_version": activation.get(
+                            "artifact_format_version"
+                        ),
+                        "remote_storage_path": storage_path,
+                        "local_path": local_path.as_posix(),
+                        "local_available": local_available,
+                        "checksum_sha256": checksum,
+                    }
+                )
     return sorted(
         rows,
         key=lambda row: (
+            row["analysis_tier"],
             row["thinking_mode"],
             row["match_group_id"],
             row["delegation_depth"],
@@ -309,9 +385,18 @@ def load_activation_index(path: str | Path) -> list[dict[str, Any]]:
                 raise ValueError(
                     f"Unsupported activation index schema on line {line_number}."
                 )
+            try:
+                normalize_index_analysis_tier(row.get("analysis_tier"))
+            except ValueError as error:
+                raise ValueError(
+                    f"Invalid analysis tier on line {line_number} of {path}."
+                ) from error
             rows.append(row)
     if not rows:
         raise ValueError("Activation index contains no rows.")
+    tiers = {row["analysis_tier"] for row in rows}
+    if len(tiers) != 1:
+        raise ValueError("Activation index must contain exactly one analysis tier.")
     return rows
 
 
@@ -323,6 +408,7 @@ def filter_activation_index(
     agent_id: str | None = None,
     checkpoint: str | None = None,
     delegation_depth: str | None = None,
+    analysis_tier: str | None = None,
 ) -> list[dict[str, Any]]:
     """Select a homogeneous probe cohort using explicit metadata fields."""
 
@@ -332,11 +418,15 @@ def filter_activation_index(
         "agent_id": agent_id,
         "checkpoint": checkpoint,
         "delegation_depth": delegation_depth,
+        "analysis_tier": analysis_tier,
     }
     return [
         row
         for row in rows
-        if all(value is None or row.get(field) == value for field, value in expected.items())
+        if all(
+            value is None or row.get(field) == value
+            for field, value in expected.items()
+        )
     ]
 
 
@@ -361,13 +451,17 @@ def load_activation_checkpoint(
     try:
         artifact = torch.load(source, map_location="cpu", weights_only=True)
     except (OSError, RuntimeError, ValueError) as error:
-        raise ValueError(f"Cannot load activation artifact {source}: {error}") from error
+        raise ValueError(
+            f"Cannot load activation artifact {source}: {error}"
+        ) from error
     if not isinstance(artifact, dict):
         raise ValueError(f"Activation artifact {source} must contain a mapping.")
 
     layers = artifact.get("layers")
-    if not isinstance(layers, list) or not layers or not all(
-        isinstance(layer, int) for layer in layers
+    if (
+        not isinstance(layers, list)
+        or not layers
+        or not all(isinstance(layer, int) for layer in layers)
     ):
         raise ValueError(f"Activation artifact {source} has invalid layers metadata.")
     format_version = artifact.get("artifact_format_version")
@@ -391,7 +485,9 @@ def load_activation_checkpoint(
         tensor = positions[checkpoint]
 
     if not isinstance(tensor, Tensor):
-        raise ValueError(f"Activation artifact {source} has no tensor for {checkpoint!r}.")
+        raise ValueError(
+            f"Activation artifact {source} has no tensor for {checkpoint!r}."
+        )
     tensor = tensor.detach().to(device="cpu")
     if tensor.ndim != 2 or tensor.shape[0] != len(layers):
         raise ValueError(
@@ -425,14 +521,26 @@ def load_probe_activation_batch(
         raise ValueError("At least one activation-index row is required.")
     checkpoints = {row.get("checkpoint") for row in rows}
     if len(checkpoints) != 1:
-        raise ValueError("Probe cohorts must contain exactly one activation checkpoint.")
+        raise ValueError(
+            "Probe cohorts must contain exactly one activation checkpoint."
+        )
+    tiers = {
+        normalize_index_analysis_tier(row.get("analysis_tier") or "unclassified")
+        for row in rows
+    }
+    if len(tiers) != 1:
+        raise ValueError("Probe cohorts must contain exactly one analysis tier.")
 
     loaded: list[LoadedActivationCheckpoint] = []
     labels: list[int] = []
     metadata: list[dict[str, Any]] = []
-    seen_samples: set[tuple[str, int]] = set()
+    seen_samples: set[tuple[str, str, int]] = set()
     for row in rows:
-        sample_key = (str(row.get("trajectory_id")), int(row.get("step_index", -1)))
+        sample_key = (
+            normalize_index_analysis_tier(row.get("analysis_tier") or "unclassified"),
+            str(row.get("trajectory_id")),
+            int(row.get("step_index", -1)),
+        )
         if sample_key in seen_samples:
             raise ValueError(f"Duplicate probe sample {sample_key!r}.")
         seen_samples.add(sample_key)
@@ -441,12 +549,14 @@ def load_probe_activation_batch(
             raise ValueError(
                 f"Probe sample {sample_key!r} has no binary {label_target!r} label."
             )
-        loaded.append(load_activation_checkpoint(
-            row["local_path"],
-            checkpoint=row["checkpoint"],
-            expected_checksum=row.get("checksum_sha256"),
-            verify_checksum=verify_checksums,
-        ))
+        loaded.append(
+            load_activation_checkpoint(
+                row["local_path"],
+                checkpoint=row["checkpoint"],
+                expected_checksum=row.get("checksum_sha256"),
+                verify_checksum=verify_checksums,
+            )
+        )
         labels.append(int(label))
         metadata.append(dict(row))
 
@@ -488,21 +598,25 @@ def summarize_activation_index(rows: Sequence[dict[str, Any]]) -> dict[str, Any]
             values[value] = values.get(value, 0) + 1
         return dict(sorted(values.items()))
 
+    tiers = {normalize_index_analysis_tier(row.get("analysis_tier")) for row in rows}
+    if len(tiers) != 1:
+        raise ValueError("Activation index summary requires exactly one analysis tier.")
+    analysis_tier = next(iter(tiers))
     unique_turns = {
-        (row["trajectory_id"], row["step_index"])
-        for row in rows
+        (row["analysis_tier"], row["trajectory_id"], row["step_index"]) for row in rows
     }
     return {
         "schema_version": ACTIVATION_INDEX_SCHEMA,
+        "analysis_tier": analysis_tier,
         "index_rows": len(rows),
         "trajectories": len({row["trajectory_id"] for row in rows}),
         "model_turns": len(unique_turns),
-        "local_artifacts": len({
-            row["local_path"] for row in rows if row.get("local_available")
-        }),
-        "missing_local_artifacts": len({
-            row["local_path"] for row in rows if not row.get("local_available")
-        }),
+        "local_artifacts": len(
+            {row["local_path"] for row in rows if row.get("local_available")}
+        ),
+        "missing_local_artifacts": len(
+            {row["local_path"] for row in rows if not row.get("local_available")}
+        ),
         "thinking_modes": counts("thinking_mode"),
         "checkpoints": counts("checkpoint"),
         "agent_roles": counts("agent_role"),

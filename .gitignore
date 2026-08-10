@@ -12,6 +12,8 @@ build/
 results/**/*.json
 results/**/*.csv
 results/**/*.jsonl
+!results/scenario1/*_modal_billing_reconciliation.json
+!results/scenario1/*_modal_billing_reconciliation.csv
 results/**/*.png
 results/**/*.svg
 results/**/*.pdf

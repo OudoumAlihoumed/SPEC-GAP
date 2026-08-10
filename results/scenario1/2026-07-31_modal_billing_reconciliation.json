@@ -1,0 +1,416 @@
+{
+  "schema_version": "spec_gap.modal_billing_reconciliation.v1",
+  "analysis_tier": null,
+  "scope_warning": "Legacy all-project reconciliation generated before analysis_tier tags; not eligible as an exploratory or definitive paper cost table.",
+  "report_date": "2026-07-31",
+  "queried_at": "2026-07-31T12:57:59.644067+00:00",
+  "source": {
+    "provider": "Modal",
+    "api": "Workspace.billing.report and Workspace.billing.summary",
+    "source_of_truth": true,
+    "report_scope": "full hourly intervals only"
+  },
+  "query": {
+    "start": "2026-07-28T00:00:00+00:00",
+    "end_requested": "2026-07-31T12:57:58.252881+00:00",
+    "resolution": "h",
+    "required_tag": {
+      "project": "spec-gap"
+    }
+  },
+  "project_metered_cost": {
+    "modal_app_count": 17,
+    "hourly_billing_row_count": 21,
+    "metered_cost_usd": "17.93903620",
+    "cost_by_resource_usd": {
+      "CPU": "0.18404353",
+      "H200": "17.61075184",
+      "Memory": "0.14424084"
+    }
+  },
+  "local_estimate": {
+    "checkpoint_cost_reference_count": 184,
+    "unique_modal_input_count": 178,
+    "duplicate_reference_count": 6,
+    "estimated_model_turn_h200_cost_usd": "15.48234715"
+  },
+  "comparison": {
+    "metered_minus_estimate_usd": "2.45668905",
+    "percent_above_estimate": "15.87"
+  },
+  "workspace_billing_cycle": {
+    "cycle_start": "2026-07-01T00:00:00+00:00",
+    "cycle_end": "2026-08-01T00:00:00+00:00",
+    "metered_cost_usd": "168.52068246",
+    "billed_cost_usd": "0.00000000",
+    "adjustments_usd": {
+      "Credits": "-162.41624591",
+      "Free Storage": "-6.10443655",
+      "Plan Cost": "0.00000000",
+      "Reservation Adjustment": "-0.00000000"
+    },
+    "metered_cost_breakdown_usd": {
+      "Ephemeral Apps": "162.41624591",
+      "LLM Tokens": "0.00000000",
+      "Volumes": "6.10443655"
+    },
+    "scope_note": "Workspace-wide billing-cycle summary. Credits and adjustments are not allocated to individual Apps by Modal's granular report."
+  },
+  "mapping_coverage": {
+    "referenced_app_count": 10,
+    "unreferenced_app_count": 7,
+    "note": "Historical Apps without a saved Modal URL remain included in the authoritative project total because their billing tag is project=spec-gap."
+  },
+  "apps": [
+    {
+      "modal_app_id": "ap-LrA6bGMXImw03ujyFJDJ4W",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-29T20:00:00+00:00",
+      "last_interval_start": "2026-07-29T20:00:00+00:00",
+      "metered_cost_usd": "0.54579407",
+      "cost_by_resource_usd": {
+        "CPU": "0.00553741",
+        "H200": "0.53719318",
+        "Memory": "0.00306348"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": []
+    },
+    {
+      "modal_app_id": "ap-KR4dlcdGYHDUMV2hwYckzM",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-29T23:00:00+00:00",
+      "last_interval_start": "2026-07-29T23:00:00+00:00",
+      "metered_cost_usd": "0.52186610",
+      "cost_by_resource_usd": {
+        "CPU": "0.00554496",
+        "H200": "0.51364588",
+        "Memory": "0.00267526"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": []
+    },
+    {
+      "modal_app_id": "ap-F2K8ejHW2CXyCEtKW8KI8P",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-30T00:00:00+00:00",
+      "last_interval_start": "2026-07-30T00:00:00+00:00",
+      "metered_cost_usd": "0.51936447",
+      "cost_by_resource_usd": {
+        "CPU": "0.00514584",
+        "H200": "0.51169440",
+        "Memory": "0.00252422"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": []
+    },
+    {
+      "modal_app_id": "ap-XJdlbxx4BlWaybqDxGv2Im",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-30T20:00:00+00:00",
+      "last_interval_start": "2026-07-30T21:00:00+00:00",
+      "metered_cost_usd": "5.00407165",
+      "cost_by_resource_usd": {
+        "CPU": "0.05277139",
+        "H200": "4.90150714",
+        "Memory": "0.04979311"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 2,
+      "local_references": [
+        "results/scenario1/reviews/2026-07-30_aihc_finance_neutral_v1_run_summary.md"
+      ]
+    },
+    {
+      "modal_app_id": "ap-cJWDwcvXvzXMmrl6SgLOcG",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-30T20:00:00+00:00",
+      "last_interval_start": "2026-07-30T20:00:00+00:00",
+      "metered_cost_usd": "1.01961156",
+      "cost_by_resource_usd": {
+        "CPU": "0.01097185",
+        "H200": "1.00227815",
+        "Memory": "0.00636156"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": [
+        "results/scenario1/reviews/2026-07-30_aihc_finance_neutral_v1_run_summary.md"
+      ]
+    },
+    {
+      "modal_app_id": "ap-HJbkGS6KZGl1ATaNEuXC0y",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-30T22:00:00+00:00",
+      "last_interval_start": "2026-07-30T22:00:00+00:00",
+      "metered_cost_usd": "0.60294083",
+      "cost_by_resource_usd": {
+        "CPU": "0.00556378",
+        "H200": "0.59454958",
+        "Memory": "0.00282748"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": [
+        "results/scenario1/reviews/2026-07-30_neuro_neutral_v1_full_matrix_summary.md",
+        "results/scenario1/reviews/2026-07-30_neuro_neutral_v1_smoke_summary.md"
+      ]
+    },
+    {
+      "modal_app_id": "ap-gDbQx8hz9sjR1N7tc2JU5P",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-30T22:00:00+00:00",
+      "last_interval_start": "2026-07-30T23:00:00+00:00",
+      "metered_cost_usd": "1.63306514",
+      "cost_by_resource_usd": {
+        "CPU": "0.01610691",
+        "H200": "1.60403745",
+        "Memory": "0.01292079"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 2,
+      "local_references": [
+        "results/scenario1/reviews/2026-07-30_neuro_neutral_v1_full_matrix_summary.md"
+      ]
+    },
+    {
+      "modal_app_id": "ap-YdniKtKOnTGb2H8MbkCg5y",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-31T03:00:00+00:00",
+      "last_interval_start": "2026-07-31T04:00:00+00:00",
+      "metered_cost_usd": "0.53914013",
+      "cost_by_resource_usd": {
+        "CPU": "0.00527050",
+        "H200": "0.53052226",
+        "Memory": "0.00334737"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 2,
+      "local_references": []
+    },
+    {
+      "modal_app_id": "ap-31TP5iv6JqFc3FjSbpkNyK",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-31T04:00:00+00:00",
+      "last_interval_start": "2026-07-31T05:00:00+00:00",
+      "metered_cost_usd": "0.67266680",
+      "cost_by_resource_usd": {
+        "CPU": "0.00700514",
+        "H200": "0.66114904",
+        "Memory": "0.00451262"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 2,
+      "local_references": [
+        "results/scenario1/2026-07-31_macro_petroleum_smoke_readiness.md",
+        "results/scenario1/2026-07-31_petroleum_2hop_attempt1_indeterminate_summary.md"
+      ]
+    },
+    {
+      "modal_app_id": "ap-LNqtyCeYtXPHJqYcdcreMB",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-31T04:00:00+00:00",
+      "last_interval_start": "2026-07-31T04:00:00+00:00",
+      "metered_cost_usd": "0.51289427",
+      "cost_by_resource_usd": {
+        "CPU": "0.00541804",
+        "H200": "0.50491518",
+        "Memory": "0.00256105"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": []
+    },
+    {
+      "modal_app_id": "ap-OlSUO2s3mFABCf3ISA6tCc",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-31T04:00:00+00:00",
+      "last_interval_start": "2026-07-31T04:00:00+00:00",
+      "metered_cost_usd": "0.30993028",
+      "cost_by_resource_usd": {
+        "CPU": "0.00320461",
+        "H200": "0.30544310",
+        "Memory": "0.00128256"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": []
+    },
+    {
+      "modal_app_id": "ap-oVQpHcyr5NA6LRUsvSQmhH",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-31T04:00:00+00:00",
+      "last_interval_start": "2026-07-31T04:00:00+00:00",
+      "metered_cost_usd": "0.55267045",
+      "cost_by_resource_usd": {
+        "CPU": "0.00571692",
+        "H200": "0.54377788",
+        "Memory": "0.00317566"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": [
+        "results/scenario1/2026-07-31_macro_2hop_smoke_readable_summary.md",
+        "results/scenario1/2026-07-31_macro_petroleum_smoke_readiness.md"
+      ]
+    },
+    {
+      "modal_app_id": "ap-t87mZg5r1QnPrReRhxf4dr",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-31T05:00:00+00:00",
+      "last_interval_start": "2026-07-31T05:00:00+00:00",
+      "metered_cost_usd": "0.69867291",
+      "cost_by_resource_usd": {
+        "CPU": "0.00742530",
+        "H200": "0.68668553",
+        "Memory": "0.00456208"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": [
+        "results/scenario1/2026-07-31_petroleum_2hop_700_word_prompt_variant_summary.md"
+      ]
+    },
+    {
+      "modal_app_id": "ap-e07NK8QI3oRKb7lHf4RniE",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-31T06:00:00+00:00",
+      "last_interval_start": "2026-07-31T06:00:00+00:00",
+      "metered_cost_usd": "0.04853578",
+      "cost_by_resource_usd": {
+        "CPU": "0.00056458",
+        "H200": "0.04792255",
+        "Memory": "0.00004865"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": []
+    },
+    {
+      "modal_app_id": "ap-opGHXLAzpe0RHhNQVKU4CG",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-31T06:00:00+00:00",
+      "last_interval_start": "2026-07-31T06:00:00+00:00",
+      "metered_cost_usd": "1.86384791",
+      "cost_by_resource_usd": {
+        "CPU": "0.01869798",
+        "H200": "1.82748045",
+        "Memory": "0.01766948"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": [
+        "results/scenario1/2026-07-31_macro_full_matrix_readable_summary.md"
+      ]
+    },
+    {
+      "modal_app_id": "ap-g1loKAi47eSt90q6Goylgn",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-31T11:00:00+00:00",
+      "last_interval_start": "2026-07-31T11:00:00+00:00",
+      "metered_cost_usd": "1.85188213",
+      "cost_by_resource_usd": {
+        "CPU": "0.01885968",
+        "H200": "1.81424664",
+        "Memory": "0.01877582"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": [
+        "results/scenario1/2026-07-31_macro_full_matrix_gen5000_v2_cost_summary.json",
+        "results/scenario1/2026-07-31_macro_full_matrix_gen5000_v2_readable_summary.md"
+      ]
+    },
+    {
+      "modal_app_id": "ap-sFQ55y9YqPAkz5qeSEreTn",
+      "description": "spec-gap-qwen3-32b",
+      "environment": "main",
+      "first_interval_start": "2026-07-31T11:00:00+00:00",
+      "last_interval_start": "2026-07-31T11:00:00+00:00",
+      "metered_cost_usd": "1.04208172",
+      "cost_by_resource_usd": {
+        "CPU": "0.01023864",
+        "H200": "1.02370343",
+        "Memory": "0.00813965"
+      },
+      "tags": {
+        "component": "qwen3-inference",
+        "project": "spec-gap"
+      },
+      "hourly_row_count": 1,
+      "local_references": [
+        "results/scenario1/2026-07-31_macro_2hop_gen5000_v2_smoke_cost_summary.json",
+        "results/scenario1/2026-07-31_macro_2hop_gen5000_v2_smoke_readable_summary.md",
+        "results/scenario1/2026-07-31_macro_full_matrix_gen5000_v2_cost_summary.json",
+        "results/scenario1/2026-07-31_macro_full_matrix_gen5000_v2_readable_summary.md"
+      ]
+    }
+  ]
+}

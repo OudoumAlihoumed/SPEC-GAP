@@ -6,12 +6,15 @@ import pytest
 
 from src.infrastructure.modal_costs import build_gpu_cost_record, build_token_usage
 from src.infrastructure.qwen_modal import (
+    DEFAULT_GENERATION_PROTOCOL_ID,
     RequestValidationError,
     activation_artifact_path,
     build_activation_checkpoint_plan,
     build_generation_result,
     build_injection_token_alignment,
     generation_result_to_agent_turn_fields,
+    generation_settings_for_protocol,
+    initialize_torch_sampling_rng,
     parse_tool_call_requests,
     rendered_input_sha256,
     split_thinking_text,
@@ -52,6 +55,58 @@ def test_request_defaults_to_controlled_qwen_settings_and_all_layers():
     assert request["generation_settings"]["top_p"] == 0.95
     assert request["activation_layers"] == list(range(64))
     assert request["activation_token_position"] == "last_generated_non_special_token"
+
+
+def test_versioned_5000_protocol_preserves_v1_and_returns_isolated_settings():
+    v1 = generation_settings_for_protocol(DEFAULT_GENERATION_PROTOCOL_ID)
+    v2 = generation_settings_for_protocol("controlled_v2_5000")
+
+    assert v1["max_new_tokens"] == 2048
+    assert v2["max_new_tokens"] == 5000
+    assert {
+        key: value for key, value in v1.items() if key != "max_new_tokens"
+    } == {
+        key: value for key, value in v2.items() if key != "max_new_tokens"
+    }
+    v2["max_new_tokens"] = 1
+    assert generation_settings_for_protocol("controlled_v2_5000")[
+        "max_new_tokens"
+    ] == 5000
+
+
+def test_unknown_generation_protocol_is_rejected():
+    with pytest.raises(RequestValidationError, match="generation_protocol_id"):
+        generation_settings_for_protocol("controlled_unknown")
+
+
+def test_sampling_rng_initializes_cpu_and_cuda_from_the_same_seed():
+    calls = []
+
+    class FakeCuda:
+        @staticmethod
+        def manual_seed_all(seed):
+            calls.append(("cuda", seed))
+
+    class FakeTorch:
+        cuda = FakeCuda()
+
+        @staticmethod
+        def manual_seed(seed):
+            calls.append(("cpu", seed))
+
+    initialize_torch_sampling_rng(FakeTorch(), 17)
+
+    assert calls == [("cpu", 17), ("cuda", 17)]
+
+
+def test_analysis_tier_survives_request_result_and_event_metadata():
+    request = validate_generation_request(request_payload(
+        analysis_tier="definitive"
+    ))
+    assert request["analysis_tier"] == "definitive"
+
+    with pytest.raises(RequestValidationError, match="analysis_tier"):
+        validate_generation_request(request_payload(analysis_tier="pilot"))
 
 
 def test_thinking_off_changes_only_the_template_switch_by_default():
@@ -246,6 +301,14 @@ def test_activation_path_is_stable_and_scoped_by_mode():
         "activations/group01_injected_3hop_thinking_on/on/step_002.pt"
     )
 
+    definitive = validate_generation_request(request_payload(
+        analysis_tier="definitive"
+    ))
+    assert activation_artifact_path(definitive) == (
+        "activations/definitive/"
+        "group01_injected_3hop_thinking_on/on/step_002.pt"
+    )
+
 
 def test_plain_endpoint_text_is_not_converted_to_a_tool_request():
     parsed = parse_tool_call_requests(
@@ -295,9 +358,15 @@ def test_tool_definition_requires_a_unique_function_name():
         ]))
 
 
-def _built_result(*, thinking_mode="on", include_cost=False):
+def _built_result(
+    *,
+    thinking_mode="on",
+    include_cost=False,
+    analysis_tier=None,
+):
     request = request_payload(
         thinking_mode=thinking_mode,
+        analysis_tier=analysis_tier,
         tools=[{"name": "archive_document"}],
         extract_activations=False,
     )
@@ -331,6 +400,7 @@ def _built_result(*, thinking_mode="on", include_cost=False):
                 thinking_token_count=1 if thinking_mode == "on" else 0,
                 final_output_token_count=1 if thinking_mode == "on" else 3,
             ),
+            runtime_metadata={"analysis_tier": analysis_tier},
         )
     return build_generation_result(
         request,
@@ -374,7 +444,9 @@ def test_thinking_off_result_has_no_hidden_thinking_fields():
 
 
 def test_agent_turn_fields_match_the_adapter_handoff_names():
-    fields = generation_result_to_agent_turn_fields(_built_result())
+    fields = generation_result_to_agent_turn_fields(_built_result(
+        analysis_tier="definitive"
+    ))
 
     assert fields["exact_model_input"] == {
         "messages": request_payload()["messages"],
@@ -388,6 +460,9 @@ def test_agent_turn_fields_match_the_adapter_handoff_names():
     assert fields["output"]["tool_call_requests"][0]["status"] == "requested"
     assert "actions" not in fields["output"]
     assert fields["model_execution_metadata"]["thinking_mode"] == "on"
+    assert fields["model_execution_metadata"]["analysis_tier"] == (
+        "definitive"
+    )
     assert fields["token_alignment"]["injection_present_in_prompt"] is False
     assert fields["activation_metadata"] is None
 
@@ -419,6 +494,19 @@ def test_cost_and_token_usage_survive_the_agent_turn_handoff():
         "total_tokens_processed": 5,
     }
     assert fields["cost_metadata"] == result["cost_metadata"]
+
+
+def test_result_rejects_cost_metadata_from_another_analysis_tier():
+    result = _built_result(
+        include_cost=True,
+        analysis_tier="definitive",
+    )
+    result["cost_metadata"]["runtime_metadata"]["analysis_tier"] = (
+        "exploratory"
+    )
+
+    with pytest.raises(RequestValidationError, match="analysis_tier"):
+        validate_generation_result(result)
 
 
 def test_result_validates_multi_position_activation_metadata():

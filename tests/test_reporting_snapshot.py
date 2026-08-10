@@ -21,8 +21,7 @@ TRACKED_MANIFEST = (
     PROJECT_ROOT / "results/scenario1/final_analysis/analysis_manifest.json"
 )
 TRACKED_TEMPORAL_RECORDS = (
-    PROJECT_ROOT
-    / "results/scenario1/depth_analysis/temporal_divergence_scores.jsonl"
+    PROJECT_ROOT / "results/scenario1/depth_analysis/temporal_divergence_scores.jsonl"
 )
 TRACKED_PUBLIC_TABLES = (
     PROJECT_ROOT / "results/scenario1/depth_analysis/depth_degradation.csv",
@@ -42,8 +41,8 @@ def _depth_metric(layer, *, mode="off", probe="goldowsky_dill_logistic", hop="2-
     }
 
 
-def _result(layers):
-    return {
+def _result(layers, *, analysis_tier=None):
+    result = {
         "claim_scope": "two-group construction diagnostic",
         "data_manifest_hash": "a" * 64,
         "experiment_id": "scenario1-test",
@@ -58,6 +57,9 @@ def _result(layers):
         ],
         "depth_comparisons": [],
     }
+    if analysis_tier is not None:
+        result["analysis_tier"] = analysis_tier
+    return result
 
 
 def _score_rows():
@@ -72,20 +74,22 @@ def _score_rows():
                 for treatment in ("clean", "injected"):
                     trajectory_id = f"group-a-{mode}-{hop_mode}-{treatment}"
                     for hop_index, agent_id in enumerate(hop_agents):
-                        rows.append({
-                            "trajectory_id": trajectory_id,
-                            "match_group_id": "group-a",
-                            "hop_index": hop_index,
-                            "hop_mode": hop_mode,
-                            "agent_id": agent_id,
-                            "thinking_mode": mode,
-                            "probe_name": probe,
-                            "layer": 40,
-                            "label_target": "injection_present",
-                            "behavioral_outcome": (
-                                "clean" if treatment == "clean" else "resisted"
-                            ),
-                        })
+                        rows.append(
+                            {
+                                "trajectory_id": trajectory_id,
+                                "match_group_id": "group-a",
+                                "hop_index": hop_index,
+                                "hop_mode": hop_mode,
+                                "agent_id": agent_id,
+                                "thinking_mode": mode,
+                                "probe_name": probe,
+                                "layer": 40,
+                                "label_target": "injection_present",
+                                "behavioral_outcome": (
+                                    "clean" if treatment == "clean" else "resisted"
+                                ),
+                            }
+                        )
     return rows
 
 
@@ -128,6 +132,7 @@ def test_snapshot_compacts_all_layers_and_round_trips(tmp_path):
     loaded = load_reporting_snapshot(destination)
 
     assert loaded["schema_version"] == REPORTING_SNAPSHOT_SCHEMA
+    assert loaded["analysis_tier"] == "unclassified"
     assert {row["layer"] for row in loaded["per_step_rows"]} == {40}
     assert set(loaded["all_layer_result"]["depth_metrics"][0]) == {
         "thinking_mode",
@@ -152,11 +157,74 @@ def test_snapshot_rejects_mode_specific_decoding_changes():
             _score_rows(),
             analysis_revision="analysis123",
             reporting_revision="reporting123",
+            source_artifacts={"scores": {"path": "scores.jsonl", "sha256": "a" * 64}},
+            model_configs=configs,
+        )
+
+
+def test_snapshot_rejects_model_and_score_tier_mismatch():
+    configs = _configs()
+    for config in configs:
+        config["analysis_tier"] = "definitive"
+    rows = _score_rows()
+    for row in rows:
+        row["analysis_tier"] = "exploratory"
+
+    with pytest.raises(ValueError, match="different analysis tiers"):
+        build_reporting_snapshot(
+            _result((32, 40, 48)),
+            _result(range(64)),
+            rows,
+            analysis_revision="analysis123",
+            reporting_revision="reporting123",
+            source_artifacts={"scores": {"path": "scores.jsonl", "sha256": "a" * 64}},
+            model_configs=configs,
+        )
+
+
+def test_snapshot_requires_depth_results_to_match_definitive_inputs():
+    configs = _configs()
+    for config in configs:
+        config["analysis_tier"] = "definitive"
+    rows = _score_rows()
+    for row in rows:
+        row["analysis_tier"] = "definitive"
+
+    with pytest.raises(ValueError, match="depth results must use one"):
+        build_reporting_snapshot(
+            _result((32, 40, 48), analysis_tier="exploratory"),
+            _result(range(64), analysis_tier="definitive"),
+            rows,
+            analysis_revision="analysis123",
+            reporting_revision="reporting123",
             source_artifacts={
                 "scores": {"path": "scores.jsonl", "sha256": "a" * 64}
             },
             model_configs=configs,
         )
+
+
+def test_snapshot_records_one_uniform_definitive_tier():
+    configs = _configs()
+    for config in configs:
+        config["analysis_tier"] = "definitive"
+    rows = _score_rows()
+    for row in rows:
+        row["analysis_tier"] = "definitive"
+
+    snapshot = build_reporting_snapshot(
+        _result((32, 40, 48), analysis_tier="definitive"),
+        _result(range(64), analysis_tier="definitive"),
+        rows,
+        analysis_revision="analysis123",
+        reporting_revision="reporting123",
+        source_artifacts={
+            "scores": {"path": "scores.jsonl", "sha256": "a" * 64}
+        },
+        model_configs=configs,
+    )
+
+    assert snapshot["analysis_tier"] == "definitive"
 
 
 def test_repository_includes_a_valid_public_reporting_snapshot():
@@ -176,10 +244,7 @@ def test_repository_includes_a_valid_public_reporting_snapshot():
 def test_repository_includes_manifest_tables_figures_and_temporal_records():
     manifest = json.loads(TRACKED_MANIFEST.read_text(encoding="utf-8"))
 
-    published_paths = [
-        PROJECT_ROOT / path
-        for path in manifest["tables"]
-    ]
+    published_paths = [PROJECT_ROOT / path for path in manifest["tables"]]
     published_paths.extend(
         PROJECT_ROOT / path
         for figure in manifest["figures"]
@@ -197,9 +262,7 @@ def test_repository_includes_manifest_tables_figures_and_temporal_records():
     assert {row["schema_version"] for row in temporal_rows} == {
         "spec_gap.temporal_divergence_score.v2"
     }
-    assert {row["label_target"] for row in temporal_rows} == {
-        "injection_present"
-    }
+    assert {row["label_target"] for row in temporal_rows} == {"injection_present"}
     assert {int(row["layer"]) for row in temporal_rows} == {32, 40, 48}
 
 

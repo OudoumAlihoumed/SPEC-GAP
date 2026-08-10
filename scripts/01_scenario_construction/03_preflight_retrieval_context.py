@@ -156,6 +156,9 @@ def main() -> None:
 
     result = {
         "schema_version": "spec_gap.context_preflight.v1",
+        "generation_protocol_id": generator.generation_protocol_id_for_registry(
+            registry
+        ),
         "model_id": MODEL_ID,
         "model_revision": MODEL_REVISION,
         "tokenizer_json_sha256": _sha256_file(tokenizer_json),

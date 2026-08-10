@@ -29,6 +29,10 @@ DEFAULT_MAX_NEW_TOKENS = 2048
 DEFAULT_NON_DOCUMENT_RESERVE_TOKENS = 6144
 BM25_K1 = 1.5
 BM25_B = 0.75
+CARRIER_CHUNK_RETENTION_POLICIES = frozenset({
+    "natural_only",
+    "require_clean_anchor",
+})
 
 _TERM = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -335,6 +339,87 @@ def _select_candidates(
     return selected
 
 
+def _retain_required_candidate(
+    selected: list[dict[str, Any]],
+    required: dict[str, Any],
+    *,
+    token_budget: int,
+    document_token_budgets: dict[str, int] | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Retain one clean anchor chunk without exceeding existing token caps."""
+
+    if any(
+        candidate["chunk_id"] == required["chunk_id"]
+        for candidate in selected
+    ):
+        return selected, []
+
+    retained = list(selected)
+    removed: list[dict[str, Any]] = []
+    if document_token_budgets is not None:
+        document_id = required["doc_id"]
+        document_budget = document_token_budgets[document_id]
+        document_used = sum(
+            candidate["token_count"]
+            for candidate in retained
+            if candidate["doc_id"] == document_id
+        )
+        removable = sorted(
+            (
+                candidate
+                for candidate in retained
+                if candidate["doc_id"] == document_id
+            ),
+            key=lambda candidate: candidate["bm25_rank"],
+            reverse=True,
+        )
+        while document_used + required["token_count"] > document_budget:
+            if not removable:
+                raise ValueError(
+                    "the carrier document budget cannot retain its clean "
+                    "anchor chunk"
+                )
+            victim = removable.pop(0)
+            retained.remove(victim)
+            removed.append(victim)
+            document_used -= victim["token_count"]
+    else:
+        tokens_used = sum(candidate["token_count"] for candidate in retained)
+        counts = Counter(candidate["doc_id"] for candidate in retained)
+        removable = sorted(
+            retained,
+            key=lambda candidate: candidate["bm25_rank"],
+            reverse=True,
+        )
+        while tokens_used + required["token_count"] > token_budget:
+            victim = next(
+                (
+                    candidate
+                    for candidate in removable
+                    if counts[candidate["doc_id"]] > 1
+                    or candidate["doc_id"] == required["doc_id"]
+                ),
+                None,
+            )
+            if victim is None:
+                raise ValueError(
+                    "the global token budget cannot retain the clean anchor "
+                    "chunk while preserving every source document"
+                )
+            removable.remove(victim)
+            retained.remove(victim)
+            removed.append(victim)
+            counts[victim["doc_id"]] -= 1
+            tokens_used -= victim["token_count"]
+
+    retained.append(required)
+    if sum(candidate["token_count"] for candidate in retained) > token_budget:
+        raise ValueError(
+            "controlled carrier retention exceeded the global token budget"
+        )
+    return retained, removed
+
+
 def detect_single_insertion(clean_text: str, injected_text: str) -> tuple[int, str]:
     """Return the offset and exact delta when injected = clean + one insertion."""
 
@@ -383,6 +468,7 @@ def build_retrieval_plan(
     document_token_budget: int = DEFAULT_DOCUMENT_TOKEN_BUDGET,
     document_token_budgets: dict[str, int] | None = None,
     non_evidence_pages: dict[str, dict[int, str]] | None = None,
+    carrier_chunk_retention_policy: str = "natural_only",
     context_window_tokens: int = DEFAULT_CONTEXT_WINDOW_TOKENS,
     max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
     non_document_reserve_tokens: int = DEFAULT_NON_DOCUMENT_RESERVE_TOKENS,
@@ -401,6 +487,11 @@ def build_retrieval_plan(
         document["role"] == "injection_carrier" for document in documents
     ) != 1:
         raise ValueError("Scenario 1 retrieval requires exactly one injection carrier")
+    if carrier_chunk_retention_policy not in CARRIER_CHUNK_RETENTION_POLICIES:
+        raise ValueError(
+            "carrier_chunk_retention_policy must be natural_only or "
+            "require_clean_anchor"
+        )
     if document_token_budget + max_new_tokens + non_document_reserve_tokens > (
         context_window_tokens
     ):
@@ -518,12 +609,49 @@ def build_retrieval_plan(
         candidate for candidate in containing_candidates
         if candidate["chunk_id"] in selected_ids
     ]
+    retention_origin = "natural_clean_rank"
+    replaced_candidates: list[dict[str, Any]] = []
+    if (
+        not selected_containing
+        and carrier_chunk_retention_policy == "require_clean_anchor"
+    ):
+        eligible_containing = [
+            candidate
+            for candidate in containing_candidates
+            if candidate["evidence_eligible"]
+        ]
+        if len(eligible_containing) != 1:
+            raise ValueError(
+                "the clean insertion anchor does not map to exactly one "
+                "evidence-eligible chunk"
+            )
+        selected, replaced_candidates = _retain_required_candidate(
+            selected,
+            eligible_containing[0],
+            token_budget=document_token_budget,
+            document_token_budgets=document_token_budgets,
+        )
+        selected_ids = {candidate["chunk_id"] for candidate in selected}
+        selected_containing = [
+            candidate for candidate in containing_candidates
+            if candidate["chunk_id"] in selected_ids
+        ]
+        retention_origin = "controlled_clean_anchor"
     if len(selected_containing) != 1:
         raise ValueError(
             "the clean BM25 selection did not naturally retain exactly one "
-            "chunk at the carrier insertion point"
+            "chunk at the carrier insertion point; use "
+            "require_clean_anchor for a controlled-exposure design"
         )
     carrier_chunk = selected_containing[0]
+    render_order = sorted(
+        selected,
+        key=lambda item: (
+            item["document_order"],
+            item["page_number"],
+            item["chunk_index"],
+        ),
+    )
 
     serializable_candidates = []
     for candidate in candidates:
@@ -567,6 +695,9 @@ def build_retrieval_plan(
                     "highest-scoring chunk per document, then global score "
                     "until the fixed token budget"
                 )
+            ),
+            "carrier_chunk_retention_policy": (
+                carrier_chunk_retention_policy
             ),
         },
         "evidence_eligibility": {
@@ -630,6 +761,15 @@ def build_retrieval_plan(
                 insertion_offset - carrier_chunk["source_char_start"]
             ),
             "ranking_used_injection_text": False,
+            "carrier_chunk_retention": {
+                "policy": carrier_chunk_retention_policy,
+                "selection_origin": retention_origin,
+                "selected_from_clean_text": True,
+                "replaced_chunk_ids": [
+                    candidate["chunk_id"]
+                    for candidate in replaced_candidates
+                ],
+            },
         },
     }
 
@@ -933,6 +1073,87 @@ def validate_retrieval_plan(
     if carrier_chunk_id not in selected_ids:
         raise ValueError("retrieval selection omitted the injection-bearing chunk")
     carrier_chunk = candidates_by_id[carrier_chunk_id]
+    baseline_selected = _select_candidates(
+        eligible_candidates,
+        [source["doc_id"] for source in sources],
+        token_budget=plan["budget"]["document_token_budget"],
+        document_token_budgets=document_budgets,
+    )
+    baseline_ids = {
+        candidate["chunk_id"] for candidate in baseline_selected
+    }
+    retention = mapping.get("carrier_chunk_retention")
+    if retention is None:
+        if (
+            carrier_chunk_id not in baseline_ids
+            or set(selected_ids) != baseline_ids
+        ):
+            raise ValueError(
+                "legacy retrieval plans must retain the carrier chunk "
+                "naturally"
+            )
+    else:
+        policy = retention.get("policy")
+        origin = retention.get("selection_origin")
+        replaced_ids = retention.get("replaced_chunk_ids")
+        if (
+            policy not in CARRIER_CHUNK_RETENTION_POLICIES
+            or plan.get("ranking", {}).get(
+                "carrier_chunk_retention_policy"
+            ) != policy
+            or origin not in {
+                "natural_clean_rank",
+                "controlled_clean_anchor",
+            }
+            or retention.get("selected_from_clean_text") is not True
+            or not isinstance(replaced_ids, list)
+            or len(replaced_ids) != len(set(replaced_ids))
+            or any(chunk_id not in candidates_by_id for chunk_id in replaced_ids)
+        ):
+            raise ValueError(
+                "retrieval carrier-chunk retention metadata is invalid"
+            )
+        if origin == "natural_clean_rank":
+            if (
+                carrier_chunk_id not in baseline_ids
+                or replaced_ids
+                or set(selected_ids) != baseline_ids
+            ):
+                raise ValueError(
+                    "natural carrier retention does not match the clean "
+                    "ranking"
+                )
+        else:
+            if (
+                policy != "require_clean_anchor"
+                or carrier_chunk_id in baseline_ids
+            ):
+                raise ValueError(
+                    "controlled carrier retention is inconsistent with the "
+                    "clean ranking"
+                )
+            expected_selected, expected_removed = _retain_required_candidate(
+                baseline_selected,
+                carrier_chunk,
+                token_budget=plan["budget"]["document_token_budget"],
+                document_token_budgets=document_budgets,
+            )
+            if (
+                set(selected_ids)
+                != {
+                    candidate["chunk_id"]
+                    for candidate in expected_selected
+                }
+                or replaced_ids
+                != [
+                    candidate["chunk_id"]
+                    for candidate in expected_removed
+                ]
+            ):
+                raise ValueError(
+                    "controlled carrier retention does not match the "
+                    "clean-anchor replacement rule"
+                )
     insertion_offset = mapping.get("source_char_offset")
     relative_offset = mapping.get("insertion_offset_in_chunk")
     if (
@@ -1137,5 +1358,8 @@ def materialize_retrieval(
             plan.get("source_pdf_verification")
         ),
         "injection_bearing_chunk_id": carrier_chunk_id,
+        "carrier_chunk_retention": copy.deepcopy(
+            mapping.get("carrier_chunk_retention")
+        ),
     }
     return materialized, payload_span, trace

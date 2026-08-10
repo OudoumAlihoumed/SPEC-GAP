@@ -13,6 +13,7 @@ import re
 from pathlib import PurePosixPath
 from typing import Any
 
+from .modal_billing import ANALYSIS_TIERS
 from .modal_costs import validate_gpu_cost_record
 
 
@@ -42,6 +43,15 @@ CONTROLLED_GENERATION_SETTINGS = {
     "seed": 0,
 }
 
+DEFAULT_GENERATION_PROTOCOL_ID = "controlled_v1_2048"
+GENERATION_PROTOCOL_SETTINGS = {
+    DEFAULT_GENERATION_PROTOCOL_ID: copy.deepcopy(CONTROLLED_GENERATION_SETTINGS),
+    "controlled_v2_5000": {
+        **CONTROLLED_GENERATION_SETTINGS,
+        "max_new_tokens": 5000,
+    },
+}
+
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _TOOL_CALL_BLOCK = re.compile(
@@ -52,6 +62,29 @@ _TOOL_CALL_BLOCK = re.compile(
 
 class RequestValidationError(ValueError):
     """Raised before a malformed request can start remote model execution."""
+
+
+def generation_settings_for_protocol(
+    protocol_id: str | None = None,
+) -> dict[str, Any]:
+    """Return an isolated settings copy for one registered run protocol."""
+
+    selected = protocol_id or DEFAULT_GENERATION_PROTOCOL_ID
+    if not isinstance(selected, str) or selected not in GENERATION_PROTOCOL_SETTINGS:
+        raise RequestValidationError(
+            "generation_protocol_id must be one of "
+            f"{sorted(GENERATION_PROTOCOL_SETTINGS)}"
+        )
+    return copy.deepcopy(GENERATION_PROTOCOL_SETTINGS[selected])
+
+
+def initialize_torch_sampling_rng(torch_module: Any, seed: int) -> None:
+    """Initialize both Torch RNGs used by one sampled model turn."""
+
+    if not isinstance(seed, int) or isinstance(seed, bool) or seed < 0:
+        raise RequestValidationError("seed must be a non-negative integer")
+    torch_module.manual_seed(seed)
+    torch_module.cuda.manual_seed_all(seed)
 
 
 def _require_string(payload: dict[str, Any], field: str) -> str:
@@ -164,6 +197,17 @@ def _validate_settings(settings: Any) -> dict[str, Any]:
     if not isinstance(seed, int) or isinstance(seed, bool) or seed < 0:
         raise RequestValidationError("seed must be a non-negative integer")
     return normalized
+
+
+def _validate_analysis_tier(value: Any) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or value.strip() not in ANALYSIS_TIERS:
+        raise RequestValidationError(
+            "analysis_tier must be one of "
+            f"{sorted(ANALYSIS_TIERS)}"
+        )
+    return value.strip()
 
 
 def _validate_layers(layers: Any) -> list[int]:
@@ -286,6 +330,9 @@ def validate_generation_request(payload: Any) -> dict[str, Any]:
         "agent_role": agent_role,
         "hop_index": hop_index,
         "thinking_mode": thinking_mode,
+        "analysis_tier": _validate_analysis_tier(
+            payload.get("analysis_tier")
+        ),
         "enable_thinking": THINKING_MODES[thinking_mode],
         "model_id": model_id,
         "model_revision": str(payload.get("model_revision") or MODEL_REVISION),
@@ -625,6 +672,7 @@ def build_generation_result(
         "tokenizer_name": tokenizer_name,
         "tokenizer_revision": tokenizer_revision,
         "thinking_mode": normalized_request["thinking_mode"],
+        "analysis_tier": normalized_request["analysis_tier"],
         "enable_thinking": normalized_request["enable_thinking"],
         "generation_settings": copy.deepcopy(
             normalized_request["generation_settings"]
@@ -908,6 +956,7 @@ def validate_generation_result(payload: Any) -> dict[str, Any]:
         "agent_role": result.get("agent_role"),
         "hop_index": result.get("hop_index"),
         "thinking_mode": result.get("thinking_mode"),
+        "analysis_tier": result.get("analysis_tier"),
         "model_id": result.get("model_name"),
         "model_revision": result.get("model_revision"),
         "messages": result.get("input_messages"),
@@ -923,6 +972,7 @@ def validate_generation_result(payload: Any) -> dict[str, Any]:
         ),
     }
     request = validate_generation_request(reconstructed_request)
+    result["analysis_tier"] = request["analysis_tier"]
     if result.get("enable_thinking") is not request["enable_thinking"]:
         raise RequestValidationError(
             "enable_thinking must match thinking_mode"
@@ -1038,6 +1088,17 @@ def validate_generation_result(payload: Any) -> dict[str, Any]:
                 raise RequestValidationError(
                     f"cost_metadata.{field} must match the model-turn result"
                 )
+        runtime = cost.get("runtime_metadata")
+        if not isinstance(runtime, dict):
+            raise RequestValidationError(
+                "cost_metadata.runtime_metadata must be an object"
+            )
+        cost_tier = runtime.get("analysis_tier")
+        if cost_tier != result["analysis_tier"]:
+            raise RequestValidationError(
+                "cost_metadata.runtime_metadata.analysis_tier must match "
+                "the model-turn result"
+            )
         usage = cost["token_usage"]
         if usage["input_tokens"] != len(result["input_token_ids"]):
             raise RequestValidationError(
@@ -1092,6 +1153,7 @@ def generation_result_to_agent_turn_fields(payload: Any) -> dict[str, Any]:
             "tokenizer_name": result["tokenizer_name"],
             "tokenizer_revision": result["tokenizer_revision"],
             "thinking_mode": result["thinking_mode"],
+            "analysis_tier": result["analysis_tier"],
             "enable_thinking": result["enable_thinking"],
             "generation_settings": copy.deepcopy(result["generation_settings"]),
             "raw_poison_exposed": result["raw_poison_exposed"],
@@ -1105,9 +1167,13 @@ def activation_artifact_path(request: dict[str, Any]) -> str:
     trajectory_id = str(request["trajectory_id"])
     thinking_mode = str(request["thinking_mode"])
     step_index = int(request["step_index"])
+    analysis_tier = _validate_analysis_tier(request.get("analysis_tier"))
     _validate_safe_id(trajectory_id, "trajectory_id")
+    parts = ["activations"]
+    if analysis_tier is not None:
+        parts.append(analysis_tier)
     path = PurePosixPath(
-        "activations",
+        *parts,
         trajectory_id,
         thinking_mode,
         f"step_{step_index:03d}.pt",

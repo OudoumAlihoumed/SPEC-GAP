@@ -11,6 +11,10 @@ import sys
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.infrastructure.modal_billing import (  # noqa: E402
+    scenario1_billing_tags,
+    validate_analysis_tier,
+)
 from src.infrastructure.modal_qwen_runner import Qwen3Runner, app  # noqa: E402
 from src.scenario1.batch import (  # noqa: E402
     build_live_batch,
@@ -19,6 +23,7 @@ from src.scenario1.batch import (  # noqa: E402
 )
 from src.scenario1.generator import ARTIFACT_ROOT, load_registries  # noqa: E402
 from src.scenario1.orchestrator import (  # noqa: E402
+    load_model_turn_result,
     run_live_trajectory,
     write_live_trajectory,
     write_model_turn_result,
@@ -33,9 +38,11 @@ def run_scenario1_batch(
     output_root: str = str(Path(ARTIFACT_ROOT) / "trajectories"),
     max_new_trajectories: int = 0,
     confirm_paid_run: str = "",
+    analysis_tier: str = "exploratory",
 ) -> None:
     """Validate or resume selected match groups in one Modal app."""
 
+    analysis_tier = validate_analysis_tier(analysis_tier)
     modes = [mode.strip() for mode in thinking_modes.split(",") if mode.strip()]
     selected_registry_paths = [
         path.strip() for path in registry_paths.split(",") if path.strip()
@@ -51,6 +58,7 @@ def run_scenario1_batch(
         registries,
         thinking_modes=modes,
         output_root=output_root,
+        analysis_tier=analysis_tier,
     )
     completed: list[tuple[dict, dict]] = []
     pending = []
@@ -81,6 +89,17 @@ def run_scenario1_batch(
         "selected_new_trajectories": len(selected),
         "selected_model_turns": model_turns,
         "thinking_modes": modes,
+        "analysis_tier": analysis_tier,
+        "generation_protocol_ids": sorted({
+            item["structural_record"]["generation_protocol_id"]
+            for item in plan
+        }),
+        "max_new_tokens": sorted({
+            item["structural_record"]["model"]["decoding_settings"][
+                "max_new_tokens"
+            ]
+            for item in plan
+        }),
         "independence_group_ids": [
             registry["independence_group_id"] for registry in registries
         ],
@@ -102,7 +121,36 @@ def run_scenario1_batch(
         print("Nothing to run: every selected trajectory already exists and validates.")
         return
 
+    billing_tags = scenario1_billing_tags(
+        domain_ids=[
+            item["structural_record"]["domain_id"] for item in selected
+        ],
+        generation_protocol_ids=[
+            item["structural_record"]["generation_protocol_id"]
+            for item in selected
+        ],
+        run_kind=("smoke" if len(selected) <= 2 else "batch"),
+        analysis_tier=analysis_tier,
+    )
+    app.set_tags(billing_tags)
+    print(json.dumps({
+        "modal_app_id": app.app_id,
+        "billing_tags": billing_tags,
+    }, indent=2), flush=True)
+
     runner = Qwen3Runner()
+
+    def generate_or_resume(request: dict) -> dict:
+        checkpoint = load_model_turn_result(request, output_root)
+        if checkpoint is not None:
+            print(
+                "[checkpoint] reusing "
+                f"{request['trajectory_id']} step {request['step_index']}",
+                flush=True,
+            )
+            return checkpoint
+        return runner.generate_agent_turn.remote(request)
+
     new_results = []
     for index, item in enumerate(selected, start=1):
         print(
@@ -112,7 +160,8 @@ def run_scenario1_batch(
         live = run_live_trajectory(
             item["structural_record"],
             thinking_mode=item["thinking_mode"],
-            generate_turn=runner.generate_agent_turn.remote,
+            analysis_tier=analysis_tier,
+            generate_turn=generate_or_resume,
             on_turn_complete=lambda _request, result: write_model_turn_result(
                 result, output_root
             ),
@@ -141,9 +190,9 @@ def run_scenario1_batch(
         "existing_estimated_model_turn_h200_cost_usd": round(all_cost, 8),
         "new_estimated_model_turn_h200_cost_usd": round(new_cost, 8),
         "billing_note": (
-            "Per-turn estimates include any cold-start time charged to the first "
-            "remote call but exclude CPU, memory, storage, credits, and discounts. "
-            "Modal billing is the final source."
+            "Per-turn estimates cover measured model-turn method time only. "
+            "They exclude App startup, model loading, idle time, CPU, memory, "
+            "storage, credits, and discounts. Modal billing is authoritative."
         ),
     }, indent=2), flush=True)
 

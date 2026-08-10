@@ -11,15 +11,19 @@ import sys
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.infrastructure.modal_qwen_runner import Qwen3Runner, app
-from src.scenario1.generator import (
+from src.infrastructure.modal_billing import (  # noqa: E402
+    scenario1_billing_tags,
+    validate_analysis_tier,
+)
+from src.infrastructure.modal_qwen_runner import Qwen3Runner, app  # noqa: E402
+from src.scenario1.generator import (  # noqa: E402
     ARTIFACT_ROOT,
     REGISTRY_PATH,
     build_record,
     build_request_plan,
     load_registry,
 )
-from src.scenario1.orchestrator import (
+from src.scenario1.orchestrator import (  # noqa: E402
     run_live_trajectory,
     write_live_trajectory,
     write_model_turn_result,
@@ -35,6 +39,7 @@ def run_scenario1_trajectory(
     action: str = "validate",
     output_root: str = str(Path(ARTIFACT_ROOT) / "trajectories"),
     confirm_paid_run: str = "",
+    analysis_tier: str = "exploratory",
 ) -> None:
     """Build the plan without compute, or run one guarded paid trajectory."""
 
@@ -44,10 +49,15 @@ def run_scenario1_trajectory(
         raise ValueError("treatment must be 'clean' or 'injected'")
     if thinking_mode not in {"on", "off"}:
         raise ValueError("thinking_mode must be 'on' or 'off'")
+    analysis_tier = validate_analysis_tier(analysis_tier)
 
     registry = load_registry(registry_path)
     structural = build_record(registry, condition_id, treatment)
-    request_plan = build_request_plan([structural], [thinking_mode])
+    request_plan = build_request_plan(
+        [structural],
+        [thinking_mode],
+        analysis_tier=analysis_tier,
+    )
 
     if action == "validate":
         print(json.dumps({
@@ -58,6 +68,7 @@ def run_scenario1_trajectory(
             "condition_id": condition_id,
             "treatment": treatment,
             "thinking_mode": thinking_mode,
+            "analysis_tier": analysis_tier,
             "agent_order": [request["agent_id"] for request in request_plan],
             "model_turn_count": len(request_plan),
             "activation_layers": request_plan[0]["activation_layers"],
@@ -72,10 +83,23 @@ def run_scenario1_trajectory(
             "--confirm-paid-run RUN_H200_TRAJECTORY"
         )
 
+    billing_tags = scenario1_billing_tags(
+        domain_ids=[structural["domain_id"]],
+        generation_protocol_ids=[structural["generation_protocol_id"]],
+        run_kind="single_trajectory",
+        analysis_tier=analysis_tier,
+    )
+    app.set_tags(billing_tags)
+    print(json.dumps({
+        "modal_app_id": app.app_id,
+        "billing_tags": billing_tags,
+    }, indent=2))
+
     runner = Qwen3Runner()
     live = run_live_trajectory(
         structural,
         thinking_mode=thinking_mode,
+        analysis_tier=analysis_tier,
         generate_turn=runner.generate_agent_turn.remote,
         on_turn_complete=lambda _request, result: write_model_turn_result(
             result, output_root

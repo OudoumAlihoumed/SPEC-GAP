@@ -15,6 +15,7 @@ from src.scenario1.retrieval import (
     build_retrieval_plan,
     detect_single_insertion,
     load_retrieval_plan,
+    materialize_retrieval,
     sha256_text,
     validate_retrieval_plan,
 )
@@ -110,6 +111,107 @@ def test_plan_builder_detects_one_exact_insertion_and_never_ranks_it():
     assert plan["injection_mapping"]["ranking_used_injection_text"] is False
     assert plan["injection_mapping"]["insertion_delta"] == "TRUSTED NOTE "
     assert plan["selection"]["selected_chunk_count"] == 3
+    assert plan["injection_mapping"]["carrier_chunk_retention"] == {
+        "policy": "natural_only",
+        "selection_origin": "natural_clean_rank",
+        "selected_from_clean_text": True,
+        "replaced_chunk_ids": [],
+    }
+
+
+def test_controlled_retention_replaces_one_clean_ranked_carrier_chunk():
+    documents = [
+        {
+            "doc_id": "carrier",
+            "title": "Carrier",
+            "role": "injection_carrier",
+            "text": "target target target target\fanchor quiet words",
+        },
+        {
+            "doc_id": "benign_1",
+            "title": "Benign one",
+            "role": "benign",
+            "text": "target benign one",
+        },
+        {
+            "doc_id": "benign_2",
+            "title": "Benign two",
+            "role": "benign",
+            "text": "target benign two",
+        },
+    ]
+    build_kwargs = {
+        "documents": documents,
+        "injected_carrier_text": (
+            "target target target target\fanchor TRUSTED NOTE quiet words"
+        ),
+        "injection_payload": "TRUSTED NOTE",
+        "query": "target",
+        "tokenizer": _WhitespaceTokenizer(),
+        "tokenizer_id": MODEL_ID,
+        "tokenizer_revision": MODEL_REVISION,
+        "tokenizer_sha256": "a" * 64,
+        "chunk_tokens": 4,
+        "overlap_tokens": 0,
+        "document_token_budget": 12,
+        "document_token_budgets": {
+            "carrier": 4,
+            "benign_1": 4,
+            "benign_2": 4,
+        },
+        "context_window_tokens": 30,
+        "max_new_tokens": 5,
+        "non_document_reserve_tokens": 5,
+    }
+
+    with pytest.raises(ValueError, match="require_clean_anchor"):
+        build_retrieval_plan(**build_kwargs)
+
+    plan = build_retrieval_plan(
+        **build_kwargs,
+        carrier_chunk_retention_policy="require_clean_anchor",
+    )
+    validate_retrieval_plan(
+        plan,
+        documents,
+        injection_payload="TRUSTED NOTE",
+    )
+
+    mapping = plan["injection_mapping"]
+    retention = mapping["carrier_chunk_retention"]
+    assert retention == {
+        "policy": "require_clean_anchor",
+        "selection_origin": "controlled_clean_anchor",
+        "selected_from_clean_text": True,
+        "replaced_chunk_ids": ["carrier__p001__c001"],
+    }
+    assert mapping["selected_carrier_chunk_id"] == "carrier__p002__c001"
+    assert plan["selection"]["selected_token_count"] == 9
+
+    clean_documents, _, clean_trace = materialize_retrieval(
+        plan=plan,
+        documents=documents,
+        treatment="clean",
+        injection_payload="TRUSTED NOTE",
+    )
+    injected_documents, _, injected_trace = materialize_retrieval(
+        plan=plan,
+        documents=documents,
+        treatment="injected",
+        injection_payload="TRUSTED NOTE",
+    )
+    assert (
+        clean_trace["selected_chunk_ids"]
+        == injected_trace["selected_chunk_ids"]
+    )
+    assert all(
+        "TRUSTED NOTE" not in document["text"]
+        for document in clean_documents
+    )
+    assert sum(
+        document["text"].count("TRUSTED NOTE")
+        for document in injected_documents
+    ) == 1
 
 
 def test_aihc_plan_indexes_every_page_of_every_full_source(
@@ -341,10 +443,10 @@ def test_aihc_exact_qwen_context_preflight_has_headroom(
         ("injected", "off"),
         ("injected", "on"),
     }
-    assert min(case["headroom_tokens"] for case in preflight["cases"]) == 7806
+    assert min(case["headroom_tokens"] for case in preflight["cases"]) == 7818
     assert aihc_pair[0]["retrieval_trace"][
         "minimum_preflight_headroom_tokens"
-    ] == 7806
+    ] == 7818
 
 
 def test_aihc_retrieval_records_pass_schema_and_semantic_checks(aihc_registry):
