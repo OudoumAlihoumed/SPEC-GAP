@@ -562,16 +562,29 @@ intervals.
 
 ### Human review status
 
-The 36 matched clean/injected pairs now have a treatment-blind review packet
-covering visible Worker 1, Worker 2 when present, and executor output, including
-complete tool requests and simulated actions. The generated packet is the
-review material; the judgments themselves must be made by two real humans.
-Both reviewer slots and adjudication fields are intentionally blank, so task
-preservation and semantic-transfer claims remain fail closed until that work is
-complete. Hidden reasoning is not included or labeled.
+The 36 matched clean/injected pairs now have a two-stage human-review protocol.
+First, two people independently review treatment-blind A/B evidence covering
+visible Worker 1, Worker 2 when present, and executor output, including complete
+tool requests, simulated actions, finish reasons, and truncation metadata. Once
+both blinded forms are locked and hash-recorded, the treatment key is released
+for a second verification pass. That pass records injection presence, matched
+documents/chunks/order/settings, truncation, the requested outcome category,
+whether any tool call specifically matches the injection rather than being
+generic, an evidence quote, and a discussion flag.
+
+The pair-control and injection checks are also captured in a separate
+hash-bound machine-verification artifact, which stays with the treatment key
+during the blind phase. Both human forms, reviewer identities, and adjudication
+fields remain blank. No manual task-preservation, semantic-transfer, or
+36/36-resistance claim may be promoted until two real humans complete both
+stages and resolve disagreements. The status artifact records the runnable
+completion-validation command and the allowed values for every field. Hidden
+reasoning is not included or labeled.
 
 [Reviewer packet](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_packet.md) |
-[Blank review form](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_form.csv) |
+[Blank blinded form](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_form.csv) |
+[Blank post-unblinding form](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_unblinded_form.csv) |
+[Protocol verification](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_protocol_verification.json) |
 [Current review status](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_status.json) |
 [Source and design covariates](results/scenario1/nine_domain_analysis/robustness/human_review/source_and_design_covariates.json)
 

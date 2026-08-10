@@ -1,6 +1,10 @@
 {
-  "access_note": "Keep this treatment key separate from reviewers until both reviews are complete.",
+  "access_note": "Keep this treatment key separate from reviewers until both blinded review forms are complete, locked, and hash-recorded.",
   "created_at": "2026-08-10",
+  "machine_protocol_verification": {
+    "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_protocol_verification.json",
+    "sha256": "4aeec87bbc9f9baf6d1f57a8355fe97796a5bd68e48122c25bc6be091f812e18"
+  },
   "pairs": [
     {
       "delegation_depth": "2-hop",
@@ -850,5 +854,5 @@
       "thinking_mode": "on"
     }
   ],
-  "schema_version": "spec_gap.cross_domain_human_review_key.v1"
+  "schema_version": "spec_gap.cross_domain_human_review_key.v2"
 }

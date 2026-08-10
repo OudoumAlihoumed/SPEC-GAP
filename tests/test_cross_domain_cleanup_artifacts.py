@@ -6,6 +6,7 @@ import csv
 import hashlib
 import json
 from pathlib import Path
+import runpy
 
 import pytest
 
@@ -14,6 +15,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ROBUSTNESS_ROOT = PROJECT_ROOT / "results/scenario1/nine_domain_analysis/robustness"
 HUMAN_REVIEW_ROOT = ROBUSTNESS_ROOT / "human_review"
 PRIMARY_PROBE = "goldowsky_dill_logistic"
+HUMAN_REVIEW_SCRIPT = (
+    PROJECT_ROOT / "scripts/04_reporting/18_build_cross_domain_human_review.py"
+)
 
 
 def _load_json(path: Path) -> dict:
@@ -132,6 +136,7 @@ def test_dual_human_review_stays_blind_blank_and_fail_closed():
     evidence = _load_json(HUMAN_REVIEW_ROOT / "human_review_evidence.json")
     status = _load_json(HUMAN_REVIEW_ROOT / "human_review_status.json")
     key = _load_json(HUMAN_REVIEW_ROOT / "human_review_key.json")
+    protocol = _load_json(HUMAN_REVIEW_ROOT / "human_review_protocol_verification.json")
 
     assert evidence["pair_count"] == 36
     assert len(evidence["review_samples"]) == 36
@@ -141,6 +146,18 @@ def test_dual_human_review_stays_blind_blank_and_fail_closed():
     )
     assert status["adjudication"]["adjudicator_id_or_pseudonym"] is None
     assert "AI-generated ratings do not satisfy this gate" in status["fail_closed_note"]
+    assert (
+        status["stages"]["post_unblinding_protocol_and_outcome_review"]["status"]
+        == "blocked_pending_blinded_form_lock"
+    )
+    assert "--validate-completed-review-dir" in status["completion_validation_command"]
+    assert status["review_rubric"]["post_unblinding_phase"]["outcome"] == [
+        "resisted",
+        "propagated_but_not_executed",
+        "attempted_but_blocked",
+        "executed",
+        "indeterminate",
+    ]
 
     forbidden_reviewer_keys = {
         "activation_metadata",
@@ -153,16 +170,56 @@ def test_dual_human_review_stays_blind_blank_and_fail_closed():
     }
     assert forbidden_reviewer_keys.isdisjoint(set(_walk_keys(evidence)))
     assert len([row for row in key["pairs"] if row["priority_reasons"]]) == 9
+    assert protocol["pair_count"] == 36
+    assert all(
+        pair["full_pair_controls"]["same_docs_chunks_order_settings"]
+        for pair in protocol["pairs"]
+    )
+    assert all(
+        sample["injection_present_verified"]
+        and sample["all_agent_turns_truncated_false"]
+        for pair in protocol["pairs"]
+        for sample in pair["samples"].values()
+    )
+    assert all(
+        pair["paired_control_verification"]["same_docs_chunks_order_settings"]
+        for pair in evidence["review_samples"]
+    )
+    assert all(
+        turn["truncated"] is False and turn["finish_reason"] == "stop"
+        for pair in evidence["review_samples"]
+        for sample in pair["samples"].values()
+        for turn in sample["turn_completion_metadata"]
+    )
 
     rows = list(csv.DictReader((HUMAN_REVIEW_ROOT / "human_review_form.csv").open()))
     assert len(rows) == 72
     manual_fields = [
-        field for field in rows[0] if field not in {"pair_id", "reviewer_slot"}
+        field
+        for field in rows[0]
+        if field
+        not in {"pair_id", "domain", "hop_depth", "thinking_mode", "reviewer_slot"}
     ]
     assert all(not row[field] for row in rows for field in manual_fields)
 
+    unblinded_rows = list(
+        csv.DictReader((HUMAN_REVIEW_ROOT / "human_review_unblinded_form.csv").open())
+    )
+    assert len(unblinded_rows) == 72
+    unblinded_manual_fields = [
+        field
+        for field in unblinded_rows[0]
+        if field
+        not in {"pair_id", "domain", "hop_depth", "thinking_mode", "reviewer_slot"}
+    ]
+    assert all(
+        not row[field] for row in unblinded_rows for field in unblinded_manual_fields
+    )
+
     for field in (
         "manual_review_form",
+        "machine_protocol_verification",
+        "post_unblinding_review_form",
         "reviewer_facing_evidence",
         "reviewer_facing_packet",
         "separate_treatment_key",
@@ -171,6 +228,16 @@ def test_dual_human_review_stays_blind_blank_and_fail_closed():
         path = PROJECT_ROOT / binding["path"]
         assert path.is_file()
         assert _sha256(path) == binding["sha256"]
+
+
+def test_completed_review_validator_rejects_the_intentionally_blank_forms():
+    namespace = runpy.run_path(
+        str(HUMAN_REVIEW_SCRIPT),
+        run_name="spec_gap_cross_domain_human_review_validation",
+    )
+
+    with pytest.raises(ValueError, match="incomplete"):
+        namespace["validate_completed_review_directory"](HUMAN_REVIEW_ROOT)
 
 
 def test_design_covariates_bind_prior_pr_evidence_and_disclose_styles():
