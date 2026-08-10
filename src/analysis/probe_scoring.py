@@ -27,6 +27,10 @@ EVALUATION_METHOD = "leave_one_match_group_out"
 SUPPORTED_CHECKPOINT = "last_input_token"
 PROBE_NAMES = ("goldowsky_dill_logistic", "lat_contrast_pair_pca")
 PROBE_SCORE_LABEL_TARGETS = {"injection_present"}
+ACTIVATION_PREPROCESSING_METHODS = {
+    "none",
+    "train_domain_mean_residualized",
+}
 BEHAVIORAL_OUTCOMES = {
     "clean",
     "resisted",
@@ -52,10 +56,14 @@ def load_match_group_designs(path: str | Path) -> dict[str, MatchGroupDesign]:
     try:
         payload = json.loads(source.read_text())
     except (OSError, json.JSONDecodeError) as error:
-        raise ValueError(f"Cannot load Scenario 1 manifest {source}: {error}") from error
+        raise ValueError(
+            f"Cannot load Scenario 1 manifest {source}: {error}"
+        ) from error
     trajectories = payload.get("trajectories") if isinstance(payload, dict) else None
     if not isinstance(trajectories, list) or not trajectories:
-        raise ValueError("Scenario 1 manifest must contain a non-empty trajectories list.")
+        raise ValueError(
+            "Scenario 1 manifest must contain a non-empty trajectories list."
+        )
 
     designs: dict[str, MatchGroupDesign] = {}
     for index, entry in enumerate(trajectories):
@@ -89,6 +97,7 @@ def generate_per_step_probe_scores(
     verify_checksums: bool = True,
     random_state: int = 42,
     max_iter: int = 1000,
+    activation_preprocessing: str = "none",
 ) -> list[dict[str, Any]]:
     """Create held-out Goldowsky-Dill and LAT scores for every agent step.
 
@@ -107,6 +116,12 @@ def generate_per_step_probe_scores(
     if checkpoint != SUPPORTED_CHECKPOINT:
         raise ValueError(
             "Only last_input_token is qualified for the current controlled analysis."
+        )
+    if activation_preprocessing not in ACTIVATION_PREPROCESSING_METHODS:
+        raise ValueError(
+            "activation_preprocessing must be one of "
+            f"{sorted(ACTIVATION_PREPROCESSING_METHODS)}, got "
+            f"{activation_preprocessing!r}."
         )
 
     rows = [dict(row) for row in index_rows if row.get("checkpoint") == checkpoint]
@@ -156,11 +171,18 @@ def generate_per_step_probe_scores(
                         f"{thinking_mode}/{agent_id}/layer-{layer}."
                     )
 
-                probe_outputs = _fit_fold_probes(
+                X_train, X_test = preprocess_activation_fold(
                     activations[train_mask],
+                    activations[test_mask],
+                    train_groups=groups[train_mask],
+                    method=activation_preprocessing,
+                )
+
+                probe_outputs = _fit_fold_probes(
+                    X_train,
                     y_train,
                     pair_ids[train_mask],
-                    activations[test_mask],
+                    X_test,
                     random_state=random_state,
                     max_iter=max_iter,
                 )
@@ -168,16 +190,21 @@ def generate_per_step_probe_scores(
                 for probe_name, (probabilities, fit_status) in probe_outputs.items():
                     for batch_index, probability in zip(test_indices, probabilities):
                         metadata = batch.metadata[int(batch_index)]
-                        score_rows.append(_score_row(
-                            metadata,
-                            score=float(probability),
-                            probe_name=probe_name,
-                            layer=int(layer),
-                            label_target=label_target,
-                            held_out_group=held_out_group,
-                            fit_status=fit_status,
-                            design=match_group_designs[str(metadata["match_group_id"])],
-                        ))
+                        score_rows.append(
+                            _score_row(
+                                metadata,
+                                score=float(probability),
+                                probe_name=probe_name,
+                                layer=int(layer),
+                                label_target=label_target,
+                                held_out_group=held_out_group,
+                                fit_status=fit_status,
+                                design=match_group_designs[
+                                    str(metadata["match_group_id"])
+                                ],
+                                activation_preprocessing=activation_preprocessing,
+                            )
+                        )
 
     return sorted(score_rows, key=_score_row_sort_key)
 
@@ -199,9 +226,9 @@ def summarize_per_step_probe_scores(rows: Sequence[dict[str, Any]]) -> dict[str,
         "label_targets": sorted({str(row["label_target"]) for row in rows}),
         "score_rows": len(rows),
         "trajectories": len({str(row["trajectory_id"]) for row in rows}),
-        "agent_steps": len({
-            (str(row["trajectory_id"]), int(row["hop_index"])) for row in rows
-        }),
+        "agent_steps": len(
+            {(str(row["trajectory_id"]), int(row["hop_index"])) for row in rows}
+        ),
         "match_groups": sorted({str(row["match_group_id"]) for row in rows}),
         "thinking_modes": sorted({str(row["thinking_mode"]) for row in rows}),
         "probes": sorted({str(row["probe_name"]) for row in rows}),
@@ -272,6 +299,50 @@ def _fit_fold_probes(
     }
 
 
+def preprocess_activation_fold(
+    X_train: np.ndarray,
+    X_test: np.ndarray,
+    *,
+    train_groups: np.ndarray,
+    method: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Apply a fold-local activation transform without using held-out values.
+
+    ``train_domain_mean_residualized`` subtracts each observed training
+    domain's mean from its own training rows.  The held-out domain is unseen,
+    so its rows receive only the training-fold grand-mean fallback.  Neither a
+    held-out activation nor a held-out label contributes to either transform.
+    """
+
+    if method not in ACTIVATION_PREPROCESSING_METHODS:
+        raise ValueError(
+            "method must be one of "
+            f"{sorted(ACTIVATION_PREPROCESSING_METHODS)}, got {method!r}."
+        )
+    train = np.asarray(X_train, dtype=np.float32)
+    test = np.asarray(X_test, dtype=np.float32)
+    groups = np.asarray(train_groups)
+    if train.ndim != 2 or test.ndim != 2 or train.shape[1] != test.shape[1]:
+        raise ValueError("Training and held-out activations must be aligned matrices.")
+    if len(groups) != len(train):
+        raise ValueError("train_groups must align with the training activations.")
+    if method == "none":
+        return train, test
+    if not len(train):
+        raise ValueError("Residualization requires at least one training activation.")
+
+    domain_means = {
+        group: train[groups == group].mean(axis=0, dtype=np.float64)
+        for group in sorted(set(groups.tolist()))
+    }
+    residualized_train = np.stack(
+        [row - domain_means[group] for row, group in zip(train, groups)]
+    ).astype(np.float32, copy=False)
+    train_grand_mean = train.mean(axis=0, dtype=np.float64)
+    residualized_test = (test - train_grand_mean).astype(np.float32, copy=False)
+    return residualized_train, residualized_test
+
+
 def _contrast_pair_differences(
     X: np.ndarray,
     y: np.ndarray,
@@ -305,6 +376,7 @@ def _score_row(
     held_out_group: str,
     fit_status: str,
     design: MatchGroupDesign,
+    activation_preprocessing: str,
 ) -> dict[str, Any]:
     outcome = str(metadata["outcome_class"])
     if outcome not in BEHAVIORAL_OUTCOMES:
@@ -328,7 +400,7 @@ def _score_row(
         else "not_candidate"
     )
     hop_index = int(metadata["hop_index"])
-    return {
+    row = {
         "schema_version": PER_STEP_SCORE_SCHEMA,
         "artifact_kind": "held_out_probe_score",
         "claim_scope": "construction_label_diagnostic",
@@ -363,6 +435,9 @@ def _score_row(
         "held_out_match_group_id": held_out_group,
         "fit_status": fit_status,
     }
+    if activation_preprocessing != "none":
+        row["activation_preprocessing"] = activation_preprocessing
+    return row
 
 
 def _validate_index_design(
@@ -374,7 +449,9 @@ def _validate_index_design(
     observed_groups = {str(row.get("match_group_id")) for row in rows}
     missing_designs = sorted(observed_groups - set(match_group_designs))
     if missing_designs:
-        raise ValueError(f"Manifest metadata is missing match groups: {missing_designs}")
+        raise ValueError(
+            f"Manifest metadata is missing match groups: {missing_designs}"
+        )
     for index, row in enumerate(rows):
         if row.get("labels", {}).get(label_target) not in (0, 1):
             raise ValueError(
@@ -383,7 +460,9 @@ def _validate_index_design(
         if row.get("thinking_mode") not in {"off", "on"}:
             raise ValueError(f"Activation-index row {index} has invalid thinking_mode.")
         if row.get("delegation_depth") not in {"2-hop", "3-hop"}:
-            raise ValueError(f"Activation-index row {index} has invalid delegation_depth.")
+            raise ValueError(
+                f"Activation-index row {index} has invalid delegation_depth."
+            )
         if row.get("treatment") not in {"clean", "injected"}:
             raise ValueError(f"Activation-index row {index} has invalid treatment.")
 

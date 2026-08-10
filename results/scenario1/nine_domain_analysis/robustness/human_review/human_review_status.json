@@ -1,0 +1,46 @@
+{
+  "adjudication": {
+    "adjudicator_id_or_pseudonym": null,
+    "completed_at": null,
+    "notes": null,
+    "required_if_disagreement": true
+  },
+  "created_at": "2026-08-10",
+  "fail_closed_note": "Do not promote task-preservation, semantic-transfer, or generic-tool-call judgments to paper-facing claims until two real humans complete all 36 pairs and disagreements are adjudicated. AI-generated ratings do not satisfy this gate.",
+  "manual_review_form": {
+    "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_form.csv",
+    "sha256": "674f858ff72bd7ebdcf79c1b4a7d25bf0442184cd90773e9e2f4b6640732724c"
+  },
+  "pair_count": 36,
+  "reasoning_channel": "Not included and not labeled; separate human or mechanistic evidence would be required.",
+  "reviewer_facing_evidence": {
+    "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_evidence.json",
+    "sha256": "44f8be6945a1f698f9509d1100ba10aa7d276d8cfa28ee1fa6b4fa450afb2016"
+  },
+  "reviewer_facing_packet": {
+    "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_packet.md",
+    "sha256": "a02a77cf5fae2697c93348058dcb163035402f341b406095c06589402658f1b9"
+  },
+  "reviewers": [
+    {
+      "completed_at": null,
+      "completed_row_count": 0,
+      "reviewer_id_or_pseudonym": null,
+      "reviewer_slot": 1,
+      "signed_form_sha256": null
+    },
+    {
+      "completed_at": null,
+      "completed_row_count": 0,
+      "reviewer_id_or_pseudonym": null,
+      "reviewer_slot": 2,
+      "signed_form_sha256": null
+    }
+  ],
+  "schema_version": "spec_gap.cross_domain_dual_human_review.v1",
+  "separate_treatment_key": {
+    "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_key.json",
+    "sha256": "bbb19dc10f1218194beb06f7e5176978779d1861b32a8d535f44ded791019d08"
+  },
+  "status": "pending_two_independent_human_reviews"
+}

@@ -1,0 +1,10 @@
+domain_id,domain_label,match_group_id,injection_style,carrier_retention_and_position
+aihc,AIHC,aihc,plain_text,natural_only
+convex,Convex,convex_open_access_v3,chat_special_tokens_and_explicit_tool_syntax,natural_only
+fin,Finance,fin,plain_text,natural_only
+kg,Knowledge Graphs,kg,chat_special_tokens_and_explicit_tool_syntax,natural_only
+macro,Macro,macro,think_tag_wrapped_text,natural_only
+neuro,Neuro,neuro,plain_text,natural_only
+petro,Petroleum,petro,plain_text,natural_only
+policy,Policy,policy,plain_text,require_clean_anchor_position_adjusted
+telecom,Telecom,telecom,plain_text,require_clean_anchor_position_adjusted

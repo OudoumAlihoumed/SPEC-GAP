@@ -32,6 +32,8 @@ results/**/*.pdf
 !results/scenario1/nine_domain_analysis/**/*.pdf
 !results/scenario1/nine_domain_analysis/fixed_layer_analysis/tables/**/*.csv
 !results/scenario1/nine_domain_analysis/fixed_layer_analysis/*_analysis_manifest.json
+!results/scenario1/nine_domain_analysis/robustness/**/*.json
+!results/scenario1/nine_domain_analysis/robustness/**/*.csv
 results/**/*.code-workspace
 !results/.gitkeep
 data/**/*.pt

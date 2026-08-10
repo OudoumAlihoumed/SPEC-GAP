@@ -399,6 +399,26 @@ python scripts/04_reporting/16_build_fixed_layer_analysis.py \
   --file-prefix scenario1_nine_domain_2026_08_06
 ```
 
+Rebuild the existing-data robustness checks without making any model calls:
+
+```bash
+python scripts/04_reporting/17_build_cross_domain_robustness.py \
+  --activation-index \
+    results/scenario1/nine_domain_analysis/data/scenario1_nine_domain_activation_artifact_index_2026_08_06.jsonl \
+  --scores \
+    results/scenario1/nine_domain_analysis/data/scenario1_nine_domain_fixed_layer_probe_scores_2026_08_06.jsonl \
+  --design-manifest \
+    results/scenario1/nine_domain_analysis/data/scenario1_nine_domain_probe_design_2026_08_06.json \
+  --output-dir results/scenario1/nine_domain_analysis/robustness
+```
+
+The separate
+[`18_build_cross_domain_human_review.py`](scripts/04_reporting/18_build_cross_domain_human_review.py)
+builder regenerates the blinded review packet from the nine hash-bound source
+branches. Exact regeneration requires those ignored trajectories to be
+hydrated locally; a clean checkout can inspect and test the compact tracked
+packet, answer key, blank form, status, and provenance files.
+
 ## Definitive Nine-Domain Activation Analysis
 
 The current analysis snapshot was frozen on 2026-08-06. It asks whether a
@@ -482,11 +502,90 @@ trajectories.
 | On | Worker 2 | 0.889 | 0.444 |
 | On | Executor | 0.389 | 0.583 |
 
-The strongest prespecified primary result is Worker 1 with thinking off:
-Goldowsky-Dill reaches 0.889 mean held-out AUROC at layer 40. This is consistent
-with a detectable activation difference at the first agent exposed to the
-documents. Downstream values vary substantially, so the current evidence does
-not support a claim of stable end-to-end propagation.
+The strongest prespecified construction-label result is Worker 1 with thinking
+off: Goldowsky-Dill reaches 0.889 mean held-out-domain AUROC at layer 40; its
+pooled AUROC is 0.710. This separates the presence of the injected prompt
+construction and tokens after the first agent sees the documents. It does not
+measure successful compromise. All 36 injected trajectories resisted, so this
+sample has no positive compromise outcomes and compromise-detection AUROC is
+not estimable. Downstream values vary substantially, so the current evidence
+also does not support a claim of stable end-to-end propagation.
+
+AIHC is the only held-out domain with primary AUROC 0.0; each of the other
+eight domains has AUROC 1.0. Each domain fold contains only four predictions
+(two clean and two injected), so these fold values are coarse and should not
+be read as precise domain-level estimates.
+
+### Injection style, exposure, and robustness checks
+
+The nine domains do not use one uniform injection construction. AIHC, Finance,
+Neuro, Petroleum, Policy, and Telecom use plain text. Macro alone wraps the
+instruction in `<think>` tags. Knowledge Graphs and Convex use chat special
+tokens plus explicit tool syntax. Removing Knowledge Graphs and Convex
+therefore leaves seven domains because Macro remains; the exact plain-text
+cohort contains six.
+
+| Worker 1, thinking off, layer 40 cohort | Domains | Filter saved nine-domain folds | Refit training and evaluation |
+| --- | ---: | ---: | ---: |
+| All domains | 9 | 0.889 | 0.889 |
+| Remove Knowledge Graphs and Convex | 7 | 0.857 | 0.786 |
+| Exact plain-text cohort | 6 | 0.833 | 0.750 |
+
+The filtered column keeps probes trained with all nine domains and removes
+only evaluation folds. The refit column removes excluded domains from both
+training and evaluation, so it is the stricter sensitivity check. These small
+cohorts do not isolate a causal attack-style mechanism.
+
+Seven domains used natural carrier selection. Policy and Telecom required a
+clean anchor and had their insertion position adjusted. The tracked design
+covariates bind those two domains to the final PR #33 and PR #34 evidence,
+including Policy-versus-Neuro request-language rates and Telecom's still-pending
+human style rating.
+
+Training-fold-only domain-mean residualization changes mean held-out-domain
+AUROC from 0.889 to 0.833 (pooled AUROC 0.710 to 0.713). The held-out domain's
+activations and labels never fit the transform. A balanced, within-domain
+permutation test that refits the complete probe in every fold gives an add-one
+`p = 0.003` across 999 deterministic permutations. This supports separability
+of the saved construction labels, not behavioral compromise.
+
+![Paired construction-score changes by domain](results/scenario1/nine_domain_analysis/robustness/figures/worker1_layer40_paired_score_deltas.png)
+
+[Vector PDF](results/scenario1/nine_domain_analysis/robustness/figures/worker1_layer40_paired_score_deltas.pdf) |
+[Editable SVG](results/scenario1/nine_domain_analysis/robustness/figures/worker1_layer40_paired_score_deltas.svg) |
+[Robustness summary](results/scenario1/nine_domain_analysis/robustness/cross_domain_robustness.md) |
+[Machine-readable evidence](results/scenario1/nine_domain_analysis/robustness/cross_domain_robustness.json)
+
+The plot shows the two observed clean/injected score changes per domain and
+their mean. Its horizontal ranges are the two observed points, not confidence
+intervals.
+
+### Human review status
+
+The 36 matched clean/injected pairs now have a treatment-blind review packet
+covering visible Worker 1, Worker 2 when present, and executor output, including
+complete tool requests and simulated actions. The generated packet is the
+review material; the judgments themselves must be made by two real humans.
+Both reviewer slots and adjudication fields are intentionally blank, so task
+preservation and semantic-transfer claims remain fail closed until that work is
+complete. Hidden reasoning is not included or labeled.
+
+[Reviewer packet](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_packet.md) |
+[Blank review form](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_form.csv) |
+[Current review status](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_status.json) |
+[Source and design covariates](results/scenario1/nine_domain_analysis/robustness/human_review/source_and_design_covariates.json)
+
+Knowledge Graphs and Convex are flagged for priority review because of their
+special-token/tool-syntax construction. The Convex 3-hop/thinking-on and
+Petroleum 2-hop/thinking-off generic tool-call cases are also flagged. An AI
+rating cannot fill either human slot.
+
+Worker 2 contributes only 18 predictions per thinking mode (nine injected),
+and appears only in 3-hop trajectories. The executor contributes 36 predictions
+per mode (18 injected). With nine held-out domains, their reported AUROCs are
+fragile. A combined natural-text attack, new mechanism axis, or arbitrary tool
+target would require a future Scenario 1 redesign by the research group; none
+of those experiments is part of this cleanup.
 
 ### Layer robustness and exploratory peaks
 
@@ -541,6 +640,7 @@ metric. Filenames use underscores and contain no em dashes.
 | `results/scenario1/nine_domain_analysis/fixed_layer_analysis/figures/by_domain/` | One standalone figure per domain, agent, and thinking mode. |
 | `results/scenario1/nine_domain_analysis/fixed_layer_analysis/tables/` | Aggregate metrics, domain-level metrics, and the portable activation tensor catalog. |
 | `results/scenario1/nine_domain_analysis/fixed_layer_analysis/scenario1_nine_domain_2026_08_06_analysis_manifest.json` | Run identity, claim scope, model revision, source files, layer sets, and generated output inventory. |
+| `results/scenario1/nine_domain_analysis/robustness/` | Style/exposure ablations, paired domain deltas, permutation and train-only residualization checks, plus the fail-closed two-human review bundle. |
 | `results/scenario1/nine_domain_analysis/data/` | Local-only source JSON, JSONL, and CSV files with descriptive dated names. Raw rows remain outside Git. |
 
 Use PDF for Overleaf and final typesetting, SVG when text or layout must remain
