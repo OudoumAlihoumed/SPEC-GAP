@@ -83,6 +83,7 @@ real endpoint.
 | Model execution | `scripts/02_model_execution/` | Validate, run, resume, repair, and reconcile Modal jobs |
 | Probe analysis | `scripts/03_probe_analysis/` | Index activations, scan layers, score probes, and analyze depth |
 | Reporting | `scripts/04_reporting/` | Rebuild public figures, tables, manifests, robustness checks, and review packets |
+| Ordered runbook | `docs/scenario1/pipeline-runbook.md` | Canonical `S00`–`S23` command order, gates, inputs, and outputs |
 | Reusable code | `src/` | Pipeline, infrastructure, extraction, probes, and analysis modules |
 | Frozen results | `results/scenario1/` | Dated result artifacts retained for reproducibility |
 | Tests | `tests/` | Unit, integration, provenance, naming, and reporting checks |
@@ -130,146 +131,87 @@ source .venv/bin/activate
 python -m pip install -e ".[dev,modal]"
 ```
 
+Package authors who rebuild retrieval inputs directly from source PDFs also
+need Poppler's `pdftotext` executable. It is a conditional `S03` system
+dependency, not a Python package; the
+[pipeline runbook](docs/scenario1/pipeline-runbook.md#s03-s06-only-when-constructing-or-changing-a-package)
+shows how to check it before package work.
+
 Run the complete test suite:
 
 ```bash
 python -m pytest -q
 ```
 
-## Safe smoke test
+## Start here
 
-Run the portable smoke command first:
+Run commands from the repository root. Every checkout starts with the same two
+local, no-network checks:
 
 ```bash
+python scripts/00_repository/00_show_pipeline.py --check
 python scripts/run_portable_smoke_test.py
 ```
 
-It builds and schema-validates all 44 structural trajectories across the two
-shared core fixtures and nine active fellow packages, then validates 308 Modal
-request templates. All output is written to temporary storage and removed. The
-command does not need network access, call Qwen, or start a GPU, and it does not
-reuse local trajectories or activation artifacts. Pass `--output-root PATH`
-only when you intentionally want to retain its dry-run files for inspection;
-the path must be new or empty, and the command refuses to overwrite files.
+The first command validates the unique repository-wide `S00`–`S23` run order,
+all declared entry points, and its checked-in runbook. The second builds and
+schema-validates all 44 structural trajectories across 11 active domains and
+validates 308 Modal request templates. It writes to temporary storage, calls no
+model, starts no GPU, and needs no private artifact cache.
 
-The lower-level default dry run builds just the two shared core fixtures—public
-health and climate science—without calling Qwen or starting a GPU:
+Choose the shortest path that matches the work:
 
-```bash
-python scripts/01_scenario_construction/01_generate_trajectories.py \
-  --mode dry_run
-```
+| Goal | Run | Stop point |
+| --- | --- | --- |
+| Check a checkout or code change | `S00`–`S02` | Portable smoke passes |
+| Rebuild public figures from tracked compact data | `S00`–`S02`, then `S20` | Reporting bundle passes |
+| Add or change a domain package | `S00`–`S06` | Package and context review pass |
+| Check authorized Modal access | `S07` | Workspace and billing owner are confirmed |
+| Execute a new experiment | `S07`–`S13` | Research-group approval and every paid gate pass |
+| Analyze hydrated run artifacts | `S14`–`S22` | Cohort, tier, policy, and hashes agree |
+| Finalize behavioral labels | `S23` | Two human reviews and adjudication are complete |
 
-To validate one active fellow package, pass its canonical configuration:
-
-```bash
-python scripts/01_scenario_construction/01_generate_trajectories.py \
-  --mode dry_run \
-  --registry \
-    experiments/scenario1/inputs/fellow_packages/aihc/domain_config.json
-```
-
-Validate generated records:
-
-```bash
-python scripts/01_scenario_construction/02_validate_trajectories.py \
-  experiments/scenario1/trajectories/*.json
-```
-
-Dry-run records contain no model response, action result, token IDs, or real
-activation path. They verify structure and request contracts only.
-
-## Pipeline
-
-Run commands from the repository root.
+The complete command-by-command guide is the
+[Scenario 1 pipeline runbook](docs/scenario1/pipeline-runbook.md). It states
+what to run, what each stage consumes and produces, which stages are optional,
+where remote or paid work begins, and when to stop. Existing filename numbers
+are stable phase-local names; the `Sxx` IDs are the unambiguous global order.
 
 ![Scenario 1 evaluation pipeline](docs/assets/scenario1_pipeline_overview.png)
 
-| Phase | Steps | Main outputs |
-| --- | ---: | --- |
-| Construction | 1–2 | Matched structural trajectories and validation reports |
-| Execution | 3–6 | Model turns, checkpoints, live trajectories, activations, and cost records |
-| Probe analysis | 7–12 | Activation index, layer scans, fixed-layer scores, and depth metrics |
-| Reporting | 13–18 | Public figures, tables, manifests, robustness evidence, and human-review materials |
-
-Detailed guides:
+Additional reference guides:
 
 - [Domain-package build guide](docs/scenario1/package-build-guide.md)
 - [Trajectory schema guide](docs/scenario1/schema.md)
 - [Full-corpus retrieval guide](docs/scenario1/full-corpus-retrieval.md)
 - [Modal execution and billing guide](docs/modal.md)
 
+To retain portable-smoke output for inspection, pass `--output-root` only with
+a new or empty path; the command refuses to overwrite existing content. Dry-run
+records verify structure and request contracts only. They contain no model
+response, action result, token IDs, or real activation path.
+
 ## Model execution on Modal
 
-Modal credentials are deliberately not stored in this repository. Each
-contributor must authenticate once, then confirm the intended workspace:
+Modal credentials are never stored in this repository. The runner is not tied
+to a person's filesystem or former workspace: app names, Volumes, caches,
+access, and billing belong to whichever workspace the active profile selects.
+A new workspace does not inherit another workspace's model cache or credits.
 
-```bash
-modal setup
-modal token info
-modal profile current
-```
-
-If the `modal` executable is not on `PATH`, use `python -m modal setup` or
-activate the environment created in [Installation](#installation).
-
-The runner is not tied to a particular person's workspace or filesystem. App
-and Volume names are resolved inside whichever workspace the active profile
-selects. A contributor who cannot access the lab workspace may use another
-authorized workspace, but its model cache and activation Volume are separate;
-that workspace owner is responsible for access, storage, and compute charges.
-Follow [the Modal guide](docs/modal.md#3-cache-the-model-without-a-gpu) to
-populate an empty workspace before its first paid model call.
-
-Check Modal authentication and workspace access with read-only CLI calls,
-without registering the production app, building its image, calling Qwen, or
-starting a GPU:
+Run `S07` before any remote preparation or paid work:
 
 ```bash
 python scripts/run_portable_smoke_test.py --check-modal
 ```
 
-This check fails with an actionable authentication message when credentials
-are absent. A successful result explicitly reports that no remote app, image
-build, model call, or GPU was started. The same command has already validated
-the 308 real request contracts locally.
-
-The following lower-level command enters Modal's app lifecycle. It does not
-call Qwen or allocate a GPU with `--action validate`, but Modal may prepare the
-app image and named resources, so workspace usage may occur:
-
-```bash
-modal run scripts/02_model_execution/03_modal_qwen_runner.py \
-  --request-path tests/fixtures/qwen_agent_turn_request.json \
-  --action validate
-```
-
-Validate one complete trajectory plan:
-
-```bash
-modal run \
-  scripts/02_model_execution/04_run_scenario1_live.py::run_scenario1_trajectory \
-  --condition-id 2-hop \
-  --treatment clean \
-  --thinking-mode off \
-  --action validate
-```
-
-Paid commands require an explicit confirmation string. Example:
-
-```bash
-modal run \
-  scripts/02_model_execution/04_run_scenario1_live.py::run_scenario1_trajectory \
-  --condition-id 2-hop \
-  --treatment clean \
-  --thinking-mode off \
-  --action run \
-  --confirm-paid-run RUN_H200_TRAJECTORY
-```
-
-The live pipeline is resumable and namespaces trajectories, checkpoints, and
-activations by `analysis_tier`. It saves each paid model turn before advancing.
-The repository's simulated tool never performs a real network action.
+This read-only check starts no production app, image build, model call, or GPU.
+The [pipeline runbook](docs/scenario1/pipeline-runbook.md#s07-s11-guarded-modal-execution)
+contains the complete credential, billing, cache, no-model validation,
+single-trajectory, and batch sequence. The separate
+[Modal guide](docs/modal.md) documents implementation and billing details.
+Paid stages require explicit confirmation strings, save every turn before
+advancing, isolate artifacts by `analysis_tier`, and use only a simulated
+no-network executor.
 
 ## Thinking and activation contract
 
@@ -367,19 +309,9 @@ same selected trajectory set and policy hash.
 
 The frozen combined activation index was migrated from schema v2 to v3 without
 changing any scientific row. The migration can assign only `unclassified`; it
-rejects attempts to relabel legacy rows as exploratory or definitive.
-
-After hydrating the ignored trajectory and tensor trees, the main analysis
-sequence is:
-
-```bash
-python scripts/03_probe_analysis/07_build_activation_index.py --help
-python scripts/03_probe_analysis/08_scan_activation_layers.py --help
-python scripts/03_probe_analysis/10_score_baseline_probes.py --help
-python scripts/03_probe_analysis/11_analyze_depth_degradation.py --help
-python scripts/03_probe_analysis/12_plot_probe_analysis.py \
-  --analysis-tier unclassified
-```
+rejects attempts to relabel legacy rows as exploratory or definitive. Runbook
+stages `S14`–`S22` give the exact artifact hydration, indexing, control, probe,
+depth, snapshot, fixed-layer, and robustness order.
 
 Rebuild the compact public reporting bundle without private trajectories or raw
 activation tensors:

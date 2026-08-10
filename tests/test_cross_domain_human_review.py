@@ -267,6 +267,35 @@ def test_manual_review_form_has_two_blank_rows_per_pair(tmp_path):
     )
 
 
+def test_review_bundle_refuses_overwrite_and_preserves_completed_form(tmp_path):
+    namespace = _namespace()
+    review_dir = tmp_path / "human-review"
+    review_dir.mkdir()
+    form = review_dir / "human_review_form.csv"
+    sentinel = "completed human judgments\n"
+    form.write_text(sentinel, encoding="utf-8")
+
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        namespace["prepare_new_review_output_directory"](review_dir)
+    with pytest.raises(FileExistsError):
+        namespace["write_blank_review_form"](form, [])
+
+    assert form.read_text(encoding="utf-8") == sentinel
+
+
+def test_review_bundle_accepts_only_new_or_empty_output(tmp_path):
+    namespace = _namespace()
+    new_dir = tmp_path / "new-review"
+    empty_dir = tmp_path / "empty-review"
+    empty_dir.mkdir()
+
+    namespace["prepare_new_review_output_directory"](new_dir)
+    namespace["prepare_new_review_output_directory"](empty_dir)
+
+    assert new_dir.is_dir() and not any(new_dir.iterdir())
+    assert empty_dir.is_dir() and not any(empty_dir.iterdir())
+
+
 def test_protocol_verification_preserves_blind_pair_controls():
     namespace = _namespace()
     clean = _record("aihc__2hop__clean__thinking_on", treatment="clean")
