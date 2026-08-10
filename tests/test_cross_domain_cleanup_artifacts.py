@@ -60,6 +60,10 @@ def test_tracked_public_outputs_are_unclassified_and_policy_bound():
         artifact = _load_json(path)
         assert artifact["analysis_tier"] == "unclassified"
         validate_embedded_paper_input_audit(artifact, policy)
+        if "source_files" in artifact:
+            assert artifact["source_files"]["paper_input_policy"] == (
+                "experiments/scenario1/paper_input_policy.json"
+            )
 
     assert (
         _load_json(HUMAN_REVIEW_ROOT / "source_and_design_covariates.json")[
@@ -176,6 +180,11 @@ def test_tracked_layer_scan_plot_cli_honors_policy_and_prefix(tmp_path, monkeypa
 
 def test_tracked_robustness_results_keep_claim_boundaries_and_sensitivities():
     artifact = _load_json(ROBUSTNESS_ROOT / "cross_domain_robustness.json")
+    policy_source = artifact["source_hashes"]["paper_input_policy"]
+    assert policy_source["path"] == (
+        "experiments/scenario1/paper_input_policy.json"
+    )
+    assert policy_source["sha256"] == _sha256(PAPER_INPUT_POLICY)
     cohorts = artifact["cohort_analyses"]
     primary = cohorts["all_nine_domains"]["full_training_and_evaluation_refit"][
         PRIMARY_PROBE

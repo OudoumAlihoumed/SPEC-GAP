@@ -87,6 +87,20 @@ def test_policy_neuro_request_language_audit_is_reproducible(
     assert reference["source_commit"] == (
         "369e93eb4459957d74a73aa45eefb1727e033693"
     )
+    assert reference["inputs"]["registry"] == (
+        "experiments/scenario1/inputs/fellow_packages/neuro/"
+        "registry_gen5000_v2.json"
+    )
+    assert reference["inputs"]["registry_sha256"] == (
+        "69d951531dbe42f4d47bbf3b4c479ae8a36675b4b4b3aba07543070a28cb5a53"
+    )
+    assert reference["inputs"]["retrieval_plan"] == (
+        "experiments/scenario1/inputs/fellow_packages/neuro/retrieval/"
+        "full_corpus_bm25_balanced_gen5000_v2.json"
+    )
+    assert reference["inputs"]["retrieval_plan_sha256"] == (
+        "fea8aaa3cb4b29b4e8b1a45bd2a13e888fabe6370083de4aed8e92405e1da4d3"
+    )
     assert len(reference["inputs"]["source_documents"]) == 3
     assert audit["domains"]["policy"]["inputs"]["registry_sha256"] == (
         _sha256(POLICY_REGISTRY)

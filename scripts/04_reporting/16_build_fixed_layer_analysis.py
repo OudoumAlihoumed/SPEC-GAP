@@ -65,6 +65,17 @@ PROBE_MARKERS = {
     "goldowsky_dill_logistic": "o",
     "lat_contrast_pair_pca": "s",
 }
+
+
+def _display_path(path: Path) -> str:
+    """Prefer a repository-relative source path when the file is in-tree."""
+
+    try:
+        return path.resolve().relative_to(PROJECT_ROOT.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 DOMAIN_LABELS = {
     "aihc": "AIHC",
     "fin": "Finance",
@@ -261,10 +272,10 @@ def main() -> None:
         "robustness_layers": list(robustness_layers),
         "probes": list(PROBE_LABELS.values()),
         "source_files": {
-            "activation_index": args.activation_index.as_posix(),
-            "probe_scores": args.scores.as_posix(),
-            "depth_analysis": args.depth_result.as_posix(),
-            "paper_input_policy": args.paper_input_policy.as_posix(),
+            "activation_index": _display_path(args.activation_index),
+            "probe_scores": _display_path(args.scores),
+            "depth_analysis": _display_path(args.depth_result),
+            "paper_input_policy": _display_path(args.paper_input_policy),
         },
         "depth_experiment_id": depth_result.get("experiment_id"),
         "outputs": {

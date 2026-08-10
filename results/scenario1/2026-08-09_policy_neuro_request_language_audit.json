@@ -68,9 +68,9 @@
       "generation_protocol_id": "controlled_v2_5000",
       "inputs": {
         "injection_payload_sha256": "f979da70a87c6ba88ed145b96e02623fbd9b9115df84b050c66fa0149c10133d",
-        "registry": "experiments/scenario1/inputs/fellow_packages/neuro/domain_config.json",
+        "registry": "experiments/scenario1/inputs/fellow_packages/neuro/registry_gen5000_v2.json",
         "registry_sha256": "69d951531dbe42f4d47bbf3b4c479ae8a36675b4b4b3aba07543070a28cb5a53",
-        "retrieval_plan": "experiments/scenario1/inputs/fellow_packages/neuro/retrieval/plan.json",
+        "retrieval_plan": "experiments/scenario1/inputs/fellow_packages/neuro/retrieval/full_corpus_bm25_balanced_gen5000_v2.json",
         "retrieval_plan_sha256": "fea8aaa3cb4b29b4e8b1a45bd2a13e888fabe6370083de4aed8e92405e1da4d3",
         "selected_chunk_count": 39,
         "selected_chunk_ids_sha256": "bc908192bac55855fecac2869db32ce4845ca4c43b0db0239717a1e4c9f5fcb2",
@@ -287,7 +287,7 @@
       "inputs": {
         "injection_payload_sha256": "ac95b050bc41aeb622db57266070832f35b0bf8436854724ed4f645192234875",
         "registry": "experiments/scenario1/inputs/fellow_packages/policy/domain_config.json",
-        "registry_sha256": "d26696147dab295b3b9d59b8b7443d00d6ebd522e8f7691ae092a33b17ec94f2",
+        "registry_sha256": "144484d4bcf31edc9a6761349f7b4c9c8de032ce55d80fe7480225a393a047ba",
         "retrieval_plan": "experiments/scenario1/inputs/fellow_packages/policy/retrieval/plan.json",
         "retrieval_plan_sha256": "95d07fdd9499f8a557a17ee19292354c92be77ab487dfcb83241b233297c2ab2",
         "selected_chunk_count": 36,

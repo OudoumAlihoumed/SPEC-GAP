@@ -127,7 +127,7 @@
     "request_language_audit": {
       "path": "results/scenario1/2026-08-09_policy_neuro_request_language_audit.json",
       "reference_snapshot": "experiments/scenario1/inputs/lexical_references/neuro_request_language_snapshot.json",
-      "reference_snapshot_sha256": "0ea2f0b61c5d84f3f7fc2e9de22a4930cbfb60f354dcc0d584b13b592f38e5f4",
+      "reference_snapshot_sha256": "a6cd5c76120a143e52b87911995cd9227c97b15ff27d9208e79bcb0492ee5154",
       "downstream_covariate_id": "clean_request_language_rate_v1"
     },
     "full_matrix_evidence": {

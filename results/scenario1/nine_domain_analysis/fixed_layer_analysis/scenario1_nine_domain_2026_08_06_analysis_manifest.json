@@ -428,7 +428,7 @@
   "source_files": {
     "activation_index": "results/scenario1/nine_domain_analysis/data/scenario1_nine_domain_activation_artifact_index_2026_08_06.jsonl",
     "depth_analysis": "results/scenario1/nine_domain_analysis/data/scenario1_nine_domain_depth_comparison_results_2026_08_06.json",
-    "paper_input_policy": "/Users/elenaajayi/Downloads/github-repos/spec-gap-cross-domain-auroc/experiments/scenario1/paper_input_policy.json",
+    "paper_input_policy": "experiments/scenario1/paper_input_policy.json",
     "probe_scores": "results/scenario1/nine_domain_analysis/data/scenario1_nine_domain_fixed_layer_probe_scores_2026_08_06.jsonl"
   },
   "trajectory_count": 72
