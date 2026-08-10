@@ -138,8 +138,22 @@ python -m pytest -q
 
 ## Safe smoke test
 
-The default dry run builds the two shared core fixtures—public health and
-climate science—without calling Qwen or starting a GPU:
+Run the portable smoke command first:
+
+```bash
+python scripts/run_portable_smoke_test.py
+```
+
+It builds and schema-validates all 44 structural trajectories across the two
+shared core fixtures and nine active fellow packages, then validates 308 Modal
+request templates. All output is written to temporary storage and removed. The
+command does not need network access, call Qwen, or start a GPU, and it does not
+reuse local trajectories or activation artifacts. Pass `--output-root PATH`
+only when you intentionally want to retain its dry-run files for inspection;
+the path must be new or empty, and the command refuses to overwrite files.
+
+The lower-level default dry run builds just the two shared core fixtures—public
+health and climate science—without calling Qwen or starting a GPU:
 
 ```bash
 python scripts/01_scenario_construction/01_generate_trajectories.py \
@@ -187,13 +201,42 @@ Detailed guides:
 
 ## Model execution on Modal
 
-Confirm the active Modal profile:
+Modal credentials are deliberately not stored in this repository. Each
+contributor must authenticate once, then confirm the intended workspace:
 
 ```bash
+modal setup
+modal token info
 modal profile current
 ```
 
-Validate one request without starting a paid run:
+If the `modal` executable is not on `PATH`, use `python -m modal setup` or
+activate the environment created in [Installation](#installation).
+
+The runner is not tied to a particular person's workspace or filesystem. App
+and Volume names are resolved inside whichever workspace the active profile
+selects. A contributor who cannot access the lab workspace may use another
+authorized workspace, but its model cache and activation Volume are separate;
+that workspace owner is responsible for access, storage, and compute charges.
+Follow [the Modal guide](docs/modal.md#3-cache-the-model-without-a-gpu) to
+populate an empty workspace before its first paid model call.
+
+Check Modal authentication and workspace access with read-only CLI calls,
+without registering the production app, building its image, calling Qwen, or
+starting a GPU:
+
+```bash
+python scripts/run_portable_smoke_test.py --check-modal
+```
+
+This check fails with an actionable authentication message when credentials
+are absent. A successful result explicitly reports that no remote app, image
+build, model call, or GPU was started. The same command has already validated
+the 308 real request contracts locally.
+
+The following lower-level command enters Modal's app lifecycle. It does not
+call Qwen or allocate a GPU with `--action validate`, but Modal may prepare the
+app image and named resources, so workspace usage may occur:
 
 ```bash
 modal run scripts/02_model_execution/03_modal_qwen_runner.py \
