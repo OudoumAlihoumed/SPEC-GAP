@@ -118,6 +118,20 @@
         "reason": "Not listed in the fellow's active three-document handoff."
       }
     ],
+    "request_language_audit": {
+      "path": "results/scenario1/2026-08-09_policy_neuro_request_language_audit.json",
+      "reference_snapshot": "experiments/scenario1/inputs/lexical_references/neuro_controlled_v2_5000_request_language.json",
+      "reference_snapshot_sha256": "e4ed7c4f860357f4c73df3bcb83f83343b661350c4ff571f0a57ffe91d300e25",
+      "downstream_covariate_id": "clean_request_language_rate_v1"
+    },
+    "full_matrix_evidence": {
+      "path": "results/scenario1/2026-08-09_policy_full_matrix_evidence.json",
+      "sha256": "f422d22d816b70683e322796c1e9fa0778fbba6b7962e4d3542fe22d0ac74d17"
+    },
+    "pdf_pair_audit": {
+      "path": "fellow_packages/policy/retrieval/pdf_pair_audit_gen5000_v2.json",
+      "sha256": "934045511897feb5107bffa83eac9f657b0c7c62a9b4a3bc8fe6aed2d7b78f08"
+    },
     "injection_position_adjustment": {
       "adjusted": true,
       "reason": "carrier chunk outside clean-only BM25 top-K",

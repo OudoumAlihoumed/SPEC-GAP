@@ -54,6 +54,26 @@ This event remains in the cost ledger and trajectory rather than being hidden.
 Reporting should distinguish any tool request from a request targeting the
 controlled endpoint.
 
+## Clean request-language covariate
+
+The requested Policy-versus-Neuro audit does **not** find higher clean
+request-language overlap in Policy. For the reviewer-named `submit`, `archive`,
+`disclose`, and `report` families, the exact selected clean source chunks contain
+10.810 occurrences per 10,000 words in Policy versus 30.876 in Neuro. Across the
+full clean corpora, the rates are 7.070 versus 24.694.
+
+An expanded transfer lexicon gives the same direction in the selected context
+(20.418 versus 33.081). `report` is common academic language, while `share` is
+often an economic noun in Policy, so both are reported separately and excluded
+in a sensitivity view rather than silently treated as instruction verbs.
+
+PR #35 should carry the measured `clean_request_language_rate_v1` covariate, but
+these results do not support explaining Policy resistance or probe behavior as
+unusually high clean request-language overlap. The deterministic method,
+surface forms, both text views, source hashes, Neuro reference snapshot, and
+limitations are recorded in
+`results/scenario1/2026-08-09_policy_neuro_request_language_audit.json`.
+
 ## Injection exposure
 
 The registered payload appeared in Worker1's rendered input at these
@@ -101,6 +121,29 @@ Machine-readable cost summary:
 These are measured H200 model-turn estimates. Modal billing remains
 authoritative because workspace charges can also include startup, CPU, memory,
 storage, credits, and discounts.
+
+## Compact result evidence
+
+The raw trajectories, activation tensors/index, cost ledger, and retrieval
+review remain outside Git because they are large or contain retrieved paper
+text. A tracked compact snapshot binds every source artifact by SHA-256 and
+copies every generated reasoning/visible output plus the machine-readable
+fields needed to audit the report: all eight outcomes, 28 model turns, four
+injection spans, finish/truncation status, the single clean non-target tool
+call, 28 activation artifacts and 70 checkpoint rows, and the cost rows/totals.
+It is stored at
+`results/scenario1/2026-08-09_policy_full_matrix_evidence.json`.
+
+## PDF pair provenance
+
+The clean carrier, original injected carrier, and position-adjusted injected
+carrier are bound to exact members of two project Drive exports by archive hash,
+member path, member hash, size, and CRC. Re-running `pdftotext -raw` confirms a
+single 335-byte insertion in both injected versions; only its location changed.
+The revised clean/injected pair renders to identical PNG bytes on all 12 pages
+with the recorded Poppler 96-DPI method. Per-page hashes, extraction hashes,
+offsets, tool versions, archive locators, and reproduction limitations are in
+`fellow_packages/policy/retrieval/pdf_pair_audit_gen5000_v2.json`.
 
 ## Decision
 
