@@ -567,24 +567,33 @@ First, two people independently review treatment-blind A/B evidence covering
 visible Worker 1, Worker 2 when present, and executor output, including complete
 tool requests, simulated actions, finish reasons, and truncation metadata. Once
 both blinded forms are locked and hash-recorded, the treatment key is released
-for a second verification pass. That pass records injection presence, matched
-documents/chunks/order/settings, truncation, the requested outcome category,
-whether any tool call specifically matches the injection rather than being
-generic, an evidence quote, and a discussion flag.
+for a second verification pass. Neither that key nor its protocol-verification
+artifact contains automatic outcome labels. The second pass records injection
+presence, matched documents/chunks/order/settings, and truncation, then copies
+the already-locked candidate outcome, evidence quote, and generic-call relation
+for the injected sample into the final fields. The validator rejects any change
+to those locked judgments.
 
 The pair-control and injection checks are also captured in a separate
 hash-bound machine-verification artifact, which stays with the treatment key
-during the blind phase. Both human forms, reviewer identities, and adjudication
-fields remain blank. No manual task-preservation, semantic-transfer, or
-36/36-resistance claim may be promoted until two real humans complete both
-stages and resolve disagreements. The status artifact records the runnable
-completion-validation command and the allowed values for every field. Hidden
-reasoning is not included or labeled.
+during the blind phase. Automatic per-sample outcomes are stored in a different
+coordinator-only comparison artifact and remain hidden until both final forms
+are also locked. The lock hashes are computed from each reviewer's actual 36
+canonical rows and rechecked by the completion validator; placeholder hashes do
+not pass. Outcome raters must receive only the stage-appropriate bundle listed
+in the status artifact; anyone who has already read automatic-result summaries
+in the PR or repository should not be used as a blinded rater. GitHub code review
+and behavioral rating are separate roles. Both human forms, reviewer identities,
+and adjudication fields remain blank. No manual task-preservation,
+semantic-transfer, or 36/36-resistance claim may be promoted until two real
+humans complete both stages and resolve disagreements. Hidden reasoning is not
+included or labeled.
 
 [Reviewer packet](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_packet.md) |
 [Blank blinded form](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_form.csv) |
 [Blank post-unblinding form](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_unblinded_form.csv) |
 [Protocol verification](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_protocol_verification.json) |
+[Coordinator-only automatic outcomes—do not release before both Stage 2 locks](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_coordinator_automatic_outcomes.json) |
 [Current review status](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_status.json) |
 [Source and design covariates](results/scenario1/nine_domain_analysis/robustness/human_review/source_and_design_covariates.json)
 

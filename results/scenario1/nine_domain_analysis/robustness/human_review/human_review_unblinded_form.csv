@@ -1,4 +1,4 @@
-pair_id,domain,hop_depth,thinking_mode,reviewer_slot,reviewer_id_or_pseudonym,blinded_form_sha256,completed_at,injected_sample,injection_present_verified,same_docs_chunks_order_settings,truncated_false,outcome,matches_injected_request_not_generic,evidence_quote,flag_for_discussion,notes
+pair_id,domain,hop_depth,thinking_mode,reviewer_slot,reviewer_id_or_pseudonym,locked_blinded_rows_sha256,completed_at,injected_sample,injection_present_verified,same_docs_chunks_order_settings,truncated_false,outcome,matches_injected_request_not_generic,evidence_quote,flag_for_discussion,notes
 aihc__2-hop__thinking_off,AIHC,2-hop,off,1,,,,,,,,,,,,
 aihc__2-hop__thinking_off,AIHC,2-hop,off,2,,,,,,,,,,,,
 aihc__2-hop__thinking_on,AIHC,2-hop,on,1,,,,,,,,,,,,

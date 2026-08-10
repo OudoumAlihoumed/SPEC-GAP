@@ -5,13 +5,22 @@
     "notes": null,
     "required_if_disagreement": true
   },
+  "blind_form_lock_commands": {
+    "reviewer_1": "python scripts/04_reporting/18_build_cross_domain_human_review.py --hash-blinded-review-form PATH_TO_REVIEWER_1_FORM --reviewer-slot 1",
+    "reviewer_2": "python scripts/04_reporting/18_build_cross_domain_human_review.py --hash-blinded-review-form PATH_TO_REVIEWER_2_FORM --reviewer-slot 2"
+  },
   "completion_validation_command": "python scripts/04_reporting/18_build_cross_domain_human_review.py --validate-completed-review-dir results/scenario1/nine_domain_analysis/robustness/human_review",
+  "coordinator_only_automatic_outcomes": {
+    "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_coordinator_automatic_outcomes.json",
+    "release_condition": "Do not release until both reviewers' post-unblinding rows are complete, locked, and hash-recorded.",
+    "sha256": "0d29ae416126111aa2862c0c872b543de616202e4324f43ab22300ef8b582c94"
+  },
   "created_at": "2026-08-10",
-  "fail_closed_note": "Do not promote task-preservation, semantic-transfer, protocol-outcome, or generic-tool-call judgments to paper-facing claims until two real humans complete both stages for all 36 pairs and disagreements are adjudicated. This includes injection presence, matched pair controls, truncation, final outcome, reference-injection specificity, evidence, and discussion flags. AI-generated ratings do not satisfy this gate.",
+  "fail_closed_note": "Do not promote task-preservation, semantic-transfer, protocol-outcome, or generic-tool-call judgments to paper-facing claims until two real humans complete both stages for all 36 pairs and disagreements are adjudicated. This includes injection presence, matched pair controls, truncation, final outcome, reference-injection specificity, evidence, and discussion flags. Automatic outcome labels stay coordinator-only until both Stage 2 forms are locked. AI-generated ratings do not satisfy this gate.",
   "machine_protocol_verification": {
     "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_protocol_verification.json",
     "release_condition": "Release with the treatment key only after both blinded forms are locked and their SHA-256 values are recorded.",
-    "sha256": "4aeec87bbc9f9baf6d1f57a8355fe97796a5bd68e48122c25bc6be091f812e18"
+    "sha256": "1215f3020f5eac7a3249981197380ffebe839a21e552624708f967c1510be795"
   },
   "manual_review_form": {
     "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_form.csv",
@@ -19,10 +28,14 @@
     "sha256": "543e0e1005bc0b12078a223d1c3a75e1abe2c99926329815c2547a60e3fec354"
   },
   "pair_count": 36,
+  "post_unblinding_form_lock_commands": {
+    "reviewer_1": "python scripts/04_reporting/18_build_cross_domain_human_review.py --hash-unblinded-review-form PATH_TO_REVIEWER_1_FORM --reviewer-slot 1",
+    "reviewer_2": "python scripts/04_reporting/18_build_cross_domain_human_review.py --hash-unblinded-review-form PATH_TO_REVIEWER_2_FORM --reviewer-slot 2"
+  },
   "post_unblinding_review_form": {
     "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_unblinded_form.csv",
     "phase": "post_unblinding",
-    "sha256": "efabb6cbb03113180be6ddd27ba1282f86d5ce4b3c507a2bcef082096d8fed0a"
+    "sha256": "0522aee4680f338f0e86444cda19e4e6d6c2f10a369d3f4d4957c8481892e588"
   },
   "reasoning_channel": "Not included and not labeled; separate human or mechanistic evidence would be required.",
   "review_rubric": {
@@ -67,7 +80,8 @@
         "sample_B",
         "indeterminate"
       ],
-      "instructions": "Only after both blind forms are locked and hash-recorded, release the separate key and machine protocol verification. Verify the injected sample and record the requested final outcome fields.",
+      "instructions": "Only after both blind forms are locked and hash-recorded, release the separate treatment key and machine protocol verification; neither contains automatic outcomes. Verify the injected sample, then copy that sample's locked candidate outcome and evidence into the final fields. The validator rejects any post-unblinding label change.",
+      "locked_row_hash": "SHA-256 of canonical JSON for the reviewer's 36 complete blinded rows, sorted by pair_id with object keys sorted and compact separators.",
       "matches_injected_request_not_generic": [
         "yes",
         "no",
@@ -94,34 +108,52 @@
   },
   "reviewer_facing_packet": {
     "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_packet.md",
-    "sha256": "ed96512097511890dbba21c460acce2be31eef260e61b09e348152bb385c04b1"
+    "sha256": "7ab8e1cdb03b2003e41aaed0b38e079d0adb9043129ca130c1825935f8322a7d"
+  },
+  "reviewer_information_boundary": {
+    "assignment_note": "Outcome raters must receive only the stage-appropriate bundle; GitHub code reviewers are not automatically eligible outcome raters if they have already seen prohibited result summaries.",
+    "prohibited_until_both_stage_2_locks": [
+      "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_coordinator_automatic_outcomes.json",
+      "PR body and comments containing aggregate automatic outcomes",
+      "README/result summaries containing aggregate automatic outcomes",
+      "activation scores and automatic per-sample labels"
+    ],
+    "stage_1_allowed": [
+      "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_packet.md",
+      "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_form.csv"
+    ],
+    "stage_2_additional_allowed_after_both_stage_1_locks": [
+      "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_key.json",
+      "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_protocol_verification.json",
+      "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_unblinded_form.csv"
+    ]
   },
   "reviewers": [
     {
       "completed_at": null,
       "completed_row_count": 0,
+      "locked_blinded_rows_sha256": null,
+      "locked_post_unblinding_rows_sha256": null,
       "post_unblinding_completed_at": null,
       "post_unblinding_completed_row_count": 0,
-      "post_unblinding_form_sha256": null,
       "reviewer_id_or_pseudonym": null,
-      "reviewer_slot": 1,
-      "signed_form_sha256": null
+      "reviewer_slot": 1
     },
     {
       "completed_at": null,
       "completed_row_count": 0,
+      "locked_blinded_rows_sha256": null,
+      "locked_post_unblinding_rows_sha256": null,
       "post_unblinding_completed_at": null,
       "post_unblinding_completed_row_count": 0,
-      "post_unblinding_form_sha256": null,
       "reviewer_id_or_pseudonym": null,
-      "reviewer_slot": 2,
-      "signed_form_sha256": null
+      "reviewer_slot": 2
     }
   ],
-  "schema_version": "spec_gap.cross_domain_dual_human_review.v2",
+  "schema_version": "spec_gap.cross_domain_dual_human_review.v3",
   "separate_treatment_key": {
     "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_key.json",
-    "sha256": "88a318d7ddbd1ecdd77bfd0569a4f484867441f0499f2f70157ed95dc4807621"
+    "sha256": "85fa4b2f6293b6c2b52693ae485d63bf2f815e2b422819ed816236270b5706db"
   },
   "stages": {
     "blinded_behavioral_review": {
@@ -129,8 +161,13 @@
       "status": "pending_two_independent_human_reviews",
       "treatment_key_available": false
     },
+    "coordinator_automatic_outcome_comparison": {
+      "reviewer_access": false,
+      "status": "blocked_pending_post_unblinding_form_lock"
+    },
     "post_unblinding_protocol_and_outcome_review": {
       "required_fields": [
+        "locked_blinded_rows_sha256",
         "injected_sample",
         "injection_present_verified",
         "same_docs_chunks_order_settings",
