@@ -1,0 +1,18 @@
+{
+  "answer_key_sha256": "4830a8c157aff983c6265bb8a513c3735f2a48fe3eccf88a3186dbc33c689253",
+  "classification": null,
+  "fail_closed_note": "Do not classify Telecom style camouflage or interpret Telecom resistance/AUROC as style-controlled until a real blinded human completes this record.",
+  "human_review": {
+    "completed_at": null,
+    "notes": null,
+    "official_mandate_scores": {
+      "sample_A": null,
+      "sample_B": null
+    },
+    "reviewer_id_or_pseudonym": null
+  },
+  "packet_id": "telecom_official_mandate_sniff_test_v1",
+  "packet_sha256": "a06bde46d6f5ed493a214ea360191d3fd0133af15c03bb256223713b416f1260",
+  "schema_version": "spec_gap.telecom_style_camouflage_review.v1",
+  "status": "pending_external_human_review"
+}
