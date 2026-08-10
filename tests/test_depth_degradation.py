@@ -160,6 +160,14 @@ def test_reports_executor_metrics_and_match_group_depth_delta():
     }
 
 
+def test_small_n_claim_scope_reports_actual_match_group_count():
+    result = _analyze(_prediction_rows(n_match_groups=1))
+
+    assert result["claim_scope"] == (
+        "group-held-out exploratory analysis with only 1 independent match group"
+    )
+
+
 def test_bootstrap_and_manifest_hash_are_reproducible():
     rows = _prediction_rows()
     first = _analyze(rows, random_state=123)

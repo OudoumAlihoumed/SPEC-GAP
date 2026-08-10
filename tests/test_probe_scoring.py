@@ -10,6 +10,7 @@ from src.analysis.probe_scoring import (
     MatchGroupDesign,
     generate_per_step_probe_scores,
     load_match_group_designs,
+    preprocess_activation_fold,
     summarize_per_step_probe_scores,
 )
 from src.extraction.saved_activations import ProbeActivationBatch
@@ -188,6 +189,61 @@ def test_generated_checkpoint_is_rejected():
             checkpoint="last_visible_answer_token",
             verify_checksums=False,
         )
+
+
+def test_train_domain_mean_residualization_never_uses_held_out_values():
+    X_train = np.asarray(
+        [
+            [1.0, 10.0],
+            [3.0, 14.0],
+            [11.0, 20.0],
+            [15.0, 28.0],
+        ]
+    )
+    train_groups = np.asarray(["a", "a", "b", "b"])
+    first_test = np.asarray([[100.0, 200.0], [300.0, 400.0]])
+    second_test = np.asarray([[-999.0, 800.0], [500.0, -700.0]])
+
+    first_train, first_held_out = preprocess_activation_fold(
+        X_train,
+        first_test,
+        train_groups=train_groups,
+        method="train_domain_mean_residualized",
+    )
+    second_train, second_held_out = preprocess_activation_fold(
+        X_train,
+        second_test,
+        train_groups=train_groups,
+        method="train_domain_mean_residualized",
+    )
+
+    np.testing.assert_allclose(first_train, second_train)
+    np.testing.assert_allclose(first_train[:2].mean(axis=0), 0.0, atol=1e-7)
+    np.testing.assert_allclose(first_train[2:].mean(axis=0), 0.0, atol=1e-7)
+    training_grand_mean = X_train.mean(axis=0)
+    np.testing.assert_allclose(first_held_out, first_test - training_grand_mean)
+    np.testing.assert_allclose(second_held_out, second_test - training_grand_mean)
+
+
+def test_generated_residualized_scores_record_the_preprocessing(monkeypatch):
+    rows = _index_rows()
+    batch = _fake_batch(rows)
+    monkeypatch.setattr(
+        scoring,
+        "load_probe_activation_batch",
+        lambda *args, **kwargs: batch,
+    )
+
+    scores = generate_per_step_probe_scores(
+        rows,
+        match_group_designs=_designs(),
+        verify_checksums=False,
+        activation_preprocessing="train_domain_mean_residualized",
+    )
+
+    assert {row["activation_preprocessing"] for row in scores} == {
+        "train_domain_mean_residualized"
+    }
 
 
 def test_mixed_analysis_tiers_are_rejected_before_scoring():

@@ -53,6 +53,10 @@ def test_layer_scan_is_group_safe_and_returns_each_layer(tmp_path):
     assert result["evaluation_method"] == "leave_one_match_group_out"
     assert result["selection_status"] == "exploratory_small_n"
     assert result["layer_selection_allowed"] is False
+    assert "insufficient_independent_match_groups" in result[
+        "layer_selection_blockers"
+    ]
+    assert "Only 2 independent match groups are available." in result["limitations"]
     assert result["pre_injection_negative_control"]["status"] == "not_available"
     assert result["completed_strata"] == 1
     stratum = result["strata"][0]
@@ -63,6 +67,30 @@ def test_layer_scan_is_group_safe_and_returns_each_layer(tmp_path):
     table = layer_scan_table(result)
     assert len(table) == 2
     assert {row["layer"] for row in table} == {0, 1}
+
+
+def test_layer_scan_reports_actual_single_match_group_count(tmp_path):
+    rows = [
+        row
+        for row in _index_rows(tmp_path)
+        if row["match_group_id"] == "group-a"
+    ]
+
+    result = run_construction_layer_scan(rows)
+
+    assert result["match_groups"] == ["group-a"]
+    assert result["completed_strata"] == 0
+    assert result["skipped_strata"] == 1
+    assert "insufficient_independent_match_groups" in result[
+        "layer_selection_blockers"
+    ]
+    assert "planner_negative_control_not_available" in result[
+        "layer_selection_blockers"
+    ]
+    assert "failed_strict_planner_input_control" not in result[
+        "layer_selection_blockers"
+    ]
+    assert "Only 1 independent match group is available." in result["limitations"]
 
 
 def test_layer_scan_skips_one_class_behavioral_target(tmp_path):

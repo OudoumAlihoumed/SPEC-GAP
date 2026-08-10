@@ -31,8 +31,8 @@ def run_construction_layer_scan(
     """Evaluate separate all-layer probes for each mode, agent, and checkpoint.
 
     Related 2-hop and 3-hop trajectories stay together because cross-validation
-    holds out the full match group. With only two groups, the result is a
-    pipeline and signal check rather than a stable estimate of generalization.
+    holds out the full match group. With fewer than three groups, the result is
+    a pipeline and signal check rather than a stable estimate of generalization.
     """
 
     rows = list(index_rows)
@@ -42,6 +42,8 @@ def run_construction_layer_scan(
         raise ValueError(
             f"label_target must be one of {sorted(LABEL_TARGETS)}, got {label_target!r}."
         )
+    match_groups = sorted({str(row["match_group_id"]) for row in rows})
+    match_group_count = len(match_groups)
 
     grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
@@ -129,9 +131,32 @@ def run_construction_layer_scan(
         else _planner_negative_control(rows, strata)
     )
     _annotate_strata_with_controls(strata, negative_control)
-    layer_selection_blockers = ["only_two_independent_match_groups"]
+    layer_selection_blockers = []
+    limitations = [
+        "The same task appears at both depths inside each held-out match group.",
+        "Layer rankings are descriptive and must not be reported as final AUROC.",
+        "All injected trajectories resisted, so action-executed labels have no positive class.",
+        "Planner generated-token checkpoints require a calibrated stochastic null.",
+        "A failed strict planner input control blocks data-driven layer selection.",
+    ]
+    if match_group_count < 3:
+        layer_selection_blockers.append("insufficient_independent_match_groups")
+        verb = "is" if match_group_count == 1 else "are"
+        noun = "group" if match_group_count == 1 else "groups"
+        limitations.insert(
+            0,
+            f"Only {match_group_count} independent match {noun} {verb} available.",
+        )
     if negative_control["blocks_layer_selection"]:
-        layer_selection_blockers.append("failed_strict_planner_input_control")
+        negative_control_status = negative_control.get("status")
+        if negative_control_status == "failed_strict_input_control":
+            layer_selection_blockers.append("failed_strict_planner_input_control")
+        elif negative_control_status == "not_available":
+            layer_selection_blockers.append(
+                "planner_negative_control_not_available"
+            )
+        else:
+            layer_selection_blockers.append("planner_negative_control_failed")
     if negative_control.get("stochastic_output_null_not_calibrated"):
         layer_selection_blockers.append("stochastic_output_null_not_calibrated")
     return {
@@ -147,19 +172,12 @@ def run_construction_layer_scan(
             "detection and is not a stable layer-selection estimate."
         ),
         "index_rows_considered": len(rows),
-        "match_groups": sorted({str(row["match_group_id"]) for row in rows}),
+        "match_groups": match_groups,
         "completed_strata": len(completed),
         "skipped_strata": len(strata) - len(completed),
         "pre_injection_negative_control": negative_control,
         "strata": strata,
-        "limitations": [
-            "Only two independent match groups are available.",
-            "The same task appears at both depths inside each held-out match group.",
-            "Layer rankings are descriptive and must not be reported as final AUROC.",
-            "All injected trajectories resisted, so action-executed labels have no positive class.",
-            "Planner generated-token checkpoints require a calibrated stochastic null.",
-            "A failed strict planner input control blocks data-driven layer selection.",
-        ],
+        "limitations": limitations,
     }
 
 

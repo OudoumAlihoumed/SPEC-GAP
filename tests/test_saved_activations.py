@@ -18,6 +18,7 @@ from src.extraction.saved_activations import (
     load_probe_activation_batch,
     summarize_activation_index,
     trajectory_analysis_tier,
+    upgrade_legacy_activation_index,
     write_activation_index,
 )
 
@@ -198,6 +199,79 @@ def test_index_round_trip_and_filter(tmp_path):
     assert selected[0]["step_index"] == 2
 
 
+def test_legacy_v2_index_is_explicitly_unclassified(tmp_path):
+    path = tmp_path / "legacy-index.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "spec_gap.activation_index.v2",
+                "trajectory_id": "historical-trajectory",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    rows = load_activation_index(path)
+
+    assert rows == [
+        {
+            "schema_version": "spec_gap.activation_index.v2",
+            "analysis_tier": "unclassified",
+            "trajectory_id": "historical-trajectory",
+        }
+    ]
+    assert upgrade_legacy_activation_index(rows) == [
+        {
+            "schema_version": ACTIVATION_INDEX_SCHEMA,
+            "analysis_tier": "unclassified",
+            "trajectory_id": "historical-trajectory",
+        }
+    ]
+
+
+def test_index_loader_rejects_mixed_schemas_and_legacy_tier_claims(tmp_path):
+    mixed = tmp_path / "mixed-index.jsonl"
+    mixed.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "schema_version": "spec_gap.activation_index.v2",
+                        "trajectory_id": "historical-trajectory",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "schema_version": ACTIVATION_INDEX_SCHEMA,
+                        "analysis_tier": "unclassified",
+                        "trajectory_id": "current-trajectory",
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="cannot mix legacy and current"):
+        load_activation_index(mixed)
+
+    legacy_claim = tmp_path / "legacy-tier-claim.jsonl"
+    legacy_claim.write_text(
+        json.dumps(
+            {
+                "schema_version": "spec_gap.activation_index.v2",
+                "analysis_tier": "definitive",
+                "trajectory_id": "misclassified-trajectory",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="cannot claim an analysis tier"):
+        load_activation_index(legacy_claim)
+
+
 def test_load_named_checkpoint_and_layers(tmp_path):
     artifact = tmp_path / "activation.pt"
     _save_current_artifact(artifact)
@@ -365,6 +439,58 @@ def test_activation_index_cli_reads_only_selected_tier(tmp_path, monkeypatch):
     assert {row["trajectory_id"] for row in rows} == {"trajectory-definitive"}
     assert {row["analysis_tier"] for row in rows} == {"definitive"}
     assert json.loads(summary_output.read_text())["analysis_tier"] == "definitive"
+
+
+def test_activation_index_cli_upgrades_legacy_index_as_unclassified(
+    tmp_path,
+    monkeypatch,
+):
+    rows = build_activation_index(
+        [_record("activations/historical.pt", "abc", analysis_tier=None)],
+        analysis_tier="unclassified",
+        artifact_root=tmp_path,
+    )
+    legacy_rows = [
+        {key: value for key, value in row.items() if key != "analysis_tier"}
+        | {"schema_version": "spec_gap.activation_index.v2"}
+        for row in rows
+    ]
+    legacy_path = tmp_path / "legacy-index.jsonl"
+    write_activation_index(legacy_rows, legacy_path)
+    output = tmp_path / "upgraded-index.jsonl"
+    summary_output = tmp_path / "upgraded-summary.json"
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/03_probe_analysis/07_build_activation_index.py"
+    )
+    namespace = runpy.run_path(
+        script,
+        run_name="spec_gap_legacy_activation_index_test",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(script),
+            "--legacy-index",
+            str(legacy_path),
+            "--analysis-tier",
+            "unclassified",
+            "--output",
+            str(output),
+            "--summary-output",
+            str(summary_output),
+        ],
+    )
+
+    namespace["main"]()
+
+    upgraded = load_activation_index(output)
+    assert {row["schema_version"] for row in upgraded} == {ACTIVATION_INDEX_SCHEMA}
+    assert {row["analysis_tier"] for row in upgraded} == {"unclassified"}
+    summary = json.loads(summary_output.read_text(encoding="utf-8"))
+    assert summary["analysis_tier"] == "unclassified"
+    assert summary["paper_input_selection"]["selected_trajectory_count"] == 1
 
 
 def test_index_loader_rejects_empty_file(tmp_path):

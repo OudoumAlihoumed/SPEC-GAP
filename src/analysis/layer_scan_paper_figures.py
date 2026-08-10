@@ -10,27 +10,13 @@ import numpy as np
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
+from matplotlib.patches import Patch  # noqa: E402
 
 from src.analysis.figure_export import save_reproducible_figure
 
 
-CHECKPOINT_ORDER = (
-    "last_input_token",
-    "last_reasoning_token",
-    "last_visible_answer_token",
-)
-CHECKPOINT_LABELS = {
-    "last_input_token": "Last input",
-    "last_reasoning_token": "Last reasoning",
-    "last_visible_answer_token": "Last visible answer",
-}
-CHECKPOINT_COLORS = {
-    "last_input_token": "#0072B2",
-    "last_reasoning_token": "#CC79A7",
-    "last_visible_answer_token": "#D55E00",
-}
-FOLD_COLORS = ("#56B4E9", "#E69F00")
 MAIN_AGENT_ORDER = ("planner_1", "worker_1", "executor_1")
 ALL_AGENT_ORDER = ("planner_1", "worker_1", "worker_2", "executor_1")
 AGENT_LABELS = {
@@ -47,21 +33,31 @@ def save_paper_layer_scan_figures(
     result: dict[str, Any],
     output_dir: str | Path,
     *,
-    dpi: int = 300,
+    dpi: int = 600,
+    filename_prefix: str = "scenario1_all_domains_",
 ) -> list[Path]:
     """Save two main figures and one appendix heatmap in three formats."""
 
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     figures = (
-        ("figure1_planner_negative_control", _planner_control_figure(result)),
-        ("figure2_shared_input_comparison", _shared_input_figure(result)),
-        ("appendix_full_layer_heatmap", _appendix_heatmap(result)),
+        (
+            "planner_negative_control",
+            _planner_control_figure(result),
+        ),
+        (
+            "shared_input_auroc_by_layer",
+            _shared_input_figure(result),
+        ),
+        (
+            "qualified_last_input_auroc_heatmap",
+            _appendix_heatmap(result),
+        ),
     )
     paths = []
     for stem, figure in figures:
         for suffix in FORMATS:
-            path = destination / f"{stem}.{suffix}"
+            path = destination / f"{filename_prefix}{stem}.{suffix}"
             _save(figure, path, result=result, dpi=dpi)
             paths.append(path)
         plt.close(figure)
@@ -70,78 +66,91 @@ def save_paper_layer_scan_figures(
 
 def _planner_control_figure(result: dict[str, Any]) -> plt.Figure:
     modes = _modes(result)
+    match_group_count = len(_match_groups(result))
+    mode_styles = {
+        "off": {"color": "#0072B2", "linestyle": "-"},
+        "on": {"color": "#D55E00", "linestyle": "--"},
+    }
     with plt.rc_context(_paper_style()):
-        figure, axes = plt.subplots(
-            1,
-            len(modes),
-            figsize=(7.2, 3.4),
-            sharex=True,
-            sharey=True,
-            squeeze=False,
+        figure, axis = plt.subplots(figsize=(6.6, 3.4))
+        axis.axhline(
+            0.5,
+            color="#B7BEC8",
+            linestyle=(0, (3, 3)),
+            linewidth=0.9,
+            zorder=0,
         )
-        for column, mode in enumerate(modes):
-            axis = axes[0][column]
-            axis.axhline(0.5, color="#555555", linestyle=":", linewidth=1)
-            for checkpoint in CHECKPOINT_ORDER:
-                stratum = _find_stratum(result, mode, "planner_1", checkpoint)
-                if stratum is None or stratum.get("status") != "completed":
-                    continue
-                control = _find_control(result, mode, checkpoint)
-                status, qualified, _ = _control_state(control)
-                linestyle = "-" if qualified else "--"
-                _plot_fold_curves(
-                    axis,
-                    stratum,
-                    color=CHECKPOINT_COLORS[checkpoint],
-                    alpha=0.18,
-                )
-                layers, means = _mean_series(stratum)
-                axis.plot(
-                    layers,
-                    means,
-                    color=CHECKPOINT_COLORS[checkpoint],
-                    linestyle=linestyle,
-                    linewidth=1.8,
-                    label=f"{CHECKPOINT_LABELS[checkpoint]} ({status})",
-                )
-            _standard_axis(axis)
-            axis.set_title(f"Thinking {mode}")
-            axis.set_xlabel("Layer")
-            axis.text(
-                -0.12,
-                1.04,
-                f"({chr(ord('a') + column)})",
-                transform=axis.transAxes,
-                fontweight="bold",
+        for mode in modes:
+            stratum = _find_stratum(
+                result,
+                mode,
+                "planner_1",
+                "last_input_token",
             )
-            axis.legend(fontsize=7, loc="best", frameon=False)
-        axes[0][0].set_ylabel("Planner mean AUROC")
-        figure.suptitle(
-            "Planner negative control before document retrieval",
-            fontweight="bold",
-            y=0.99,
+            if stratum is None or stratum.get("status") != "completed":
+                continue
+            control = _find_control(result, mode, "last_input_token")
+            status, qualified, _ = _control_state(control)
+            if not qualified:
+                continue
+            layers, means = _mean_series(stratum)
+            style = mode_styles.get(
+                mode,
+                {"color": "#333333", "linestyle": "-"},
+            )
+            axis.plot(
+                layers,
+                means,
+                linewidth=2.0,
+                label=f"Thinking {mode} ({status})",
+                zorder=2,
+                **style,
+            )
+        _standard_axis(axis)
+        axis.set_xlabel("Model layer")
+        axis.set_ylabel("Mean held-out AUROC")
+        axis.grid(axis="y", color="#ECEFF3", linewidth=0.7, zorder=0)
+        axis.legend(loc="upper right", frameon=False)
+        axis.text(
+            62.5,
+            0.515,
+            "Random baseline = 0.5",
+            ha="right",
+            va="bottom",
+            fontsize=7,
+            color="#6B7280",
         )
         figure.text(
-            0.5,
-            0.005,
-            (
-                "Faint lines are held-out match groups; bold lines are their mean. "
-                "n=2 groups. Dashed checkpoints are not qualified for layer selection."
-            ),
-            ha="center",
-            fontsize=7.5,
+            0.12,
+            0.95,
+            "Pre-retrieval planner negative control",
+            ha="left",
+            fontsize=11,
+            fontweight="bold",
         )
-        figure.tight_layout(rect=(0, 0.06, 1, 0.93))
+        figure.text(
+            0.12,
+            0.89,
+            (
+                "Identical clean and injected inputs; "
+                f"n={match_group_count} held-out domains"
+            ),
+            ha="left",
+            fontsize=8,
+            color="#4B5563",
+        )
+        figure.subplots_adjust(left=0.12, right=0.98, bottom=0.17, top=0.80)
     return figure
 
 
 def _shared_input_figure(result: dict[str, Any]) -> plt.Figure:
     modes = _modes(result)
+    match_group_count = len(_match_groups(result))
     with plt.rc_context(_paper_style()):
         figure, axes = plt.subplots(
             len(MAIN_AGENT_ORDER),
             len(modes),
-            figsize=(7.2, 7.0),
+            figsize=(7.2, 6.4),
             sharex=True,
             sharey=True,
             squeeze=False,
@@ -150,7 +159,13 @@ def _shared_input_figure(result: dict[str, Any]) -> plt.Figure:
         for row, agent_id in enumerate(MAIN_AGENT_ORDER):
             for column, mode in enumerate(modes):
                 axis = axes[row][column]
-                axis.axhline(0.5, color="#555555", linestyle=":", linewidth=1)
+                axis.axhline(
+                    0.5,
+                    color="#B7BEC8",
+                    linestyle=(0, (3, 3)),
+                    linewidth=0.8,
+                    zorder=0,
+                )
                 stratum = _find_stratum(
                     result,
                     mode,
@@ -167,21 +182,28 @@ def _shared_input_figure(result: dict[str, Any]) -> plt.Figure:
                         va="center",
                     )
                 else:
-                    _plot_named_folds(axis, stratum)
+                    _plot_fold_iqr(axis, stratum)
                     layers, means = _mean_series(stratum)
-                    axis.plot(layers, means, color="#000000", linewidth=1.8)
-                    axis.text(
-                        0.02,
-                        0.04,
-                        f"n={stratum['sample_count']}; groups={stratum['match_group_count']}",
-                        transform=axis.transAxes,
-                        fontsize=7,
+                    axis.plot(
+                        layers,
+                        means,
+                        color="#111827",
+                        linewidth=1.8,
+                        zorder=2,
                     )
                 _standard_axis(axis)
+                axis.grid(axis="y", color="#F0F2F5", linewidth=0.6, zorder=0)
                 if row == 0:
                     axis.set_title(f"Thinking {mode}")
                 if column == 0:
-                    axis.set_ylabel(f"{AGENT_LABELS[agent_id]}\nMean AUROC")
+                    axis.set_ylabel(
+                        AGENT_LABELS[agent_id],
+                        rotation=0,
+                        ha="right",
+                        va="center",
+                        fontweight="bold",
+                        labelpad=30,
+                    )
                 if row == len(MAIN_AGENT_ORDER) - 1:
                     axis.set_xlabel("Layer")
                 axis.text(
@@ -193,140 +215,172 @@ def _shared_input_figure(result: dict[str, Any]) -> plt.Figure:
                 )
                 panel_index += 1
         legend_handles = [
-            Line2D([0], [0], color=FOLD_COLORS[0], linewidth=1, label="Held-out group 1"),
-            Line2D([0], [0], color=FOLD_COLORS[1], linewidth=1, label="Held-out group 2"),
-            Line2D([0], [0], color="#000000", linewidth=1.8, label="Mean"),
-            Line2D([0], [0], color="#555555", linestyle=":", label="Chance"),
+            Patch(
+                facecolor="#9CA3AF",
+                edgecolor="none",
+                alpha=0.28,
+                label=f"Domain IQR (n={match_group_count})",
+            ),
+            Line2D([0], [0], color="#111827", linewidth=1.8, label="Mean"),
+            Line2D(
+                [0],
+                [0],
+                color="#B7BEC8",
+                linestyle=(0, (3, 3)),
+                label="Random baseline = 0.5",
+            ),
         ]
         figure.legend(
             handles=legend_handles,
             loc="upper center",
             bbox_to_anchor=(0.5, 0.945),
-            ncol=4,
+            ncol=3,
             frameon=False,
             fontsize=7.5,
         )
         figure.suptitle(
-            "Clean–injected discrimination at the shared input checkpoint",
+            "Clean versus injected signal at the shared input checkpoint",
             fontweight="bold",
             y=0.99,
         )
         figure.text(
+            0.012,
             0.5,
-            0.005,
-            (
-                "Leave-one-match-group-out construction-label analysis. "
-                "Exploratory only; not behavioral-compromise performance."
-            ),
+            "Mean held-out AUROC",
+            rotation=90,
+            va="center",
             ha="center",
-            fontsize=7.5,
+            fontsize=8,
         )
-        figure.tight_layout(rect=(0, 0.04, 1, 0.90))
+        figure.tight_layout(rect=(0.09, 0, 1, 0.89))
     return figure
 
 
 def _appendix_heatmap(result: dict[str, Any]) -> plt.Figure:
-    ordered = []
-    for mode in _modes(result):
-        for checkpoint in CHECKPOINT_ORDER:
-            for agent_id in ALL_AGENT_ORDER:
-                stratum = _find_stratum(result, mode, agent_id, checkpoint)
-                if stratum is not None and stratum.get("status") == "completed":
-                    ordered.append(stratum)
-    matrix = []
-    labels = []
-    unqualified_rows = []
-    qualification_messages = []
-    for stratum in ordered:
-        control = _find_control(
-            result,
-            stratum["thinking_mode"],
-            stratum["checkpoint"],
-        )
-        status, qualified, message = _control_state(control)
-        layers, means = _mean_series(stratum)
-        if layers != list(range(64)):
-            raise ValueError("Paper heatmap requires complete layers 0 through 63.")
-        matrix.append(means if qualified else [np.nan] * 64)
-        unqualified_rows.append(not qualified)
-        qualification_messages.append(message)
-        labels.append(
-            f"{stratum['thinking_mode']} | {AGENT_LABELS[stratum['agent_id']]} | "
-            f"{CHECKPOINT_LABELS[stratum['checkpoint']]} [{status}]"
-        )
-
-    with plt.rc_context(_paper_style()):
-        figure, axis = plt.subplots(figsize=(8.2, max(5.0, 0.29 * len(ordered))))
-        color_map = plt.get_cmap("cividis").copy()
-        color_map.set_bad("#c7c7c7")
-        image = axis.imshow(
-            np.asarray(matrix, dtype=float),
-            aspect="auto",
-            interpolation="nearest",
-            cmap=color_map,
-            vmin=0.0,
-            vmax=1.0,
-        )
-        axis.set_xticks(range(0, 64, 8))
-        axis.set_xticklabels(range(0, 64, 8))
-        axis.set_yticks(range(len(labels)))
-        axis.set_yticklabels(labels, fontsize=6.6)
-        axis.set_xlabel("Layer")
-        axis.set_title(
-            "Appendix: full exploratory layer scan",
-            fontweight="bold",
-            pad=10,
-        )
-        for row, unqualified in enumerate(unqualified_rows):
-            if unqualified:
-                axis.text(
-                    31.5,
-                    row,
-                    qualification_messages[row],
-                    ha="center",
-                    va="center",
-                    fontsize=6.5,
-                    color="#222222",
+    match_group_count = len(_match_groups(result))
+    modes = _modes(result)
+    mode_matrices = []
+    for mode in modes:
+        matrix = []
+        for agent_id in ALL_AGENT_ORDER:
+            stratum = _find_stratum(
+                result,
+                mode,
+                agent_id,
+                "last_input_token",
+            )
+            control = _find_control(result, mode, "last_input_token")
+            _, qualified, _ = _control_state(control)
+            if (
+                stratum is None
+                or stratum.get("status") != "completed"
+                or not qualified
+            ):
+                raise ValueError(
+                    f"Qualified last-input stratum missing for {mode}/{agent_id}."
                 )
-        color_bar = figure.colorbar(image, ax=axis, fraction=0.025, pad=0.02)
-        color_bar.set_label("Mean AUROC")
-        figure.text(
-            0.5,
-            0.005,
-            (
-                "Grey rows are not qualified by the matched planner control. "
-                "n=2 independent groups; values are descriptive and not used for "
-                "final layer selection."
-            ),
-            ha="center",
-            fontsize=7.5,
+            layers, means = _mean_series(stratum)
+            if layers != list(range(64)):
+                raise ValueError(
+                    "Paper heatmap requires complete layers 0 through 63."
+                )
+            matrix.append(means)
+        mode_matrices.append(np.asarray(matrix, dtype=float))
+
+    color_map = LinearSegmentedColormap.from_list(
+        "spec_gap_auroc",
+        ((0.0, "#0072B2"), (0.5, "#F7F7F7"), (1.0, "#D55E00")),
+    )
+    color_norm = TwoSlopeNorm(vmin=0.0, vcenter=0.5, vmax=1.0)
+    with plt.rc_context(_paper_style()):
+        figure, axes = plt.subplots(
+            len(modes),
+            1,
+            figsize=(7.4, 4.5),
+            sharex=True,
+            squeeze=False,
         )
-        figure.tight_layout(rect=(0, 0.035, 1, 1))
+        image = None
+        for row, (mode, matrix) in enumerate(zip(modes, mode_matrices)):
+            axis = axes[row][0]
+            image = axis.imshow(
+                matrix,
+                aspect="auto",
+                interpolation="nearest",
+                cmap=color_map,
+                norm=color_norm,
+            )
+            axis.set_yticks(range(len(ALL_AGENT_ORDER)))
+            axis.set_yticklabels(
+                [AGENT_LABELS[agent] for agent in ALL_AGENT_ORDER],
+                fontsize=7.5,
+            )
+            axis.set_title(
+                f"Thinking {mode}",
+                loc="left",
+                fontsize=8.5,
+                fontweight="bold",
+                pad=5,
+            )
+            axis.tick_params(axis="y", length=0, pad=7)
+            for spine in axis.spines.values():
+                spine.set_color("#D1D5DB")
+                spine.set_linewidth(0.7)
+        axes[-1][0].set_xticks([0, 8, 16, 24, 32, 40, 48, 56, 63])
+        axes[-1][0].set_xlabel("Model layer")
+        color_axis = figure.add_axes((0.91, 0.18, 0.018, 0.58))
+        if image is None:
+            raise ValueError("No qualified heatmap data were available.")
+        color_bar = figure.colorbar(image, cax=color_axis)
+        color_bar.set_ticks([0.0, 0.25, 0.5, 0.75, 1.0])
+        color_bar.set_ticklabels(
+            ["0.00", "0.25", "0.50\nrandom", "0.75", "1.00"]
+        )
+        color_bar.set_label("Mean held-out AUROC")
+        color_bar.ax.axhline(0.5, color="#4B5563", linewidth=0.8)
+        figure.text(
+            0.11,
+            0.95,
+            "Clean versus injected AUROC across model layers",
+            ha="left",
+            fontsize=11,
+            fontweight="bold",
+        )
+        figure.text(
+            0.11,
+            0.90,
+            (
+                "Qualified last-input checkpoints; "
+                f"n={match_group_count} held-out domains"
+            ),
+            ha="left",
+            fontsize=8,
+            color="#4B5563",
+        )
+        figure.subplots_adjust(
+            left=0.20,
+            right=0.88,
+            bottom=0.13,
+            top=0.82,
+            hspace=0.34,
+        )
     return figure
 
 
-def _plot_fold_curves(
-    axis: plt.Axes,
-    stratum: dict[str, Any],
-    *,
-    color: str,
-    alpha: float,
-) -> None:
+def _plot_fold_iqr(axis: plt.Axes, stratum: dict[str, Any]) -> None:
     layers, folds = _fold_series(stratum)
-    for fold_values in folds:
-        axis.plot(layers, fold_values, color=color, linewidth=0.7, alpha=alpha)
-
-
-def _plot_named_folds(axis: plt.Axes, stratum: dict[str, Any]) -> None:
-    layers, folds = _fold_series(stratum)
-    for index, fold_values in enumerate(folds):
-        axis.plot(
-            layers,
-            fold_values,
-            color=FOLD_COLORS[index % len(FOLD_COLORS)],
-            linewidth=0.8,
-            alpha=0.72,
-        )
+    values = np.asarray(folds, dtype=float)
+    lower = np.quantile(values, 0.25, axis=0)
+    upper = np.quantile(values, 0.75, axis=0)
+    axis.fill_between(
+        layers,
+        lower,
+        upper,
+        color="#9CA3AF",
+        alpha=0.28,
+        linewidth=0,
+        zorder=1,
+    )
 
 
 def _mean_series(stratum: dict[str, Any]) -> tuple[list[int], list[float]]:
@@ -401,10 +455,27 @@ def _modes(result: dict[str, Any]) -> list[str]:
     })
 
 
+def _match_groups(result: dict[str, Any]) -> list[str]:
+    completed = [
+        stratum
+        for stratum in result.get("strata", [])
+        if stratum.get("status") == "completed"
+    ]
+    for stratum in completed:
+        match_groups = stratum.get("match_groups")
+        if match_groups:
+            return [str(group) for group in match_groups]
+    count = max(
+        (int(stratum.get("match_group_count", 0)) for stratum in completed),
+        default=0,
+    )
+    return [f"group {index}" for index in range(1, count + 1)]
+
+
 def _standard_axis(axis: plt.Axes) -> None:
     axis.set_xlim(0, 63)
     axis.set_ylim(-0.02, 1.02)
-    axis.set_xticks(range(0, 64, 16))
+    axis.set_xticks([0, 16, 32, 48, 63])
     axis.set_yticks(np.linspace(0, 1, 6))
     axis.spines["top"].set_visible(False)
     axis.spines["right"].set_visible(False)
@@ -420,6 +491,10 @@ def _paper_style() -> dict[str, Any]:
         "legend.fontsize": 7,
         "figure.titlesize": 11,
         "font.family": "DejaVu Sans",
+        "axes.linewidth": 0.8,
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
+        "svg.fonttype": "none",
     }
 
 

@@ -1,0 +1,73 @@
+domain_id,domain_label,held_out_match_group_id,thinking_mode,agent_id,agent_label,probe_name,probe_label,layer,n_predictions,n_trajectories,n_clean,n_injected,held_out_fold_auroc,brier,ece_10_bin
+aihc,AIHC,aihc,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,0,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,8,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,16,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,24,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,32,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,40,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,48,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,56,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,63,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,lat_contrast_pair_pca,LAT,0,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,lat_contrast_pair_pca,LAT,8,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,lat_contrast_pair_pca,LAT,16,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,lat_contrast_pair_pca,LAT,24,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,lat_contrast_pair_pca,LAT,32,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,lat_contrast_pair_pca,LAT,40,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,lat_contrast_pair_pca,LAT,48,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,lat_contrast_pair_pca,LAT,56,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,planner_1,Planner,lat_contrast_pair_pca,LAT,63,4,4,2,2,0.5,0.25,0.0
+aihc,AIHC,aihc,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,0,4,4,2,2,0.0,0.4999998336055446,0.49999872563223113
+aihc,AIHC,aihc,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,8,4,4,2,2,0.5,0.47166635285158287,0.5221035329170899
+aihc,AIHC,aihc,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,16,4,4,2,2,0.25,0.49861103100895166,0.4945403949808113
+aihc,AIHC,aihc,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,24,4,4,2,2,0.0,0.38463589028579204,0.608467147979556
+aihc,AIHC,aihc,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,32,4,4,2,2,0.5,0.2533898071419547,0.44623413309109594
+aihc,AIHC,aihc,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,40,4,4,2,2,0.0,0.49896105730434775,0.49494562171312584
+aihc,AIHC,aihc,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,48,4,4,2,2,0.0,0.49350536694371905,0.4865994813688554
+aihc,AIHC,aihc,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,56,4,4,2,2,0.0,0.4976585769052402,0.4890011301900649
+aihc,AIHC,aihc,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,63,4,4,2,2,0.5,0.46054785510657414,0.4496832729146028
+aihc,AIHC,aihc,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,0,4,4,2,2,0.5,0.24904061808664016,0.024931125615966776
+aihc,AIHC,aihc,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,8,4,4,2,2,0.0,0.30930501830416274,0.36568523488413407
+aihc,AIHC,aihc,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,16,4,4,2,2,1.0,0.29140322971844823,0.2166441767259757
+aihc,AIHC,aihc,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,24,4,4,2,2,0.75,0.300817743360916,0.23698046245908677
+aihc,AIHC,aihc,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,32,4,4,2,2,0.75,0.3175602102169651,0.37470726906460816
+aihc,AIHC,aihc,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,40,4,4,2,2,1.0,0.24515967444606052,0.17932448587548236
+aihc,AIHC,aihc,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,48,4,4,2,2,0.5,0.45210949827282576,0.44441847229620957
+aihc,AIHC,aihc,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,56,4,4,2,2,1.0,0.3671883592287752,0.47101850182459376
+aihc,AIHC,aihc,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,63,4,4,2,2,0.0,0.4368158075537656,0.5553446415500215
+aihc,AIHC,aihc,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,0,2,2,1,1,1.0,0.04567502473891847,0.2088216484050297
+aihc,AIHC,aihc,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,8,2,2,1,1,1.0,0.09289896319273341,0.23914178432261488
+aihc,AIHC,aihc,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,16,2,2,1,1,0.0,0.6093494147235284,0.7704625116264969
+aihc,AIHC,aihc,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,24,2,2,1,1,0.0,0.3449425965134157,0.5734670850294468
+aihc,AIHC,aihc,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,32,2,2,1,1,1.0,0.002780440834097222,0.04003933982676575
+aihc,AIHC,aihc,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,40,2,2,1,1,1.0,0.0002147443686881007,0.013136034381447548
+aihc,AIHC,aihc,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,48,2,2,1,1,1.0,0.01607119329836082,0.10729084687367518
+aihc,AIHC,aihc,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,56,2,2,1,1,0.0,0.4957937534175273,0.4906832908973222
+aihc,AIHC,aihc,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,63,2,2,1,1,0.0,0.49977704093272274,0.4976552552582832
+aihc,AIHC,aihc,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,0,2,2,1,1,0.0,0.25930016348829266,0.08769524836019993
+aihc,AIHC,aihc,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,8,2,2,1,1,0.0,0.33491681648443766,0.24813722266500693
+aihc,AIHC,aihc,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,16,2,2,1,1,0.0,0.536923749612316,0.7200472103609189
+aihc,AIHC,aihc,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,24,2,2,1,1,0.0,0.4531891505518826,0.672411432104556
+aihc,AIHC,aihc,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,32,2,2,1,1,1.0,0.14597844578881142,0.37884067940970223
+aihc,AIHC,aihc,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,40,2,2,1,1,0.0,0.36507309124729487,0.6038280938526812
+aihc,AIHC,aihc,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,48,2,2,1,1,0.0,0.2605934360321265,0.031855448519530594
+aihc,AIHC,aihc,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,56,2,2,1,1,1.0,0.20755891010201363,0.43176135575592545
+aihc,AIHC,aihc,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,63,2,2,1,1,1.0,0.24134013134744883,0.14899425806021654
+aihc,AIHC,aihc,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,0,4,4,2,2,0.5,0.2994314049430032,0.5020570261185722
+aihc,AIHC,aihc,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,8,4,4,2,2,0.0,0.6450560315761092,0.7961596815445104
+aihc,AIHC,aihc,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,16,4,4,2,2,0.0,0.6755367935967406,0.8155476911964301
+aihc,AIHC,aihc,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,24,4,4,2,2,0.5,0.26371402404362926,0.35056761841546386
+aihc,AIHC,aihc,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,32,4,4,2,2,0.75,0.32379348517026996,0.36920719669665963
+aihc,AIHC,aihc,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,40,4,4,2,2,1.0,0.18817391449594864,0.35098354835310974
+aihc,AIHC,aihc,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,48,4,4,2,2,0.5,0.2864653620718655,0.30933804195962034
+aihc,AIHC,aihc,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,56,4,4,2,2,0.5,0.37372812983648884,0.5214314608931971
+aihc,AIHC,aihc,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,63,4,4,2,2,1.0,0.16094561348844258,0.24651905360244927
+aihc,AIHC,aihc,off,executor_1,Executor,lat_contrast_pair_pca,LAT,0,4,4,2,2,0.75,0.2390517782236107,0.21282864457708173
+aihc,AIHC,aihc,off,executor_1,Executor,lat_contrast_pair_pca,LAT,8,4,4,2,2,0.5,0.26617490277062505,0.27697655294599954
+aihc,AIHC,aihc,off,executor_1,Executor,lat_contrast_pair_pca,LAT,16,4,4,2,2,0.5,0.24938557557698393,0.04678062456240728
+aihc,AIHC,aihc,off,executor_1,Executor,lat_contrast_pair_pca,LAT,24,4,4,2,2,0.5,0.25351094351830294,0.05360992244381246
+aihc,AIHC,aihc,off,executor_1,Executor,lat_contrast_pair_pca,LAT,32,4,4,2,2,0.5,0.2510035641270154,0.2723627394732653
+aihc,AIHC,aihc,off,executor_1,Executor,lat_contrast_pair_pca,LAT,40,4,4,2,2,0.75,0.24555745286144925,0.1144598568885416
+aihc,AIHC,aihc,off,executor_1,Executor,lat_contrast_pair_pca,LAT,48,4,4,2,2,0.75,0.2380562448141994,0.24840638615243152
+aihc,AIHC,aihc,off,executor_1,Executor,lat_contrast_pair_pca,LAT,56,4,4,2,2,0.75,0.2414431348061081,0.1925949262483847
+aihc,AIHC,aihc,off,executor_1,Executor,lat_contrast_pair_pca,LAT,63,4,4,2,2,0.75,0.23316706566773399,0.19630891282360347

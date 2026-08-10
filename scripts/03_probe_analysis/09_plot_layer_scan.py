@@ -20,6 +20,9 @@ from src.analysis.paper_inputs import (  # noqa: E402
     load_paper_input_policy,
     validate_embedded_paper_input_audit,
 )
+from src.extraction.saved_activations import (  # noqa: E402
+    normalize_index_analysis_tier,
+)
 
 
 def main() -> None:
@@ -36,7 +39,15 @@ def main() -> None:
         type=Path,
         default=PROJECT_ROOT / "results/scenario1/figures/paper",
     )
-    parser.add_argument("--dpi", type=int, default=180)
+    parser.add_argument("--dpi", type=int, default=600)
+    parser.add_argument(
+        "--filename-prefix",
+        default="scenario1_all_domains_",
+        help=(
+            "Paper-facing prefix for every output filename. Use a dated, "
+            "self-identifying value for definitive analyses."
+        ),
+    )
     parser.add_argument(
         "--paper-input-policy",
         type=Path,
@@ -45,18 +56,31 @@ def main() -> None:
     args = parser.parse_args()
 
     result = json.loads(args.input.read_text())
+    analysis_tier = normalize_index_analysis_tier(result.get("analysis_tier"))
     paper_policy = load_paper_input_policy(args.paper_input_policy)
     paper_input_selection = validate_embedded_paper_input_audit(
         result,
         paper_policy,
     )
-    paths = save_paper_layer_scan_figures(result, args.output_dir, dpi=args.dpi)
-    print(json.dumps({
-        "figure_count": len(paths),
-        "figures": [path.as_posix() for path in paths],
-        "claim_scope": result["claim_scope"],
-        "paper_input_policy_id": paper_input_selection["policy_id"],
-    }, indent=2, sort_keys=True))
+    paths = save_paper_layer_scan_figures(
+        result,
+        args.output_dir,
+        dpi=args.dpi,
+        filename_prefix=args.filename_prefix,
+    )
+    print(
+        json.dumps(
+            {
+                "figure_count": len(paths),
+                "figures": [path.as_posix() for path in paths],
+                "claim_scope": result["claim_scope"],
+                "analysis_tier": analysis_tier,
+                "paper_input_policy_id": paper_input_selection["policy_id"],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":

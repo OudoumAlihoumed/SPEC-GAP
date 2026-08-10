@@ -23,6 +23,7 @@ from src.infrastructure.qwen_modal import ACTIVATION_ARTIFACT_FORMAT
 
 
 ACTIVATION_INDEX_SCHEMA = "spec_gap.activation_index.v3"
+LEGACY_ACTIVATION_INDEX_SCHEMAS = frozenset({"spec_gap.activation_index.v2"})
 ACTIVATION_INDEX_ANALYSIS_TIERS = frozenset({*ANALYSIS_TIERS, "unclassified"})
 CHECKPOINT_NAMES = {
     "last_input_token",
@@ -368,9 +369,16 @@ def write_activation_index(rows: Sequence[dict[str, Any]], path: str | Path) -> 
 
 
 def load_activation_index(path: str | Path) -> list[dict[str, Any]]:
-    """Load and minimally validate activation-index JSONL rows."""
+    """Load and minimally validate activation-index JSONL rows.
+
+    Version 2 indexes predate explicit analysis-tier provenance. They remain
+    readable as historical inputs, but are classified as ``unclassified`` in
+    memory. Current version 3 indexes must always carry their saved tier.
+    Mixing legacy and current rows in one file is rejected.
+    """
 
     rows: list[dict[str, Any]] = []
+    source_schemas: set[str] = set()
     with Path(path).open() as handle:
         for line_number, line in enumerate(handle, start=1):
             if not line.strip():
@@ -381,23 +389,75 @@ def load_activation_index(path: str | Path) -> list[dict[str, Any]]:
                 raise ValueError(
                     f"Invalid JSON on line {line_number} of {path}."
                 ) from error
-            if row.get("schema_version") != ACTIVATION_INDEX_SCHEMA:
+            schema_version = row.get("schema_version")
+            if schema_version not in {
+                ACTIVATION_INDEX_SCHEMA,
+                *LEGACY_ACTIVATION_INDEX_SCHEMAS,
+            }:
                 raise ValueError(
                     f"Unsupported activation index schema on line {line_number}."
                 )
-            try:
-                normalize_index_analysis_tier(row.get("analysis_tier"))
-            except ValueError as error:
-                raise ValueError(
-                    f"Invalid analysis tier on line {line_number} of {path}."
-                ) from error
+            source_schemas.add(schema_version)
+            if schema_version in LEGACY_ACTIVATION_INDEX_SCHEMAS:
+                legacy_tier = row.get("analysis_tier")
+                if legacy_tier not in (None, "unclassified"):
+                    raise ValueError(
+                        "Legacy activation indexes cannot claim an analysis tier "
+                        f"on line {line_number} of {path}."
+                    )
+                row = {**row, "analysis_tier": "unclassified"}
+            else:
+                try:
+                    normalize_index_analysis_tier(row.get("analysis_tier"))
+                except ValueError as error:
+                    raise ValueError(
+                        f"Invalid analysis tier on line {line_number} of {path}."
+                    ) from error
             rows.append(row)
     if not rows:
         raise ValueError("Activation index contains no rows.")
-    tiers = {row["analysis_tier"] for row in rows}
+    if len(source_schemas) != 1:
+        raise ValueError(
+            "Activation index cannot mix legacy and current schema versions."
+        )
+    activation_index_analysis_tier(rows)
+    return rows
+
+
+def activation_index_analysis_tier(rows: Iterable[dict[str, Any]]) -> str:
+    """Return the one explicit tier represented by activation-index rows."""
+
+    tiers = {normalize_index_analysis_tier(row.get("analysis_tier")) for row in rows}
     if len(tiers) != 1:
         raise ValueError("Activation index must contain exactly one analysis tier.")
-    return rows
+    return next(iter(tiers))
+
+
+def upgrade_legacy_activation_index(
+    rows: Sequence[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Upgrade one homogeneous legacy index to explicit v3 provenance.
+
+    Historical v2 indexes never recorded an execution tier. The only honest
+    migration is therefore ``unclassified``; this helper cannot promote them
+    to exploratory or definitive status.
+    """
+
+    if not rows:
+        raise ValueError("At least one legacy activation-index row is required.")
+    schemas = {row.get("schema_version") for row in rows}
+    if not schemas.issubset(LEGACY_ACTIVATION_INDEX_SCHEMAS):
+        raise ValueError("Only legacy activation-index rows can be upgraded.")
+    if activation_index_analysis_tier(rows) != "unclassified":
+        raise ValueError("Legacy activation-index rows must remain unclassified.")
+    return [
+        {
+            **row,
+            "schema_version": ACTIVATION_INDEX_SCHEMA,
+            "analysis_tier": "unclassified",
+        }
+        for row in rows
+    ]
 
 
 def filter_activation_index(
@@ -598,10 +658,7 @@ def summarize_activation_index(rows: Sequence[dict[str, Any]]) -> dict[str, Any]
             values[value] = values.get(value, 0) + 1
         return dict(sorted(values.items()))
 
-    tiers = {normalize_index_analysis_tier(row.get("analysis_tier")) for row in rows}
-    if len(tiers) != 1:
-        raise ValueError("Activation index summary requires exactly one analysis tier.")
-    analysis_tier = next(iter(tiers))
+    analysis_tier = activation_index_analysis_tier(rows)
     unique_turns = {
         (row["analysis_tier"], row["trajectory_id"], row["step_index"]) for row in rows
     }

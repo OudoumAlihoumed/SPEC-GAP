@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 
 from src.analysis.layer_scan_paper_figures import (
     _control_state,
+    _match_groups,
     save_paper_layer_scan_figures,
 )
 
@@ -66,9 +67,9 @@ def test_save_paper_figures_in_vector_and_preview_formats(tmp_path):
     assert len(paths) == 9
     assert {path.suffix for path in paths} == {".png", ".svg", ".pdf"}
     assert {path.stem for path in paths} == {
-        "figure1_planner_negative_control",
-        "figure2_shared_input_comparison",
-        "appendix_full_layer_heatmap",
+        "scenario1_all_domains_planner_negative_control",
+        "scenario1_all_domains_shared_input_auroc_by_layer",
+        "scenario1_all_domains_qualified_last_input_auroc_heatmap",
     }
     assert all(path.is_file() and path.stat().st_size > 1000 for path in paths)
     for path in paths:
@@ -76,6 +77,8 @@ def test_save_paper_figures_in_vector_and_preview_formats(tmp_path):
             payload = path.read_text(encoding="utf-8")
             assert all(line == line.rstrip() for line in payload.splitlines())
             assert "<dc:date>" not in payload
+            if "heatmap" in path.stem:
+                assert "UNCALIBRATED" not in payload
         elif path.suffix == ".pdf":
             payload = path.read_bytes()
             assert b"CreationDate" not in payload
@@ -99,3 +102,12 @@ def test_control_state_distinguishes_pass_failure_and_uncalibrated_null():
         False,
         "Blocked by planner control",
     )
+
+
+def test_match_groups_uses_names_and_falls_back_to_count():
+    named = _paper_result()
+    named["strata"][0]["match_groups"] = ["aihc", "fin", "neuro"]
+    named["strata"][0]["match_group_count"] = 3
+    assert _match_groups(named) == ["aihc", "fin", "neuro"]
+
+    assert _match_groups(_paper_result()) == ["group 1", "group 2"]

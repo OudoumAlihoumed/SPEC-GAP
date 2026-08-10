@@ -1,0 +1,73 @@
+domain_id,domain_label,held_out_match_group_id,thinking_mode,agent_id,agent_label,probe_name,probe_label,layer,n_predictions,n_trajectories,n_clean,n_injected,held_out_fold_auroc,brier,ece_10_bin
+telecom,Telecom,telecom,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,0,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,8,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,16,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,24,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,32,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,40,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,48,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,56,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,goldowsky_dill_logistic,Goldowsky-Dill,63,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,lat_contrast_pair_pca,LAT,0,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,lat_contrast_pair_pca,LAT,8,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,lat_contrast_pair_pca,LAT,16,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,lat_contrast_pair_pca,LAT,24,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,lat_contrast_pair_pca,LAT,32,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,lat_contrast_pair_pca,LAT,40,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,lat_contrast_pair_pca,LAT,48,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,lat_contrast_pair_pca,LAT,56,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,planner_1,Planner,lat_contrast_pair_pca,LAT,63,4,4,2,2,0.5,0.25,0.0
+telecom,Telecom,telecom,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,0,4,4,2,2,1.0,0.4999999998942716,0.4999999999379138
+telecom,Telecom,telecom,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,8,4,4,2,2,0.75,0.41075185052351854,0.4146985821921573
+telecom,Telecom,telecom,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,16,4,4,2,2,1.0,0.48888205796334583,0.49190623430965197
+telecom,Telecom,telecom,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,24,4,4,2,2,1.0,0.46475046896198924,0.48180579601382945
+telecom,Telecom,telecom,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,32,4,4,2,2,1.0,0.033778105331932394,0.14041567100274335
+telecom,Telecom,telecom,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,40,4,4,2,2,1.0,0.10671994809259418,0.26282404497337386
+telecom,Telecom,telecom,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,48,4,4,2,2,0.75,0.4378350853494244,0.4566747868302576
+telecom,Telecom,telecom,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,56,4,4,2,2,0.75,0.29761978345845885,0.25619041867831993
+telecom,Telecom,telecom,off,worker_1,Worker 1,goldowsky_dill_logistic,Goldowsky-Dill,63,4,4,2,2,0.5,0.3116460741322376,0.4972655389087731
+telecom,Telecom,telecom,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,0,4,4,2,2,0.0,0.25490125986207,0.03659039435124134
+telecom,Telecom,telecom,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,8,4,4,2,2,1.0,0.24708269079605,0.1814201309400012
+telecom,Telecom,telecom,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,16,4,4,2,2,1.0,0.261740337699677,0.13080864645904883
+telecom,Telecom,telecom,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,24,4,4,2,2,0.0,0.25731845614890725,0.03018940352903582
+telecom,Telecom,telecom,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,32,4,4,2,2,1.0,0.23791132469898382,0.042385301672422604
+telecom,Telecom,telecom,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,40,4,4,2,2,0.0,0.32131723353715513,0.3784082468009804
+telecom,Telecom,telecom,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,48,4,4,2,2,1.0,0.277148183225511,0.44434801840420185
+telecom,Telecom,telecom,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,56,4,4,2,2,0.75,0.264806694684739,0.30291054135457895
+telecom,Telecom,telecom,off,worker_1,Worker 1,lat_contrast_pair_pca,LAT,63,4,4,2,2,1.0,0.27405046823942475,0.33956252524089764
+telecom,Telecom,telecom,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,0,2,2,1,1,1.0,0.10237251634612174,0.31381982482297344
+telecom,Telecom,telecom,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,8,2,2,1,1,0.0,0.8400713082666948,0.9131034819950401
+telecom,Telecom,telecom,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,16,2,2,1,1,0.0,0.6049252233104397,0.7434339956487903
+telecom,Telecom,telecom,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,24,2,2,1,1,0.0,0.49280080120847747,0.4909228061604817
+telecom,Telecom,telecom,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,32,2,2,1,1,0.0,0.4975504613563105,0.4967445827136019
+telecom,Telecom,telecom,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,40,2,2,1,1,1.0,0.4666140147691198,0.47620317601000317
+telecom,Telecom,telecom,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,48,2,2,1,1,1.0,0.25953342037072585,0.39648513694359416
+telecom,Telecom,telecom,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,56,2,2,1,1,1.0,0.3454775732799992,0.3554960354810587
+telecom,Telecom,telecom,off,worker_2,Worker 2,goldowsky_dill_logistic,Goldowsky-Dill,63,2,2,1,1,0.0,0.3981446364941567,0.6005159279988361
+telecom,Telecom,telecom,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,0,2,2,1,1,0.0,0.31894042299991615,0.255664501754147
+telecom,Telecom,telecom,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,8,2,2,1,1,0.0,0.4691972562432904,0.6134233192265003
+telecom,Telecom,telecom,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,16,2,2,1,1,0.0,0.2810952283124514,0.03541408754071762
+telecom,Telecom,telecom,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,24,2,2,1,1,0.0,0.2516113299050058,0.00840955367269225
+telecom,Telecom,telecom,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,32,2,2,1,1,1.0,0.2507017037376432,0.058062397056253934
+telecom,Telecom,telecom,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,40,2,2,1,1,1.0,0.24398293925747602,0.05204296986987966
+telecom,Telecom,telecom,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,48,2,2,1,1,1.0,0.24007067959261802,0.4807648173850594
+telecom,Telecom,telecom,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,56,2,2,1,1,1.0,0.24234248162200303,0.13072807268749487
+telecom,Telecom,telecom,off,worker_2,Worker 2,lat_contrast_pair_pca,LAT,63,2,2,1,1,1.0,0.2840404358504085,0.4925103918371028
+telecom,Telecom,telecom,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,0,4,4,2,2,0.0,0.6578099486075083,0.694716840129735
+telecom,Telecom,telecom,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,8,4,4,2,2,0.5,0.32816582539958483,0.39794036991737175
+telecom,Telecom,telecom,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,16,4,4,2,2,0.75,0.4522926532553881,0.4722218854978557
+telecom,Telecom,telecom,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,24,4,4,2,2,0.75,0.37139954162893335,0.44166394398715986
+telecom,Telecom,telecom,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,32,4,4,2,2,0.75,0.22094477613550237,0.35793618801565197
+telecom,Telecom,telecom,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,40,4,4,2,2,1.0,0.16519900843104837,0.2224494464544502
+telecom,Telecom,telecom,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,48,4,4,2,2,0.75,0.24268352448280575,0.29625762001466593
+telecom,Telecom,telecom,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,56,4,4,2,2,0.25,0.4120135821758836,0.5046159559036527
+telecom,Telecom,telecom,off,executor_1,Executor,goldowsky_dill_logistic,Goldowsky-Dill,63,4,4,2,2,0.25,0.5397075335652379,0.6247460194999717
+telecom,Telecom,telecom,off,executor_1,Executor,lat_contrast_pair_pca,LAT,0,4,4,2,2,0.5,0.28495389292607654,0.3663827742431158
+telecom,Telecom,telecom,off,executor_1,Executor,lat_contrast_pair_pca,LAT,8,4,4,2,2,0.75,0.24459125617693578,0.25889279566801005
+telecom,Telecom,telecom,off,executor_1,Executor,lat_contrast_pair_pca,LAT,16,4,4,2,2,0.5,0.26004302119368633,0.2697908259274673
+telecom,Telecom,telecom,off,executor_1,Executor,lat_contrast_pair_pca,LAT,24,4,4,2,2,0.5,0.2478278376711645,0.10208774983385088
+telecom,Telecom,telecom,off,executor_1,Executor,lat_contrast_pair_pca,LAT,32,4,4,2,2,0.5,0.25431957763351043,0.08731958618423608
+telecom,Telecom,telecom,off,executor_1,Executor,lat_contrast_pair_pca,LAT,40,4,4,2,2,0.5,0.2555779815462374,0.094966714100721
+telecom,Telecom,telecom,off,executor_1,Executor,lat_contrast_pair_pca,LAT,48,4,4,2,2,0.75,0.24337015975182194,0.10031195569841306
+telecom,Telecom,telecom,off,executor_1,Executor,lat_contrast_pair_pca,LAT,56,4,4,2,2,0.75,0.24608695524376972,0.07874997715692328
+telecom,Telecom,telecom,off,executor_1,Executor,lat_contrast_pair_pca,LAT,63,4,4,2,2,0.75,0.2453540086693697,0.24657900062324067

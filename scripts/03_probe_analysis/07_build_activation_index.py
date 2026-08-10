@@ -15,15 +15,18 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src.extraction.saved_activations import (  # noqa: E402
     ACTIVATION_INDEX_ANALYSIS_TIERS,
     build_activation_index,
+    load_activation_index,
     load_trajectory_records,
     summarize_activation_index,
     trajectory_paths_for_analysis_tier,
+    upgrade_legacy_activation_index,
     write_activation_index,
 )
 from src.analysis.paper_inputs import (  # noqa: E402
     DEFAULT_PAPER_INPUT_POLICY,
     load_paper_input_policy,
     select_paper_trajectory_records,
+    validate_paper_analysis_inputs,
 )
 
 
@@ -38,6 +41,14 @@ def main() -> None:
         "--trajectory-root",
         type=Path,
         default=PROJECT_ROOT / "experiments/scenario1/trajectories/live",
+    )
+    parser.add_argument(
+        "--legacy-index",
+        type=Path,
+        help=(
+            "Upgrade a historical v2 index to explicit v3/unclassified metadata "
+            "instead of rebuilding from trajectory files."
+        ),
     )
     parser.add_argument(
         "--artifact-root",
@@ -77,23 +88,36 @@ def main() -> None:
     parser.add_argument("--verify-checksums", action="store_true")
     args = parser.parse_args()
 
-    paths = trajectory_paths_for_analysis_tier(
-        args.trajectory_root,
-        args.analysis_tier,
-    )
-    records = load_trajectory_records(paths)
     paper_policy = load_paper_input_policy(args.paper_input_policy)
-    records, paper_input_selection = select_paper_trajectory_records(
-        records,
-        paper_policy,
-    )
-    rows = build_activation_index(
-        records,
-        analysis_tier=args.analysis_tier,
-        artifact_root=args.artifact_root,
-        require_local=args.require_local,
-        verify_checksums=args.verify_checksums,
-    )
+    if args.legacy_index:
+        if args.analysis_tier != "unclassified":
+            raise ValueError(
+                "A legacy activation index can only be upgraded as unclassified."
+            )
+        if args.require_local or args.verify_checksums:
+            raise ValueError(
+                "Legacy-index migration only updates metadata; run the downstream "
+                "scan without --skip-checksums to verify every activation artifact."
+            )
+        rows = upgrade_legacy_activation_index(load_activation_index(args.legacy_index))
+        paper_input_selection = validate_paper_analysis_inputs(rows, paper_policy)
+    else:
+        paths = trajectory_paths_for_analysis_tier(
+            args.trajectory_root,
+            args.analysis_tier,
+        )
+        records = load_trajectory_records(paths)
+        records, paper_input_selection = select_paper_trajectory_records(
+            records,
+            paper_policy,
+        )
+        rows = build_activation_index(
+            records,
+            analysis_tier=args.analysis_tier,
+            artifact_root=args.artifact_root,
+            require_local=args.require_local,
+            verify_checksums=args.verify_checksums,
+        )
     write_activation_index(rows, args.output)
     summary = summarize_activation_index(rows)
     summary["paper_input_selection"] = paper_input_selection

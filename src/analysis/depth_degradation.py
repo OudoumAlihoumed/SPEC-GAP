@@ -221,7 +221,9 @@ def analyze_depth_degradation(
         "data_manifest_hash": prediction_manifest_hash(rows),
         "n_match_groups": n_match_groups,
         "claim_scope": (
-            "group-held-out exploratory analysis with only two independent match groups"
+            "group-held-out exploratory analysis with only "
+            f"{n_match_groups} independent match "
+            f"{'group' if n_match_groups == 1 else 'groups'}"
             if n_match_groups < 3
             else "preliminary match-group evaluation"
         ),

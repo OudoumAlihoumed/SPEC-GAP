@@ -123,6 +123,12 @@ def _audit_rows(tmp_path, *, mismatch_planner_input=False):
 def test_control_audit_separates_strict_and_stochastic_controls(tmp_path):
     result = run_activation_control_audit(_audit_rows(tmp_path))
 
+    assert result["match_groups"] == ["group-a"]
+    assert "insufficient_independent_match_groups" in result[
+        "layer_selection_blockers"
+    ]
+    assert "Only 1 independent match group is available." in result["limitations"]
+
     strict = result["strict_planner_input_control"]
     assert strict["status"] == "passed"
     assert strict["blocks_layer_selection"] is False

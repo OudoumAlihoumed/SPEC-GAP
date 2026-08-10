@@ -80,6 +80,28 @@ def run_activation_control_audit(
 
     strict_control = _strict_planner_input_control(complete_pairs)
     stochastic_control = _stochastic_planner_output_control(complete_pairs)
+    match_groups = sorted({str(row["match_group_id"]) for row in rows})
+    match_group_count = len(match_groups)
+    layer_selection_blockers = [
+        *(
+            []
+            if strict_control["status"] == "passed"
+            else ["strict_planner_input_control_failed"]
+        ),
+        "stochastic_output_null_not_calibrated",
+    ]
+    limitations = [
+        "Generated planner checkpoints are stochastic nulls, not strict identity controls.",
+        "The audit reports paired distances and does not convert them into probe AUROC.",
+    ]
+    if match_group_count < 3:
+        layer_selection_blockers.append("insufficient_independent_match_groups")
+        verb = "is" if match_group_count == 1 else "are"
+        noun = "group" if match_group_count == 1 else "groups"
+        limitations.insert(
+            1,
+            f"Only {match_group_count} independent match {noun} {verb} available.",
+        )
     return {
         "schema_version": ACTIVATION_CONTROL_SCHEMA,
         "audit_type": "paired_activation_control",
@@ -91,27 +113,15 @@ def run_activation_control_audit(
         "complete_pair_count": len(complete_pairs),
         "incomplete_pair_count": len(incomplete_pairs),
         "incomplete_pairs": incomplete_pairs,
-        "match_groups": sorted({str(row["match_group_id"]) for row in rows}),
+        "match_groups": match_groups,
         "thinking_modes": sorted({str(row["thinking_mode"]) for row in rows}),
         "strict_planner_input_control": strict_control,
         "stochastic_planner_output_control": stochastic_control,
         "propagation_profiles": _summarize_profiles(complete_pairs),
         "pairs": complete_pairs,
         "layer_selection_allowed": False,
-        "layer_selection_blockers": [
-            *(
-                []
-                if strict_control["status"] == "passed"
-                else ["strict_planner_input_control_failed"]
-            ),
-            "stochastic_output_null_not_calibrated",
-            "only_two_independent_match_groups",
-        ],
-        "limitations": [
-            "Generated planner checkpoints are stochastic nulls, not strict identity controls.",
-            "Only two independent match groups are available.",
-            "The audit reports paired distances and does not convert them into probe AUROC.",
-        ],
+        "layer_selection_blockers": layer_selection_blockers,
+        "limitations": limitations,
     }
 
 
