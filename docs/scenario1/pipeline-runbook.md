@@ -111,6 +111,32 @@ The command refuses to overwrite a nonempty path.
 Existing active packages already contain their checked retrieval plans. Do not
 regenerate them merely to inspect the repository.
 
+The canonical source-PDF verification calls `pdftotext -raw`. That executable
+comes from Poppler and is outside the Python environment created at `S00`.
+Install it with the operating system's package manager when needed (for
+example, `brew install poppler` on macOS or `sudo apt-get install
+poppler-utils` on Debian/Ubuntu). On Windows, install an approved Poppler
+distribution, add its `bin` directory to `PATH`, and use the PowerShell check
+shown below.
+
+The command examples in this guide otherwise use a POSIX-compatible shell.
+Verify the executable and version before `S03`:
+
+```bash
+pdftotext -v
+command -v pdftotext  # optional POSIX location check
+```
+
+PowerShell equivalent:
+
+```powershell
+pdftotext -v
+(Get-Command pdftotext).Source
+```
+
+Stop if the command is absent. A Poppler-version extraction difference will
+also fail the tracked text/hash checks rather than silently changing a plan.
+
 For a new or intentionally changed package, first prepare its plan with the
 exact pinned tokenizer and source files:
 
@@ -156,16 +182,28 @@ validation, or source/license review fails.
 These stages use whichever workspace the active contributor profile selects;
 they are not tied to one person's laptop or former lab membership.
 
-Authenticate, confirm the workspace, inspect its current billing summary, and
-run the read-only access check:
+If no valid Modal profile exists yet, complete one-time onboarding first:
 
 ```bash
 modal setup
+```
+
+`modal setup` opens the authentication flow and writes local profile/token
+configuration. It starts no app or compute, but it is not part of the read-only
+`S07` verification.
+
+Once credentials exist, confirm the workspace, inspect its current billing
+summary, and run the read-only access check:
+
+```bash
 modal profile current
 modal token info
 modal billing summary --json
 python scripts/run_portable_smoke_test.py --check-modal
 ```
+
+The optional Modal dependency is pinned to 1.5.3 or newer because
+`modal billing summary` first became available in that release line.
 
 If the workspace is wrong, access is missing, or the budget is unknown, stop.
 Do not infer that another workspace's model Volume or credits are available.
@@ -357,12 +395,18 @@ evidence. Keep reviewer forms blank in Git:
 python scripts/04_reporting/18_build_cross_domain_human_review.py \
   --activation-index PATH/TO/activation_index.jsonl \
   --source-root DOMAIN=PATH/TO/DOMAIN_TRAJECTORIES \
-  --output-dir PATH/TO/HUMAN_REVIEW_BUNDLE
+  --policy-language-audit PATH/TO/policy_request_language_audit.json \
+  --policy-pdf-audit PATH/TO/policy_pdf_pair_audit.json \
+  --telecom-pdf-audit PATH/TO/telecom_pdf_pair_audit.json \
+  --telecom-style-review PATH/TO/telecom_style_review.json \
+  --output-dir PATH/TO/NEW_OR_EMPTY_HUMAN_REVIEW_BUNDLE
 ```
 
-Repeat `--source-root` for every domain in the declared cohort and supply any
-required policy, PDF, or Telecom style-audit bindings shown by `--help`. After
-two real reviewers complete and lock both phases, validate the bundle:
+Repeat `--source-root` for every domain in the declared cohort. The four audit
+paths shown above are required build bindings, not optional examples. Build
+mode refuses any nonempty output directory so it cannot erase human judgments.
+Never rebuild a completed bundle; use validation mode only. After two real
+reviewers complete and lock both phases, validate the bundle:
 
 ```bash
 python scripts/04_reporting/18_build_cross_domain_human_review.py \

@@ -49,6 +49,31 @@ def test_runbook_contains_the_exact_generated_catalog_table() -> None:
     assert render_markdown_table() in text
     assert "Do not run every numbered file" in text
     assert "research group owns" in text
+    for required_flag in (
+        "--policy-language-audit",
+        "--policy-pdf-audit",
+        "--telecom-pdf-audit",
+        "--telecom-style-review",
+    ):
+        assert required_flag in text
+    assert "pdftotext -v" in text
+    assert "Get-Command pdftotext" in text
+    assert "outside the Python environment" in text
+    assert "NEW_OR_EMPTY_HUMAN_REVIEW_BUNDLE" in text
+    assert "Never rebuild a completed bundle" in text
+
+
+def test_modal_setup_is_separate_from_read_only_workspace_verification() -> None:
+    text = RUNBOOK.read_text(encoding="utf-8")
+    verification = text[
+        text.index("Once credentials exist") : text.index("If the workspace is wrong")
+    ]
+
+    assert "`modal setup`" not in verification
+    assert "writes local profile/token" in text
+    assert '"modal>=1.5.3,<2"' in (PROJECT_ROOT / "pyproject.toml").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_readme_points_to_one_start_command_and_one_detailed_runbook() -> None:
@@ -57,3 +82,4 @@ def test_readme_points_to_one_start_command_and_one_detailed_runbook() -> None:
     assert "python scripts/00_repository/00_show_pipeline.py --check" in readme
     assert "docs/scenario1/pipeline-runbook.md" in readme
     assert "S00" in readme and "S23" in readme
+    assert "Poppler's `pdftotext`" in readme

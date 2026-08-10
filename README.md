@@ -131,6 +131,12 @@ source .venv/bin/activate
 python -m pip install -e ".[dev,modal]"
 ```
 
+Package authors who rebuild retrieval inputs directly from source PDFs also
+need Poppler's `pdftotext` executable. It is a conditional `S03` system
+dependency, not a Python package; the
+[pipeline runbook](docs/scenario1/pipeline-runbook.md#s03-s06-only-when-constructing-or-changing-a-package)
+shows how to check it before package work.
+
 Run the complete test suite:
 
 ```bash

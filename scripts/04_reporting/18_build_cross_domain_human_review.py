@@ -229,6 +229,28 @@ REVIEW_RUBRIC = {
 }
 
 
+def prepare_new_review_output_directory(path: Path) -> None:
+    """Create or accept an empty bundle directory without overwriting evidence."""
+
+    if path.exists():
+        if not path.is_dir():
+            raise ValueError(
+                f"human-review --output-dir must be a new or empty directory: {path}"
+            )
+        existing = sorted(item.name for item in path.iterdir())
+        if existing:
+            preview = ", ".join(existing[:5])
+            if len(existing) > 5:
+                preview += ", ..."
+            raise FileExistsError(
+                "refusing to overwrite nonempty human-review bundle "
+                f"{path} (found: {preview}). Use "
+                "--validate-completed-review-dir for a completed bundle."
+            )
+        return
+    path.mkdir(parents=True, exist_ok=False)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
@@ -278,7 +300,14 @@ def main() -> None:
     parser.add_argument("--policy-pdf-audit", type=Path)
     parser.add_argument("--telecom-pdf-audit", type=Path)
     parser.add_argument("--telecom-style-review", type=Path)
-    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help=(
+            "New or empty bundle directory. Build mode refuses to overwrite any "
+            "existing content; validate completed bundles with the validation mode."
+        ),
+    )
     args = parser.parse_args()
 
     if (
@@ -343,6 +372,7 @@ def main() -> None:
     if missing:
         parser.error("build mode requires " + ", ".join(missing))
 
+    prepare_new_review_output_directory(args.output_dir)
     roots = parse_source_roots(args.source_root)
     index_rows = load_activation_index(args.activation_index)
     expected_trajectory_ids = _trajectory_ids_by_domain(index_rows)
@@ -357,7 +387,6 @@ def main() -> None:
     if len(pairs) != 36:
         raise ValueError(f"Expected 36 review pairs, found {len(pairs)}.")
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
     evidence_path = args.output_dir / "human_review_evidence.json"
     packet_path = args.output_dir / "human_review_packet.md"
     key_path = args.output_dir / "human_review_key.json"
@@ -1119,7 +1148,7 @@ def write_blank_review_form(path: Path, pairs: list[dict[str, Any]]) -> None:
     """Write two intentionally blank blinded human-review rows per pair."""
 
     fieldnames = [*PAIR_METADATA_FIELDS, *BLINDED_MANUAL_FIELDS]
-    with path.open("w", encoding="utf-8", newline="") as handle:
+    with path.open("x", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for pair in pairs:
@@ -1136,7 +1165,7 @@ def write_blank_unblinded_review_form(
     """Write the blank post-lock treatment-aware verification form."""
 
     fieldnames = [*PAIR_METADATA_FIELDS, *UNBLINDED_MANUAL_FIELDS]
-    with path.open("w", encoding="utf-8", newline="") as handle:
+    with path.open("x", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for pair in pairs:
