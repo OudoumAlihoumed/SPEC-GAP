@@ -1859,7 +1859,7 @@
     "input_trajectory_count": 72,
     "mode": "validation",
     "policy_id": "scenario1_paper_finance_v2_2026_08_07",
-    "policy_sha256": "4642e98a0742af1c8cdee57bbec78c21c451902cd6d73d813613c7e38799d5c6",
+    "policy_sha256": "687934a1b018d029ff6abf000fb168f7c653b2e8cc85c017898887202df52531",
     "schema_version": "spec_gap.scenario1_paper_input_audit.v1",
     "selected_item_count": 630,
     "selected_trajectory_count": 72,
@@ -16218,8 +16218,8 @@
       "sha256": "059b24c0efe05562eafbabeff302d827569362cab2fea41c8cbf19f1be1e8dd8"
     },
     "paper_input_policy": {
-      "path": "/Users/elenaajayi/Downloads/github-repos/spec-gap-cross-domain-auroc/experiments/scenario1/paper_input_policy.json",
-      "sha256": "645952b17d31e36bd871e08b1e1feac7095e6fb15cfe8f1940360014bffb0f7a"
+      "path": "experiments/scenario1/paper_input_policy.json",
+      "sha256": "ce6859da4049854a8502c62a49ff2bf060c0401f6f0396123b72db6d8b734ff9"
     },
     "probe_design": {
       "path": "results/scenario1/nine_domain_analysis/data/scenario1_nine_domain_probe_design_2026_08_06.json",

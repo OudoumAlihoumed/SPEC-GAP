@@ -286,10 +286,10 @@
       "generation_protocol_id": "controlled_v2_5000",
       "inputs": {
         "injection_payload_sha256": "ac95b050bc41aeb622db57266070832f35b0bf8436854724ed4f645192234875",
-        "registry": "experiments/scenario1/inputs/fellow_packages/policy/registry.json",
-        "registry_sha256": "3aa274b2e3a4892443654457b016fa5b1add7a2ea4a66ea5e74a744029af2ee7",
-        "retrieval_plan": "experiments/scenario1/inputs/fellow_packages/policy/retrieval/full_corpus_bm25_all_pages_gen5000_v2.json",
-        "retrieval_plan_sha256": "65760512a4418f9b0be237de1e027a7b6d71a1fe5270402fac136214ba4f1157",
+        "registry": "experiments/scenario1/inputs/fellow_packages/policy/domain_config.json",
+        "registry_sha256": "144484d4bcf31edc9a6761349f7b4c9c8de032ce55d80fe7480225a393a047ba",
+        "retrieval_plan": "experiments/scenario1/inputs/fellow_packages/policy/retrieval/plan.json",
+        "retrieval_plan_sha256": "95d07fdd9499f8a557a17ee19292354c92be77ab487dfcb83241b233297c2ab2",
         "selected_chunk_count": 36,
         "selected_chunk_ids_sha256": "a42e1c24d285dd339dcc93b5cb9433ba04942f98381034139afca19859fa6d50",
         "source_documents": [

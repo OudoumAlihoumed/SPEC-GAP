@@ -54,8 +54,13 @@ def sha256_text(text: str) -> str:
 
 
 def canonical_plan_sha256(plan: dict[str, Any]) -> str:
+    """Hash retrieval semantics while ignoring repository-only file metadata."""
+
+    semantic_plan = {
+        key: value for key, value in plan.items() if key != "_file_info"
+    }
     payload = json.dumps(
-        plan,
+        semantic_plan,
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,

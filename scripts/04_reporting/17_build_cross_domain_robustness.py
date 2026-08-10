@@ -126,6 +126,15 @@ COHORTS = {
 }
 
 
+def _display_path(path: Path) -> str:
+    """Prefer a repository-relative source path when the file is in-tree."""
+
+    try:
+        return path.resolve().relative_to(PROJECT_ROOT.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
@@ -251,21 +260,21 @@ def main() -> None:
     design_table = _design_table()
     source_hashes = {
         "activation_index": {
-            "path": args.activation_index.as_posix(),
+            "path": _display_path(args.activation_index),
             "sha256": _sha256(args.activation_index),
             "rows": len(index_rows),
         },
         "saved_probe_scores": {
-            "path": args.scores.as_posix(),
+            "path": _display_path(args.scores),
             "sha256": _sha256(args.scores),
             "rows": len(all_score_rows),
         },
         "probe_design": {
-            "path": args.design_manifest.as_posix(),
+            "path": _display_path(args.design_manifest),
             "sha256": _sha256(args.design_manifest),
         },
         "paper_input_policy": {
-            "path": args.paper_input_policy.as_posix(),
+            "path": _display_path(args.paper_input_policy),
             "sha256": _sha256(args.paper_input_policy),
         },
         "activation_artifacts": {

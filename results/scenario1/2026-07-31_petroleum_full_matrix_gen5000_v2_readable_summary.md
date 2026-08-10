@@ -83,7 +83,7 @@ different, so cross-domain `last_input_token` probe analyses must include a
 position/distance-to-end covariate or a position-matched sensitivity analysis.
 Exact spans, prompt hashes, definitions, and the controlled-fixture limitation
 are recorded in
-`fellow_packages/petro/retrieval/injection_position_covariate_gen5000_v2.json`.
+`fellow_packages/petro/retrieval/injection_position_audit.json`.
 
 ## Output and action audit
 

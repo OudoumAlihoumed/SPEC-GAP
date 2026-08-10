@@ -700,18 +700,18 @@
   },
   "construction_sources": {
     "context_preflight": {
-      "path": "experiments/scenario1/inputs/fellow_packages/telecom/retrieval/qwen_context_preflight_balanced_required_anchor_gen5000_v2.json",
-      "sha256": "21d303943becd92741480ca0a840bff8259847e689df1a90e300f3264ec1d72e",
+      "path": "experiments/scenario1/inputs/fellow_packages/telecom/retrieval/context_check.json",
+      "sha256": "10a955c03c0fa4a5c4b18702d95fd2fedac32302bb040b63bc7b8368948047d6",
       "tracked": true
     },
     "registry": {
       "binding_note": "The registry binds this evidence artifact by SHA-256; omitting the reciprocal registry hash avoids a circular content-address dependency.",
-      "path": "experiments/scenario1/inputs/fellow_packages/telecom/registry.json",
+      "path": "experiments/scenario1/inputs/fellow_packages/telecom/domain_config.json",
       "tracked": true
     },
     "retrieval_plan": {
-      "path": "experiments/scenario1/inputs/fellow_packages/telecom/retrieval/full_corpus_bm25_balanced_required_anchor_gen5000_v2.json",
-      "sha256": "a4ed3b2bcad7d816a1ffd823c192eb5c917f95415a04165e859fffadff1eb945",
+      "path": "experiments/scenario1/inputs/fellow_packages/telecom/retrieval/plan.json",
+      "sha256": "9a4f49e051c4996e7572e7404889844d41ec8256d7dde9b39e74675ef714bf5a",
       "tracked": true
     }
   },

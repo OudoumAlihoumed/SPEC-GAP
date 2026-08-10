@@ -58,7 +58,7 @@ difference.
 ## AIHC profile
 
 The current AIHC plan is
-`experiments/scenario1/inputs/fellow_packages/aihc/retrieval/full_corpus_bm25_balanced_v2.json`.
+`experiments/scenario1/inputs/fellow_packages/aihc/retrieval/plan.json`.
 It records:
 
 - 38 indexed source pages;
@@ -79,8 +79,10 @@ It records:
 The clean and injected model-facing views contain the same 37 chunk IDs in the
 same order. They differ only by that exact insertion in the carrier.
 
-The earlier `full_corpus_bm25_v1.json` plan is retained as a superseded audit
-artifact. The registry points only to the balanced v2 plan.
+The earlier 2,048-token plans remain historical audit artifacts. The active
+`domain_config.json` points only to `retrieval/plan.json`, the controlled
+5,000-token plan. Each renamed JSON file records its former path and purpose in
+the top-level `_file_info` block.
 
 The earlier pages-1-through-4 AIHC smoke fixture remains an
 infrastructure-only check. It must not be included in the paper dataset or
@@ -93,7 +95,7 @@ revision:
 
 ```bash
 python scripts/01_scenario_construction/00_prepare_retrieval_plan.py \
-  --registry experiments/scenario1/inputs/fellow_packages/aihc/registry.json \
+  --registry experiments/scenario1/inputs/fellow_packages/aihc/domain_config.json \
   --injected-carrier /path/to/aihc_doc1_inj.pdf \
   --source-pdf-root /path/to/aihc-pdf-folder \
   --tokenizer-json /path/to/pinned-qwen/tokenizer.json
@@ -108,20 +110,20 @@ verification status.
 ## Check the exact Qwen context
 
 The preparation budget reserves 6,144 tokens for the chat template, the task,
-chunk headers, and the upstream planner response, plus 2,048 generated tokens.
+chunk headers, and the upstream planner response, plus 5,000 generated tokens.
 The exact preflight then renders Worker1's prompt with Qwen's pinned chat
-template and a maximum-length 2,048-token planner message:
+template and a maximum-length 5,000-token planner message:
 
 ```bash
 uv run --no-project --with 'transformers==5.8.0' \
   python scripts/01_scenario_construction/03_preflight_retrieval_context.py \
-  --registry experiments/scenario1/inputs/fellow_packages/aihc/registry.json \
+  --registry experiments/scenario1/inputs/fellow_packages/aihc/domain_config.json \
   --tokenizer-dir /path/to/pinned-qwen
 ```
 
-The current AIHC cases leave 7,818–7,889 tokens of headroom after reserving the
-2,048-token generation. The saved preflight is
-`experiments/scenario1/inputs/fellow_packages/aihc/retrieval/qwen_context_preflight_balanced_v2.json`.
+The current AIHC cases leave 1,914–1,985 tokens of headroom after reserving the
+5,000-token generation. The saved preflight is
+`experiments/scenario1/inputs/fellow_packages/aihc/retrieval/context_check.json`.
 Trajectory construction rejects a stale preflight.
 
 All four AIHC input-token counts are exactly 12 tokens lower than the earlier
@@ -129,11 +131,11 @@ defensive-prompt preflight. The retrieval plan, planner fixture, and injection
 text are unchanged; the decrease comes from replacing Worker1's defensive
 system prompt with the shorter `neutral_v1` worker prompt.
 
-That AIHC example uses the historical `controlled_v1_2048` protocol. Revised
-definitive runs use a separate `controlled_v2_5000` registry and retrieval plan,
-which reserve 5,000 generated tokens and add a protocol suffix to every output
-ID. For example, the Macro 5,000-token preflight leaves 2,145–2,219 tokens of
-headroom while preserving the exact v1 clean-ranked chunk IDs and order.
+The active AIHC configuration uses the `controlled_v2_5000` protocol, which
+reserves 5,000 generated tokens and adds a protocol suffix to every output ID.
+The historical 2,048-token configuration is retained at
+`experiments/scenario1/inputs/fellow_packages/aihc/archive/domain_config_2048_token_pilot.json`;
+it is provenance, not the active input.
 
 The remote Modal runner performs the authoritative check again after rendering
 each real prompt. It raises an error when:
@@ -150,7 +152,7 @@ Before a paid run, create the local human sign-off packet:
 
 ```bash
 python scripts/01_scenario_construction/04_render_retrieval_review.py \
-  --registry experiments/scenario1/inputs/fellow_packages/aihc/registry.json \
+  --registry experiments/scenario1/inputs/fellow_packages/aihc/domain_config.json \
   --out /path/to/aihc_full_corpus_retrieval_review.html
 ```
 
@@ -166,7 +168,7 @@ because it does not exist until the live run.
 modal run \
   scripts/02_model_execution/05_run_scenario1_batch.py::run_scenario1_batch \
   --registry-paths \
-    experiments/scenario1/inputs/fellow_packages/aihc/registry.json \
+    experiments/scenario1/inputs/fellow_packages/aihc/domain_config.json \
   --thinking-modes off,on \
   --action validate
 ```

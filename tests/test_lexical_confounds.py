@@ -27,14 +27,14 @@ FINANCE_REGISTRY = (
     INPUTS_ROOT
     / "fellow_packages"
     / "fin"
-    / "registry_gen5000_v2.json"
+    / "domain_config.json"
 )
 FINANCE_PLAN = (
     INPUTS_ROOT
     / "fellow_packages"
     / "fin"
     / "retrieval"
-    / "full_corpus_bm25_balanced_gen5000_v2.json"
+    / "plan.json"
 )
 AUDIT_RESULT = (
     PROJECT_ROOT
@@ -46,7 +46,7 @@ AUDIT_MARKDOWN = AUDIT_RESULT.with_suffix(".md")
 REFERENCE_SNAPSHOT = (
     INPUTS_ROOT
     / "lexical_references"
-    / "convex_open_access_v3.json"
+    / "convex_reference_snapshot.json"
 )
 AUDIT_SCRIPT = (
     PROJECT_ROOT
@@ -149,7 +149,7 @@ def test_real_finance_package_is_hash_and_offset_validated():
     assert "SREP" in package.injection_text
     assert package.registry_path == (
         "experiments/scenario1/inputs/fellow_packages/fin/"
-        "registry_gen5000_v2.json"
+        "domain_config.json"
     )
 
 
@@ -205,9 +205,19 @@ def test_committed_finance_convex_audit_records_the_metric_sensitivity():
         "54b8e7179714a60607f1d633658932e9b0131cd7"
     )
     reference_inputs = audit["domains"]["convex"]["inputs"]
-    assert reference_inputs["registry"].startswith("experiments/scenario1/")
-    assert reference_inputs["retrieval_plan"].startswith(
-        "experiments/scenario1/"
+    assert reference_inputs["registry"] == (
+        "experiments/scenario1/inputs/fellow_packages/"
+        "convex_open_access_v3/registry.json"
+    )
+    assert reference_inputs["registry_sha256"] == (
+        "0e482a2d1ece47bd0fb1cfa3dd547ee6d95d48c1d6a8926d038ad59d15afe121"
+    )
+    assert reference_inputs["retrieval_plan"] == (
+        "experiments/scenario1/inputs/fellow_packages/convex_open_access_v3/"
+        "retrieval/full_corpus_bm25_all_pages_open_access_v3.json"
+    )
+    assert reference_inputs["retrieval_plan_sha256"] == (
+        "24d3ae88fb91cf0a55ee16b33cb5bf075aa0b82e9aeccd78e726880a0ef91af1"
     )
     assert len(reference_inputs["source_documents"]) == 3
     assert all(

@@ -13,6 +13,7 @@ from src.infrastructure.qwen_modal import MODEL_ID, MODEL_REVISION
 from src.scenario1 import generator
 from src.scenario1.retrieval import (
     build_retrieval_plan,
+    canonical_plan_sha256,
     detect_single_insertion,
     load_retrieval_plan,
     materialize_retrieval,
@@ -28,8 +29,17 @@ AIHC_REGISTRY_PATH = (
     / "inputs"
     / "fellow_packages"
     / "aihc"
-    / "registry.json"
+    / "domain_config.json"
 )
+
+
+def test_file_metadata_does_not_change_retrieval_semantic_hash():
+    plan = {"schema_version": "example", "selection": {"ids": ["a"]}}
+    annotated = {
+        "_file_info": {"renamed_from": "old.json", "purpose": "test"},
+        **plan,
+    }
+    assert canonical_plan_sha256(plan) == canonical_plan_sha256(annotated)
 
 
 class _Encoding:
@@ -230,7 +240,7 @@ def test_aihc_plan_indexes_every_page_of_every_full_source(
     assert sum(
         source["page_count"] for source in aihc_plan["source_documents"]
     ) == 38
-    assert aihc_plan["profile_id"] == "full_corpus_bm25_balanced_v2"
+    assert aihc_plan["profile_id"] == "full_corpus_bm25_balanced_gen5000_v2"
     assert aihc_plan["selection"]["candidate_chunk_count"] == 90
     assert aihc_plan["selection"]["eligible_candidate_chunk_count"] == 65
     assert aihc_plan["selection"]["excluded_candidate_chunk_count"] == 25
@@ -443,10 +453,10 @@ def test_aihc_exact_qwen_context_preflight_has_headroom(
         ("injected", "off"),
         ("injected", "on"),
     }
-    assert min(case["headroom_tokens"] for case in preflight["cases"]) == 7818
+    assert min(case["headroom_tokens"] for case in preflight["cases"]) == 1914
     assert aihc_pair[0]["retrieval_trace"][
         "minimum_preflight_headroom_tokens"
-    ] == 7818
+    ] == 1914
 
 
 def test_aihc_retrieval_records_pass_schema_and_semantic_checks(aihc_registry):

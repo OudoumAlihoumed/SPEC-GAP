@@ -396,8 +396,10 @@ def load_lexical_package_snapshot(
 
     path = Path(snapshot_path)
     root = Path(project_root) if project_root is not None else None
+    snapshot = _read_json(path)
+    snapshot.pop("_file_info", None)
     return _package_from_snapshot_data(
-        _read_json(path),
+        snapshot,
         snapshot_path=path,
         project_root=root,
     )

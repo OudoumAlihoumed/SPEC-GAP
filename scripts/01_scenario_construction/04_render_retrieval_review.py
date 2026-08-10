@@ -20,7 +20,7 @@ from src.scenario1.retrieval import load_retrieval_plan  # noqa: E402
 
 
 DEFAULT_REGISTRY = (
-    generator.INPUTS / "fellow_packages" / "aihc" / "registry.json"
+    generator.INPUTS / "fellow_packages" / "aihc" / "domain_config.json"
 )
 DEFAULT_OUTPUT = (
     generator.INPUTS

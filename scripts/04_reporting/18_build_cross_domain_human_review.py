@@ -43,6 +43,9 @@ DOMAIN_LABELS = {
     "policy": "Policy",
     "telecom": "Telecom",
 }
+# These are historical paths inside the exact SOURCE_COMMITS below. They are
+# intentionally not rewritten to the current ``domain_config.json`` names:
+# changing them would make the review builder read different source commits.
 REGISTRY_PATHS = {
     "aihc": "experiments/scenario1/inputs/fellow_packages/aihc/registry_gen5000_v2.json",
     "convex": "experiments/scenario1/inputs/fellow_packages/convex_open_access_v3/registry.json",

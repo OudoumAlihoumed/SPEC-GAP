@@ -94,7 +94,7 @@ retrieval headers and inter-chunk separators from both quantities. Payload-span
 controls should use the payload ratios; whole-prompt controls should use the
 source-context ratios. Exact hashes, counts, marker IDs, and definitions are
 recorded in
-`fellow_packages/convex_open_access_v3/retrieval/token_footprint_audit_open_access_v3.json`.
+`fellow_packages/convex_open_access_v3/retrieval/token_footprint_audit.json`.
 
 ## Output and action audit
 

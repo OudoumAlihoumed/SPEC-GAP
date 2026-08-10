@@ -100,7 +100,7 @@ Files:
 - `results/scenario1/2026-08-07_finance_convex_lexical_confound_audit.json`
 - `results/scenario1/2026-08-07_finance_convex_lexical_confound_audit.md`
 - `scripts/01_scenario_construction/05_audit_lexical_confounds.py`
-- `experiments/scenario1/inputs/lexical_references/convex_open_access_v3.json`
+- `experiments/scenario1/inputs/lexical_references/convex_reference_snapshot.json`
 
 ## Tool-interface diagnostic
 
