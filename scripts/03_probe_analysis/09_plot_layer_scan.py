@@ -15,6 +15,11 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src.analysis.layer_scan_paper_figures import (  # noqa: E402
     save_paper_layer_scan_figures,
 )
+from src.analysis.paper_inputs import (  # noqa: E402
+    DEFAULT_PAPER_INPUT_POLICY,
+    load_paper_input_policy,
+    validate_embedded_paper_input_audit,
+)
 
 
 def main() -> None:
@@ -32,14 +37,25 @@ def main() -> None:
         default=PROJECT_ROOT / "results/scenario1/figures/paper",
     )
     parser.add_argument("--dpi", type=int, default=180)
+    parser.add_argument(
+        "--paper-input-policy",
+        type=Path,
+        default=PROJECT_ROOT / DEFAULT_PAPER_INPUT_POLICY,
+    )
     args = parser.parse_args()
 
     result = json.loads(args.input.read_text())
+    paper_policy = load_paper_input_policy(args.paper_input_policy)
+    paper_input_selection = validate_embedded_paper_input_audit(
+        result,
+        paper_policy,
+    )
     paths = save_paper_layer_scan_figures(result, args.output_dir, dpi=args.dpi)
     print(json.dumps({
         "figure_count": len(paths),
         "figures": [path.as_posix() for path in paths],
         "claim_scope": result["claim_scope"],
+        "paper_input_policy_id": paper_input_selection["policy_id"],
     }, indent=2, sort_keys=True))
 
 

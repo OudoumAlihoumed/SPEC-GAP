@@ -242,6 +242,15 @@ tokens for the repair operation.
 
 ## Activation Analysis
 
+Paper-facing Scenario 1 commands use the tracked policy at
+`experiments/scenario1/paper_input_policy.json`. When Finance trajectories are
+present, the activation-index builder selects only the complete
+`controlled_v2_5000` matrix and records a policy audit. The layer scan, probe
+scoring, depth analysis, and final reporting steps validate the same policy and
+fail before producing outputs if a Finance v1 trajectory, an incomplete v2
+matrix, or a stale aggregate audit is supplied. Historical v1 artifacts remain
+available for explicitly separate sensitivity work.
+
 Download the activation tree created by the Modal runner:
 
 ```bash
@@ -257,6 +266,9 @@ python scripts/03_probe_analysis/07_build_activation_index.py \
   --require-local \
   --verify-checksums
 ```
+
+Use `--paper-input-policy <path>` at every stage only when running a different,
+explicitly reviewed cohort policy. The tracked Finance policy is the default.
 
 Run the exploratory all-layer scan:
 

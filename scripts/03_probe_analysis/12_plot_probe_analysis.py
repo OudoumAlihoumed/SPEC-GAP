@@ -16,6 +16,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.analysis.depth_degradation import load_prediction_jsonl  # noqa: E402
+from src.analysis.paper_inputs import (  # noqa: E402
+    DEFAULT_PAPER_INPUT_POLICY,
+    load_paper_input_policy,
+    validate_paper_analysis_inputs,
+)
 from src.analysis.probe_analysis_figures import (  # noqa: E402
     REFERENCE_LAYER,
     figure_catalog,
@@ -99,8 +104,14 @@ def main() -> None:
         type=Path,
         default=PROJECT_ROOT / "results/scenario1/final_analysis",
     )
+    parser.add_argument(
+        "--paper-input-policy",
+        type=Path,
+        default=PROJECT_ROOT / DEFAULT_PAPER_INPUT_POLICY,
+    )
     parser.add_argument("--dpi", type=int, default=300)
     args = parser.parse_args()
+    paper_policy = load_paper_input_policy(args.paper_input_policy)
 
     if args.snapshot_input:
         if args.analysis_revision:
@@ -138,6 +149,10 @@ def main() -> None:
                 "path": _relative(args.all_layer_result),
                 "sha256": sha256_file(args.all_layer_result),
             },
+            "paper_input_policy": {
+                "path": _relative(args.paper_input_policy),
+                "sha256": sha256_file(args.paper_input_policy),
+            },
         }
         snapshot = build_reporting_snapshot(
             reference,
@@ -151,9 +166,16 @@ def main() -> None:
                 args.analysis_tier,
             ),
         )
-        write_reporting_snapshot(snapshot, args.snapshot_output)
         analysis_tier = reporting_snapshot_analysis_tier(snapshot)
         snapshot_path = args.snapshot_output
+
+    paper_input_selection = validate_paper_analysis_inputs(
+        score_rows,
+        paper_policy,
+    )
+    snapshot["paper_input_selection"] = paper_input_selection
+    if not args.snapshot_input:
+        write_reporting_snapshot(snapshot, args.snapshot_output)
 
     figure_paths = save_probe_analysis_figures(
         reference,
@@ -208,6 +230,11 @@ def main() -> None:
         },
         "sample": sample,
         "source_artifacts": snapshot["source_artifacts"],
+        "paper_input_selection": paper_input_selection,
+        "paper_input_policy": {
+            "path": _relative(args.paper_input_policy),
+            "sha256": sha256_file(args.paper_input_policy),
+        },
         "reporting_snapshot": {
             "path": _relative(snapshot_path),
             "sha256": _sha256(snapshot_path),
@@ -240,6 +267,7 @@ def main() -> None:
                 "metric_table": _relative(metric_table),
                 "delta_table": _relative(delta_table),
                 "analysis_status": manifest["analysis_status"],
+                "paper_input_policy_id": paper_input_selection["policy_id"],
             },
             indent=2,
             sort_keys=True,

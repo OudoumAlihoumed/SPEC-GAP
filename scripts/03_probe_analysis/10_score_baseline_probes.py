@@ -13,6 +13,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.analysis.depth_degradation import validate_prediction_rows  # noqa: E402
+from src.analysis.paper_inputs import (  # noqa: E402
+    DEFAULT_PAPER_INPUT_POLICY,
+    load_paper_input_policy,
+    validate_paper_analysis_inputs,
+)
 from src.analysis.probe_scoring import (  # noqa: E402
     generate_per_step_probe_scores,
     load_match_group_designs,
@@ -40,6 +45,11 @@ def main() -> None:
         default=PROJECT_ROOT / "experiments/scenario1/manifest.json",
     )
     parser.add_argument(
+        "--paper-input-policy",
+        type=Path,
+        default=PROJECT_ROOT / DEFAULT_PAPER_INPUT_POLICY,
+    )
+    parser.add_argument(
         "--layers",
         default="all",
         help="Comma-separated layer indices, or 'all' (default).",
@@ -60,8 +70,14 @@ def main() -> None:
     args = parser.parse_args()
 
     selected_layers = _parse_layers(args.layers)
+    index_rows = load_activation_index(args.index)
+    paper_policy = load_paper_input_policy(args.paper_input_policy)
+    paper_input_selection = validate_paper_analysis_inputs(
+        index_rows,
+        paper_policy,
+    )
     score_rows = generate_per_step_probe_scores(
-        load_activation_index(args.index),
+        index_rows,
         match_group_designs=load_match_group_designs(args.manifest),
         label_target="injection_present",
         layers=selected_layers,
@@ -77,6 +93,7 @@ def main() -> None:
         "activation_index": args.index.as_posix(),
         "scenario_manifest": args.manifest.as_posix(),
         "output_jsonl": args.output_jsonl.as_posix(),
+        "paper_input_selection": paper_input_selection,
     })
     args.output_summary.parent.mkdir(parents=True, exist_ok=True)
     args.output_summary.write_text(

@@ -20,6 +20,11 @@ from src.extraction.saved_activations import (  # noqa: E402
     trajectory_paths_for_analysis_tier,
     write_activation_index,
 )
+from src.analysis.paper_inputs import (  # noqa: E402
+    DEFAULT_PAPER_INPUT_POLICY,
+    load_paper_input_policy,
+    select_paper_trajectory_records,
+)
 
 
 def main() -> None:
@@ -59,6 +64,15 @@ def main() -> None:
         type=Path,
         default=PROJECT_ROOT / "results/scenario1/activation_index_summary.json",
     )
+    parser.add_argument(
+        "--paper-input-policy",
+        type=Path,
+        default=PROJECT_ROOT / DEFAULT_PAPER_INPUT_POLICY,
+        help=(
+            "Tracked protocol-selection policy. Managed historical trajectories "
+            "are excluded before the activation index is built."
+        ),
+    )
     parser.add_argument("--require-local", action="store_true")
     parser.add_argument("--verify-checksums", action="store_true")
     args = parser.parse_args()
@@ -68,6 +82,11 @@ def main() -> None:
         args.analysis_tier,
     )
     records = load_trajectory_records(paths)
+    paper_policy = load_paper_input_policy(args.paper_input_policy)
+    records, paper_input_selection = select_paper_trajectory_records(
+        records,
+        paper_policy,
+    )
     rows = build_activation_index(
         records,
         analysis_tier=args.analysis_tier,
@@ -77,6 +96,7 @@ def main() -> None:
     )
     write_activation_index(rows, args.output)
     summary = summarize_activation_index(rows)
+    summary["paper_input_selection"] = paper_input_selection
     args.summary_output.parent.mkdir(parents=True, exist_ok=True)
     args.summary_output.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     print(
