@@ -114,6 +114,27 @@
     "source_drive_folder": "scenario_1_and_7-20260804T205723Z-1-001.zip",
     "source_archive_sha256": "60df1c8740a68749a126d337bdc32286a5aa89d946f330a7701d9768b9ec010d",
     "source_handoff_sha256": "94bb0d4e3bfc08f6813a6417d56d3b1560ebfec37d55aecd2f27198b4cc66bd3",
+    "full_matrix_evidence": {
+      "path": "results/scenario1/2026-08-09_telecom_full_matrix_evidence.json",
+      "sha256": "1106c23631c776c91024e98dd95b063aa3e5dbc4e7cf8e4ea202e3e53a80891f",
+      "status": "tracked_compact_snapshot"
+    },
+    "pdf_pair_audit": {
+      "path": "fellow_packages/telecom/retrieval/pdf_pair_audit_gen5000_v2.json",
+      "sha256": "2d8538fc65e8bc9b0bdad94171d3bbb07416f31265e36001b313e598ea1be5fe",
+      "status": "tracked_reproducible_audit"
+    },
+    "style_camouflage_review": {
+      "packet": "results/scenario1/2026-08-09_telecom_style_camouflage_blind_packet.md",
+      "packet_sha256": "a06bde46d6f5ed493a214ea360191d3fd0133af15c03bb256223713b416f1260",
+      "answer_key": "fellow_packages/telecom/style_camouflage_blind_key.json",
+      "answer_key_sha256": "4830a8c157aff983c6265bb8a513c3735f2a48fe3eccf88a3186dbc33c689253",
+      "review_record": "results/scenario1/2026-08-09_telecom_style_camouflage_review.json",
+      "review_record_sha256": "b6755172496a3b650a9144ff2573909a4b7e6fd6bee8364e847ea53e89ed7874",
+      "status": "pending_external_human_review",
+      "downstream_covariate_id": "telecom_style_camouflage_single_rater_v1",
+      "required_for_pr35": true
+    },
     "source_pdf_sha256": {
       "telecom_doc1_clean.pdf": "73090f26b5e12935f5780087a85b3bd1e6ec5b11bc80f98cb38bd7198221d70a",
       "telecom_doc2_clean.pdf": "49ccb403fda010bdfaa922a1c7db8ee3f1842b297a8bcaf71afff916684a12d6",
@@ -165,10 +186,19 @@
       "clean_pdf_unchanged": true,
       "payload_preserved_exactly": true,
       "original_injected_pdf_sha256": "060cab827b708f0a8717c5502902da07aafa2de91519224371c6dbca895ef4a1",
-      "revised_injected_pdf_sha256": "ec0e65059d5dc54907ac29916def61424a34701b045a198f7bcb512ac86c2d4c"
+      "revised_injected_pdf_sha256": "ec0e65059d5dc54907ac29916def61424a34701b045a198f7bcb512ac86c2d4c",
+      "original_source_archive": {
+        "filename": "drive-download-20260729T202621Z-1-001.zip",
+        "sha256": "72826ea18191e40d03fef6b1984d583e219e291f3862339e06eb7bd617a2c7b4",
+        "handoff_member": "trajectory_file/telecom_trajectory.json",
+        "handoff_sha256": "f79a6f1e93908ecbbd5cf26f2da44f8390c9d3bc76a331751cb88ca6e239389e",
+        "clean_carrier_member": "match_pair_domain_files/telecom/telecom_doc3_clean.pdf",
+        "injected_carrier_member": "match_pair_domain_files/telecom/telecom_doc3_inj.pdf"
+      }
     },
     "normalization_notes": [
       "The latest fellow handoff moves the unchanged payload into the Section 2.2 body discussion; the clean carrier is unchanged.",
+      "The requested blind official-mandate style diagnostic is prepared but pending a real human teammate; Telecom style camouflage and AUROC interpretation remain fail-closed until that review is recorded.",
       "The active package contains three documents. telecom_doc4_clean.pdf and the separate CSV-based data-mining package remain archived and are not supplied to the model.",
       "The primary analysis is conditional on exposure: if clean-only BM25 omits the carrier location, the clean anchor chunk is retained deterministically under the same document and global token budgets in both treatments.",
       "The controlled_v2_5000 protocol reserves 5,000 output tokens while preserving the neutral prompts, sampler, pinned model revision, and seed used by the other definitive domains."

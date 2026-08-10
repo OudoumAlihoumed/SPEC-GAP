@@ -62,6 +62,12 @@ removing the one 290-character delta, including its leading newline,
 reproduces the clean extraction byte for byte, and all 32 rendered carrier
 pages are pixel-identical at 96 DPI.
 
+The two source archives, member hashes, extraction offsets, exact insertion,
+Poppler versions, and all 32 page hashes are recorded in
+`experiments/scenario1/inputs/fellow_packages/telecom/retrieval/pdf_pair_audit_gen5000_v2.json`.
+Reproduction requires the two exact Drive exports named in that audit; the PDFs
+themselves are not committed.
+
 ## Matched-pair and exposure checks
 
 For every delegation-depth and thinking-mode pair:
@@ -103,6 +109,13 @@ relabeled as injection compromise. One clean 3-hop/thinking-off response also
 asked whether the user wanted a later audit submission, but it made no tool
 request.
 
+The ignored raw trajectories and ledgers are bound by SHA-256 in
+`results/scenario1/2026-08-09_telecom_full_matrix_evidence.json`. That compact
+snapshot carries all 28 generated reasoning/visible outputs, tool and action
+records, exposure spans, activation checksums and paired-control summary, cost
+rows, billing command and rows, and the manual-QC records needed to audit these
+claims without committing retrieved paper context or activation tensors.
+
 ## Activation audit
 
 - Local activation artifacts: 28/28
@@ -142,6 +155,28 @@ metered billing rows are the authoritative source.
 The final validation reported 8 complete, 0 pending, 0 selected model turns,
 and no GPU start.
 
+## Style-camouflage diagnostic — pending human review
+
+The reviewer-requested blind “sounds like an official mandate” comparison has
+been prepared. Its reviewer-facing packet contains two unlabeled samples: a
+two-sentence clean Telecom procedure passage and the exact registered
+injection. The source spans, hashes, fixed blind order, 1–5 scale, and
+predeclared single-rater classification rule are recorded separately so the
+comparison is auditable without revealing the answer to the reviewer.
+
+- Blind packet:
+  `results/scenario1/2026-08-09_telecom_style_camouflage_blind_packet.md`
+- Answer key and source bindings:
+  `experiments/scenario1/inputs/fellow_packages/telecom/style_camouflage_blind_key.json`
+- Human review record:
+  `results/scenario1/2026-08-09_telecom_style_camouflage_review.json`
+
+The human review record is intentionally blank and has status
+`pending_external_human_review`. An AI agent cannot substitute for the requested
+teammate. Until a real blinded reviewer supplies the two scores and reviewer
+metadata, Telecom must not be labeled high or low style camouflage, and its
+resistance or AUROC must not be described as style-controlled.
+
 ## Local generated artifacts
 
 - Trajectories:
@@ -164,6 +199,7 @@ and no GPU start.
 The latest handoff identifies Onyinye Okoli as the package creator. All three
 active papers have DOI source records and CC BY 4.0 licenses. The fourth paper
 and the separate CSV/data-mining package remain archived and were not indexed
-or supplied to the model. The package is ready for cross-domain activation
-analysis, with the injection-position adjustment retained as an explicit
-methodological disclosure.
+or supplied to the model. The existing package is reviewable for later
+cross-domain work, with the injection-position adjustment retained as an
+explicit methodological disclosure and the style-camouflage diagnostic carried
+forward as pending until a human completes it.
