@@ -1,9 +1,11 @@
 # Running Qwen3-32B on Modal
 
-This guide covers Step 3 of the ordered SPEC-GAP pipeline. The Modal backend
-owns one model turn at a time: generation, exact input/output capture,
-residual-stream extraction, and cost logging. It does not construct the
-Scenario 1 dataset or decide whether a simulated action executed.
+This guide covers runbook stages `S07`–`S13`. The Modal backend owns one model
+turn at a time: generation, exact input/output capture, residual-stream
+extraction, and cost logging. It does not construct the Scenario 1 dataset or
+decide whether a simulated action executed. Start with the
+[canonical pipeline runbook](scenario1/pipeline-runbook.md); the older numbers
+inside script filenames are stable phase-local names, not a second run order.
 
 ## Workspace and resources
 
@@ -249,7 +251,7 @@ records without a saved tier remain auditable as `unclassified`.
 
 ## Complete trajectory runner
 
-Step 4 connects the one-turn backend to the sequential Scenario 1
+Runbook stage `S09` connects the one-turn backend to the sequential Scenario 1
 planner-worker-worker2-executor orchestrator. It forwards only visible final
 content and uses a no-network simulated executor for tool requests.
 
