@@ -505,7 +505,10 @@
     "interpretation": "Retain this measured covariate in cross-domain sensitivity analysis, but do not explain Policy resistance or probe behavior as higher clean request-language overlap in this comparison.",
     "neuro_value": 30.875542,
     "policy_value": 10.809512,
-    "recommended_primary_value": "selected_clean_source_chunks.reviewer_named_families.group_rate_per_10000_words",
+    "recommended_primary_value_paths": {
+      "neuro": "domains.neuro.views.selected_clean_source_chunks.group_rates_per_10000_words.reviewer_named_families",
+      "policy": "domains.policy.views.selected_clean_source_chunks.group_rates_per_10000_words.reviewer_named_families"
+    },
     "required_for_pr35": true
   },
   "finding": {

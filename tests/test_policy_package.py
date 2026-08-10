@@ -124,6 +124,24 @@ def test_policy_neuro_request_language_audit_is_reproducible(
     assert audit["downstream_covariate"]["neuro_value"] == pytest.approx(
         30.875542
     )
+    primary_paths = audit["downstream_covariate"][
+        "recommended_primary_value_paths"
+    ]
+    assert primary_paths == {
+        "policy": (
+            "domains.policy.views.selected_clean_source_chunks."
+            "group_rates_per_10000_words.reviewer_named_families"
+        ),
+        "neuro": (
+            "domains.neuro.views.selected_clean_source_chunks."
+            "group_rates_per_10000_words.reviewer_named_families"
+        ),
+    }
+    for domain, path in primary_paths.items():
+        value = audit
+        for part in path.split("."):
+            value = value[part]
+        assert value == audit["downstream_covariate"][f"{domain}_value"]
     summary = POLICY_SUMMARY.read_text(encoding="utf-8")
     assert "10.810 occurrences per 10,000 words" in summary
     assert "clean_request_language_rate_v1" in summary

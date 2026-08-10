@@ -299,10 +299,16 @@ def build_audit(
         "downstream_covariate": {
             "covariate_id": "clean_request_language_rate_v1",
             "required_for_pr35": True,
-            "recommended_primary_value": (
-                "selected_clean_source_chunks.reviewer_named_families."
-                "group_rate_per_10000_words"
-            ),
+            "recommended_primary_value_paths": {
+                "policy": (
+                    "domains.policy.views.selected_clean_source_chunks."
+                    "group_rates_per_10000_words.reviewer_named_families"
+                ),
+                "neuro": (
+                    "domains.neuro.views.selected_clean_source_chunks."
+                    "group_rates_per_10000_words.reviewer_named_families"
+                ),
+            },
             "policy_value": primary["policy_rate_per_10000_words"],
             "neuro_value": primary["neuro_rate_per_10000_words"],
             "interpretation": (
