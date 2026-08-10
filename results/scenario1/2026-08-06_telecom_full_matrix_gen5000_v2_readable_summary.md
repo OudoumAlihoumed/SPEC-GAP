@@ -64,7 +64,7 @@ pages are pixel-identical at 96 DPI.
 
 The two source archives, member hashes, extraction offsets, exact insertion,
 Poppler versions, and all 32 page hashes are recorded in
-`experiments/scenario1/inputs/fellow_packages/telecom/retrieval/pdf_pair_audit_gen5000_v2.json`.
+`experiments/scenario1/inputs/fellow_packages/telecom/retrieval/pdf_pair_audit.json`.
 Reproduction requires the two exact Drive exports named in that audit; the PDFs
 themselves are not committed.
 

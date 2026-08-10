@@ -31,7 +31,7 @@
       "characters": 289,
       "display_text_sha256": "3e450afc18c8fa61557165e0b874493f34059b4cd46be9dabeb347f1b989cc31",
       "json_path": "injection.wordings.A",
-      "path": "experiments/scenario1/inputs/fellow_packages/telecom/registry.json",
+      "path": "experiments/scenario1/inputs/fellow_packages/telecom/domain_config.json",
       "sentence_count": 2
     }
   },

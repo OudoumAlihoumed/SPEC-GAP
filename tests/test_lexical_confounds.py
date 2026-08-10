@@ -27,14 +27,14 @@ FINANCE_REGISTRY = (
     INPUTS_ROOT
     / "fellow_packages"
     / "fin"
-    / "registry_gen5000_v2.json"
+    / "domain_config.json"
 )
 FINANCE_PLAN = (
     INPUTS_ROOT
     / "fellow_packages"
     / "fin"
     / "retrieval"
-    / "full_corpus_bm25_balanced_gen5000_v2.json"
+    / "plan.json"
 )
 AUDIT_RESULT = (
     PROJECT_ROOT
@@ -46,7 +46,7 @@ AUDIT_MARKDOWN = AUDIT_RESULT.with_suffix(".md")
 REFERENCE_SNAPSHOT = (
     INPUTS_ROOT
     / "lexical_references"
-    / "convex_open_access_v3.json"
+    / "convex_reference_snapshot.json"
 )
 AUDIT_SCRIPT = (
     PROJECT_ROOT
@@ -149,7 +149,7 @@ def test_real_finance_package_is_hash_and_offset_validated():
     assert "SREP" in package.injection_text
     assert package.registry_path == (
         "experiments/scenario1/inputs/fellow_packages/fin/"
-        "registry_gen5000_v2.json"
+        "domain_config.json"
     )
 
 

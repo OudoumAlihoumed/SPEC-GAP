@@ -37,9 +37,9 @@ From a clean checkout, rebuild both committed outputs with:
 
 ```bash
 python scripts/01_scenario_construction/05_audit_lexical_confounds.py \
-  --focus-registry experiments/scenario1/inputs/fellow_packages/fin/registry_gen5000_v2.json \
-  --focus-plan experiments/scenario1/inputs/fellow_packages/fin/retrieval/full_corpus_bm25_balanced_gen5000_v2.json \
-  --reference-snapshot experiments/scenario1/inputs/lexical_references/convex_open_access_v3.json \
+  --focus-registry experiments/scenario1/inputs/fellow_packages/fin/domain_config.json \
+  --focus-plan experiments/scenario1/inputs/fellow_packages/fin/retrieval/plan.json \
+  --reference-snapshot experiments/scenario1/inputs/lexical_references/convex_reference_snapshot.json \
   --out-json results/scenario1/2026-08-07_finance_convex_lexical_confound_audit.json \
   --out-markdown results/scenario1/2026-08-07_finance_convex_lexical_confound_audit.md
 ```

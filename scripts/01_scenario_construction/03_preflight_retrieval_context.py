@@ -28,7 +28,7 @@ from src.scenario1.retrieval import (  # noqa: E402
 
 
 DEFAULT_REGISTRY = (
-    generator.INPUTS / "fellow_packages" / "aihc" / "registry.json"
+    generator.INPUTS / "fellow_packages" / "aihc" / "domain_config.json"
 )
 PLANNER_SEED_TEXT = (
     " analysis of clinical validation evidence and reporting standards."

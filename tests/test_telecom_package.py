@@ -1,4 +1,4 @@
-"""Review and provenance invariants for the Telecom v2 package."""
+"""Review and provenance invariants for the active Telecom package."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 INPUTS_ROOT = ROOT / "experiments" / "scenario1" / "inputs"
 TELECOM_ROOT = INPUTS_ROOT / "fellow_packages" / "telecom"
-REGISTRY_PATH = TELECOM_ROOT / "registry.json"
+REGISTRY_PATH = TELECOM_ROOT / "domain_config.json"
 STYLE_SCRIPT = (
     ROOT / "scripts" / "01_scenario_construction" / "05_build_telecom_style_review.py"
 )
@@ -30,7 +30,7 @@ STYLE_REVIEW = (
 EVIDENCE_PATH = (
     ROOT / "results" / "scenario1" / "2026-08-09_telecom_full_matrix_evidence.json"
 )
-PDF_AUDIT_PATH = TELECOM_ROOT / "retrieval" / "pdf_pair_audit_gen5000_v2.json"
+PDF_AUDIT_PATH = TELECOM_ROOT / "retrieval" / "pdf_pair_audit.json"
 SUMMARY_PATH = (
     ROOT
     / "results"
@@ -305,4 +305,4 @@ def test_telecom_summary_keeps_human_style_result_pending():
     assert "An AI agent cannot substitute" in summary
     assert "must not be labeled high or low style camouflage" in summary
     assert "2026-08-09_telecom_full_matrix_evidence.json" in summary
-    assert "pdf_pair_audit_gen5000_v2.json" in summary
+    assert "pdf_pair_audit.json" in summary

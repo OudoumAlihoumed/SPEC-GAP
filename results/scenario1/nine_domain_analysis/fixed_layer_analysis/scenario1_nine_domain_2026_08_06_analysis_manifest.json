@@ -324,7 +324,7 @@
     "input_trajectory_count": 72,
     "mode": "validation",
     "policy_id": "scenario1_paper_finance_v2_2026_08_07",
-    "policy_sha256": "4642e98a0742af1c8cdee57bbec78c21c451902cd6d73d813613c7e38799d5c6",
+    "policy_sha256": "687934a1b018d029ff6abf000fb168f7c653b2e8cc85c017898887202df52531",
     "schema_version": "spec_gap.scenario1_paper_input_audit.v1",
     "selected_item_count": 630,
     "selected_trajectory_count": 72,

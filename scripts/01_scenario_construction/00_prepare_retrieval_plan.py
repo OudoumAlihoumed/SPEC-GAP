@@ -47,7 +47,7 @@ from src.scenario1.retrieval import (  # noqa: E402
 
 
 DEFAULT_AIHC_REGISTRY = (
-    INPUTS / "fellow_packages" / "aihc" / "registry.json"
+    INPUTS / "fellow_packages" / "aihc" / "domain_config.json"
 )
 def _sha256_file(path: Path) -> str:
     digest = hashlib.sha256()

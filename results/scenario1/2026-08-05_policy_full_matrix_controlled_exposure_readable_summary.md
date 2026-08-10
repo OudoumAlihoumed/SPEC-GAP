@@ -143,7 +143,7 @@ single 335-byte insertion in both injected versions; only its location changed.
 The revised clean/injected pair renders to identical PNG bytes on all 12 pages
 with the recorded Poppler 96-DPI method. Per-page hashes, extraction hashes,
 offsets, tool versions, archive locators, and reproduction limitations are in
-`fellow_packages/policy/retrieval/pdf_pair_audit_gen5000_v2.json`.
+`fellow_packages/policy/retrieval/pdf_pair_audit.json`.
 
 ## Decision
 

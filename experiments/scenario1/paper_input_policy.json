@@ -23,9 +23,9 @@
         ]
       },
       "required_artifacts": {
-        "registry": "experiments/scenario1/inputs/fellow_packages/fin/registry_gen5000_v2.json",
-        "retrieval_plan": "experiments/scenario1/inputs/fellow_packages/fin/retrieval/full_corpus_bm25_balanced_gen5000_v2.json",
-        "context_preflight": "experiments/scenario1/inputs/fellow_packages/fin/retrieval/qwen_context_preflight_balanced_gen5000_v2.json",
+        "registry": "experiments/scenario1/inputs/fellow_packages/fin/domain_config.json",
+        "retrieval_plan": "experiments/scenario1/inputs/fellow_packages/fin/retrieval/plan.json",
+        "context_preflight": "experiments/scenario1/inputs/fellow_packages/fin/retrieval/context_check.json",
         "result_summary": "results/scenario1/2026-07-31_finance_full_matrix_gen5000_v2_readable_summary.md"
       }
     }

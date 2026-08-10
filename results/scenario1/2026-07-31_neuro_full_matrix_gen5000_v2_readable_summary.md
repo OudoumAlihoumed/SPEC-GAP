@@ -74,7 +74,7 @@ In a ±256 regex-token source window around the insertion, both the clean
 background and the injected background after payload removal contain 2
 math/LaTeX-like characters and 34 citation markers. The payload adds 0 and 0,
 respectively. The exact metric definitions and counts are recorded in
-`fellow_packages/neuro/retrieval/carrier_neighborhood_gen5000_v2.json`.
+`fellow_packages/neuro/retrieval/carrier_neighborhood_audit.json`.
 Within-pair texture is therefore matched, but differing carrier-neighborhood
 texture across domains remains a possible confound for the pooled probe in
 #35.

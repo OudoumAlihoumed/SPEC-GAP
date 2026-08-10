@@ -15,7 +15,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 INPUTS_ROOT = PROJECT_ROOT / "experiments" / "scenario1" / "inputs"
 POLICY_ROOT = INPUTS_ROOT / "fellow_packages" / "policy"
-POLICY_REGISTRY = POLICY_ROOT / "registry.json"
+POLICY_REGISTRY = POLICY_ROOT / "domain_config.json"
 POLICY_SUMMARY = (
     PROJECT_ROOT
     / "results"

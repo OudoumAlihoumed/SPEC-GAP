@@ -418,6 +418,7 @@ def main() -> None:
     )
     if args.reference_snapshot is not None:
         neuro = json.loads(args.reference_snapshot.read_text(encoding="utf-8"))
+        neuro.pop("_file_info", None)
         validate_domain_snapshot(neuro)
     else:
         neuro = load_domain_snapshot(

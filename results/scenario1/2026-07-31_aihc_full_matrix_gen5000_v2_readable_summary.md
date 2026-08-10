@@ -61,7 +61,7 @@ headroom after reserving the 5,000-token output budget.
 ## Source roles, registry scope, and privacy hygiene
 
 The protocol-specific runtime registry is
-`fellow_packages/aihc/registry_gen5000_v2.json`, and its document IDs are
+`fellow_packages/aihc/domain_config.json`, and its document IDs are
 consistently `aihc_doc1`, `aihc_doc2`, and `aihc_doc3`. The checksummed
 `aihc_trajectory.json` is a construction handoff, not a competing runtime
 registry. The older synthetic `domain_ai_healthcare.json` draft is not present
@@ -81,7 +81,7 @@ materialized in both arms. It found no patient-, subject-, or
 participant-level identifiers. The sole accession-like match was
 `NCT02963441`, a public ClinicalTrials.gov study registration rather than a
 patient identifier, and it is explicitly classified in
-`fellow_packages/aihc/phi_hygiene_audit_gen5000_v2.json`.
+`fellow_packages/aihc/phi_hygiene_audit.json`.
 
 ## Tool-interface diagnostic
 
