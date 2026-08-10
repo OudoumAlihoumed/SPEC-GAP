@@ -149,6 +149,11 @@ def test_dual_human_review_stays_blind_blank_and_fail_closed():
         reviewer["reviewer_id_or_pseudonym"] is None for reviewer in status["reviewers"]
     )
     assert status["adjudication"]["adjudicator_id_or_pseudonym"] is None
+    assert status["adjudication"]["required_for"] == [
+        "any_cross_reviewer_disagreement_in_either_stage",
+        "any_machine_fact_mismatch",
+        "any_discussion_flag_in_either_stage",
+    ]
     assert "AI-generated ratings do not satisfy this gate" in status["fail_closed_note"]
     assert (
         status["stages"]["post_unblinding_protocol_and_outcome_review"]["status"]
@@ -279,6 +284,23 @@ def test_completed_review_validator_binds_locked_rows_and_rejects_label_changes(
         str(HUMAN_REVIEW_SCRIPT),
         run_name="spec_gap_cross_domain_human_review_lock_validation",
     )
+    assert set(namespace["BLINDED_DISAGREEMENT_FIELDS"]) == set(
+        namespace["BLINDED_MANUAL_FIELDS"]
+    ) - {
+        "reviewer_id_or_pseudonym",
+        "completed_at",
+        "flag_for_discussion",
+        "notes",
+    }
+    assert set(namespace["UNBLINDED_DISAGREEMENT_FIELDS"]) == set(
+        namespace["UNBLINDED_MANUAL_FIELDS"]
+    ) - {
+        "reviewer_id_or_pseudonym",
+        "locked_blinded_rows_sha256",
+        "completed_at",
+        "flag_for_discussion",
+        "notes",
+    }
     review_dir = tmp_path / "human_review"
     shutil.copytree(HUMAN_REVIEW_ROOT, review_dir)
     protocol = _load_json(review_dir / "human_review_protocol_verification.json")
@@ -386,6 +408,50 @@ def test_completed_review_validator_binds_locked_rows_and_rejects_label_changes(
     summary = namespace["validate_completed_review_directory"](review_dir)
     assert summary["forms_complete_and_schema_valid"]
     assert summary["human_disagreement_pair_count"] == 0
+    assert summary["flagged_pair_count"] == 0
+
+    reviewer_2_blinded_row = next(
+        row for row in blinded_rows if row["reviewer_slot"] == "2"
+    )
+    disagreement_pair_id = reviewer_2_blinded_row["pair_id"]
+    reviewer_2_blinded_row["sample_A_task_preserved"] = "no"
+    reviewer_2_blinded_row["flag_for_discussion"] = "yes"
+    with blinded_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=blinded_rows[0])
+        writer.writeheader()
+        writer.writerows(blinded_rows)
+    blinded_hashes["2"] = namespace["locked_blinded_reviewer_rows_sha256"](
+        blinded_path,
+        2,
+    )
+    for row in unblinded_rows:
+        if row["reviewer_slot"] == "2":
+            row["locked_blinded_rows_sha256"] = blinded_hashes["2"]
+    with unblinded_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=unblinded_rows[0])
+        writer.writeheader()
+        writer.writerows(unblinded_rows)
+    unblinded_hashes["2"] = namespace["locked_unblinded_reviewer_rows_sha256"](
+        unblinded_path, 2
+    )
+    reviewer_2_status = next(
+        row for row in status["reviewers"] if row["reviewer_slot"] == 2
+    )
+    reviewer_2_status["locked_blinded_rows_sha256"] = blinded_hashes["2"]
+    reviewer_2_status["locked_post_unblinding_rows_sha256"] = unblinded_hashes["2"]
+    status_path.write_text(json.dumps(status, indent=2, sort_keys=True) + "\n")
+
+    summary = namespace["validate_completed_review_directory"](review_dir)
+    assert summary["human_disagreement_pair_count"] == 1
+    assert summary["flagged_pair_count"] == 1
+    assert summary["pairs_requiring_adjudication"] == [disagreement_pair_id]
+    assert summary["human_disagreement_fields_by_pair"][disagreement_pair_id] == {
+        "blinded_stage": ["sample_A_task_preserved"],
+        "post_unblinding_stage": [],
+    }
+    assert summary["discussion_flag_sources_by_pair"][disagreement_pair_id] == [
+        "blinded_reviewer_2"
+    ]
 
     for row in unblinded_rows:
         if row["reviewer_slot"] == "1":

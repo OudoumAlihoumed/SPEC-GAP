@@ -3,7 +3,11 @@
     "adjudicator_id_or_pseudonym": null,
     "completed_at": null,
     "notes": null,
-    "required_if_disagreement": true
+    "required_for": [
+      "any_cross_reviewer_disagreement_in_either_stage",
+      "any_machine_fact_mismatch",
+      "any_discussion_flag_in_either_stage"
+    ]
   },
   "blind_form_lock_commands": {
     "reviewer_1": "python scripts/04_reporting/18_build_cross_domain_human_review.py --hash-blinded-review-form PATH_TO_REVIEWER_1_FORM --reviewer-slot 1",
@@ -16,7 +20,7 @@
     "sha256": "0d29ae416126111aa2862c0c872b543de616202e4324f43ab22300ef8b582c94"
   },
   "created_at": "2026-08-10",
-  "fail_closed_note": "Do not promote task-preservation, semantic-transfer, protocol-outcome, or generic-tool-call judgments to paper-facing claims until two real humans complete both stages for all 36 pairs and disagreements are adjudicated. This includes injection presence, matched pair controls, truncation, final outcome, reference-injection specificity, evidence, and discussion flags. Automatic outcome labels stay coordinator-only until both Stage 2 forms are locked. AI-generated ratings do not satisfy this gate.",
+  "fail_closed_note": "Do not promote task-preservation, semantic-transfer, protocol-outcome, or generic-tool-call judgments to paper-facing claims until two real humans complete both stages for all 36 pairs and every disagreement or discussion flag from either stage is adjudicated. This includes injection presence, matched pair controls, truncation, task preservation, per-agent semantic transfer, final outcome, reference-injection specificity, and evidence. Automatic outcome labels stay coordinator-only until both Stage 2 forms are locked. AI-generated ratings do not satisfy this gate.",
   "machine_protocol_verification": {
     "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_protocol_verification.json",
     "release_condition": "Release with the treatment key only after both blinded forms are locked and their SHA-256 values are recorded.",
@@ -108,7 +112,7 @@
   },
   "reviewer_facing_packet": {
     "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_packet.md",
-    "sha256": "7ab8e1cdb03b2003e41aaed0b38e079d0adb9043129ca130c1825935f8322a7d"
+    "sha256": "347af78663b2070f814b4d7fd8fcfed2f058bbfb6b937c24d4c7bdffa0e8e4c4"
   },
   "reviewer_information_boundary": {
     "assignment_note": "Outcome raters must receive only the stage-appropriate bundle; GitHub code reviewers are not automatically eligible outcome raters if they have already seen prohibited result summaries.",
@@ -150,7 +154,7 @@
       "reviewer_slot": 2
     }
   ],
-  "schema_version": "spec_gap.cross_domain_dual_human_review.v3",
+  "schema_version": "spec_gap.cross_domain_dual_human_review.v4",
   "separate_treatment_key": {
     "path": "results/scenario1/nine_domain_analysis/robustness/human_review/human_review_key.json",
     "sha256": "85fa4b2f6293b6c2b52693ae485d63bf2f815e2b422819ed816236270b5706db"

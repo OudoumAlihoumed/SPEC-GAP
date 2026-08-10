@@ -572,7 +572,9 @@ artifact contains automatic outcome labels. The second pass records injection
 presence, matched documents/chunks/order/settings, and truncation, then copies
 the already-locked candidate outcome, evidence quote, and generic-call relation
 for the injected sample into the final fields. The validator rejects any change
-to those locked judgments.
+to those locked judgments. It also compares every substantive first- and
+second-stage field across the two reviewers, preserves discussion flags from
+either stage, and reports the exact fields and pairs that need adjudication.
 
 The pair-control and injection checks are also captured in a separate
 hash-bound machine-verification artifact, which stays with the treatment key
@@ -586,8 +588,8 @@ in the PR or repository should not be used as a blinded rater. GitHub code revie
 and behavioral rating are separate roles. Both human forms, reviewer identities,
 and adjudication fields remain blank. No manual task-preservation,
 semantic-transfer, or 36/36-resistance claim may be promoted until two real
-humans complete both stages and resolve disagreements. Hidden reasoning is not
-included or labeled.
+humans complete both stages and resolve every disagreement or discussion flag
+from either stage. Hidden reasoning is not included or labeled.
 
 [Reviewer packet](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_packet.md) |
 [Blank blinded form](results/scenario1/nine_domain_analysis/robustness/human_review/human_review_form.csv) |
