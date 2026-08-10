@@ -18,12 +18,14 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src.infrastructure.qwen_modal import (  # noqa: E402
     DEFAULT_GENERATION_PROTOCOL_ID,
 )
+from src.infrastructure.modal_billing import ANALYSIS_TIERS  # noqa: E402
 from src.scenario1.validator import validate_payload  # noqa: E402
 
 
 CSV_FIELDS = (
     "trajectory_id",
     "domain_id",
+    "analysis_tier",
     "treatment",
     "condition_id",
     "thinking_mode",
@@ -57,11 +59,92 @@ def _generation_protocol_id(record: dict[str, Any]) -> str:
 
 
 def _agent_turns(record: dict[str, Any]) -> list[dict[str, Any]]:
+    trace = record.get("trajectory_trace")
+    if not isinstance(trace, dict):
+        raise ValueError("trajectory_trace must be an object")
+    events = trace.get("full_events")
+    if not isinstance(events, list):
+        raise ValueError("trajectory_trace.full_events must be an array")
     return [
         event
-        for event in record["trajectory_trace"]["full_events"]
+        for event in events
         if event.get("type") == "agent_turn"
     ]
+
+
+def _sampling_reproducibility(
+    records: Iterable[dict[str, Any]],
+) -> dict[str, Any]:
+    """Audit saved trajectory and turn seeds without promising exact replay."""
+
+    seeds: set[int] = set()
+    turn_count = 0
+    for record in records:
+        trajectory_id = record.get("trajectory_id", "<unknown>")
+        model = record.get("model")
+        if not isinstance(model, dict):
+            raise ValueError(f"{trajectory_id}: model must be an object")
+        seed = model.get("seed")
+        decoding = model.get("decoding_settings")
+        if (
+            not isinstance(seed, int)
+            or isinstance(seed, bool)
+            or not isinstance(decoding, dict)
+            or decoding.get("seed") != seed
+        ):
+            raise ValueError(
+                f"{trajectory_id}: model seed does not match decoding seed"
+            )
+        seeds.add(seed)
+        for event in _agent_turns(record):
+            turn_count += 1
+            metadata = event.get("model_execution_metadata")
+            settings = (
+                metadata.get("generation_settings")
+                if isinstance(metadata, dict) else None
+            )
+            if not isinstance(settings, dict) or settings.get("seed") != seed:
+                raise ValueError(
+                    f"{trajectory_id}: saved agent-turn seed does not match "
+                    "the trajectory seed"
+                )
+    if turn_count == 0:
+        raise ValueError("sampling audit requires at least one saved agent turn")
+    return {
+        "recorded_seeds": sorted(seeds),
+        "model_turn_count_checked": turn_count,
+        "trajectory_decoding_and_saved_turn_seeds_match": True,
+        "bit_identical_stochastic_rerun_guaranteed": False,
+        "analysis_unit": "saved_one_shot_sample",
+        "limitation": (
+            "A fixed seed does not guarantee identical stochastic CUDA output "
+            "across runtime, library, hardware, or kernel changes."
+        ),
+    }
+
+
+def _saved_analysis_tier(record: dict[str, Any]) -> str:
+    tiers = set()
+    for event in _agent_turns(record):
+        metadata = event.get("model_execution_metadata")
+        tiers.add(
+            metadata.get("analysis_tier")
+            if isinstance(metadata, dict) else None
+        )
+    if len(tiers) != 1:
+        raise ValueError(
+            f"{record.get('trajectory_id', '<unknown>')}: saved agent turns "
+            "mix analysis tiers"
+        )
+    tier = next(iter(tiers), None)
+    if tier is None:
+        return "unclassified"
+    if tier not in ANALYSIS_TIERS:
+        raise ValueError(
+            f"{record.get('trajectory_id', '<unknown>')}: invalid saved "
+            "analysis tier"
+        )
+    return tier
 
 
 def build_protocol_ledger(
@@ -79,6 +162,11 @@ def build_protocol_ledger(
         _generation_protocol_id(record) for record in selected
     } != {generation_protocol_id}:
         raise ValueError("the ledger may contain only one generation protocol")
+    analysis_tiers = {_saved_analysis_tier(record) for record in selected}
+    if len(analysis_tiers) != 1:
+        raise ValueError("the ledger may contain only one analysis tier")
+    analysis_tier = next(iter(analysis_tiers))
+    sampling_reproducibility = _sampling_reproducibility(selected)
 
     rows: list[dict[str, Any]] = []
     tool_request_details: list[dict[str, Any]] = []
@@ -137,6 +225,7 @@ def build_protocol_ledger(
             row = {
                 "trajectory_id": record["trajectory_id"],
                 "domain_id": record["domain_id"],
+                "analysis_tier": analysis_tier,
                 "treatment": record["treatment"],
                 "condition_id": record["condition_id"],
                 "thinking_mode": record["model"]["thinking_mode"],
@@ -195,12 +284,16 @@ def build_protocol_ledger(
 
     max_row = max(rows, key=lambda row: int(row["generated_tokens"]))
     summary = {
-        "schema_version": "spec_gap.generation_protocol_cost_summary.v1",
+        "schema_version": "spec_gap.generation_protocol_cost_summary.v2",
         "generation_protocol_id": generation_protocol_id,
+        "analysis_tier": analysis_tier,
+        "analysis_tier_uniform": True,
+        "paper_cost_table_eligibility": "not_assessed_by_protocol_ledger",
         "modal_run_urls": list(modal_run_urls),
         "model_names": sorted(model_names),
         "model_revisions": sorted(model_revisions),
         "max_new_token_values": sorted(max_new_token_values),
+        "sampling_reproducibility": sampling_reproducibility,
         "trajectory_count": len(selected),
         "model_turn_count": len(rows),
         "outcome_counts": dict(sorted(outcomes.items())),
@@ -269,6 +362,11 @@ def main() -> None:
         default=PROJECT_ROOT / "experiments/scenario1/trajectories/live",
     )
     parser.add_argument("--generation-protocol-id", required=True)
+    parser.add_argument(
+        "--analysis-tier",
+        required=True,
+        choices=sorted((*ANALYSIS_TIERS, "unclassified")),
+    )
     parser.add_argument("--domain-id")
     parser.add_argument("--output-csv", type=Path, required=True)
     parser.add_argument("--output-json", type=Path, required=True)
@@ -277,9 +375,11 @@ def main() -> None:
     args = parser.parse_args()
 
     records = []
-    for path in sorted(args.trajectory_root.glob("*/*.json")):
+    for path in sorted(args.trajectory_root.rglob("*.json")):
         record = json.loads(path.read_text())
         if _generation_protocol_id(record) != args.generation_protocol_id:
+            continue
+        if _saved_analysis_tier(record) != args.analysis_tier:
             continue
         if args.domain_id is not None and record.get("domain_id") != args.domain_id:
             continue
@@ -298,6 +398,14 @@ def main() -> None:
         generation_protocol_id=args.generation_protocol_id,
         modal_run_urls=args.modal_run_url,
     )
+    summary["declared_completeness"] = {
+        "expected_trajectory_count": args.expected_trajectory_count,
+        "observed_trajectory_count": len(records),
+        "passed": (
+            len(records) == args.expected_trajectory_count
+            if args.expected_trajectory_count is not None else None
+        ),
+    }
     args.output_csv.parent.mkdir(parents=True, exist_ok=True)
     with args.output_csv.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS)
@@ -309,6 +417,8 @@ def main() -> None:
     )
     print(json.dumps({
         "trajectory_count": summary["trajectory_count"],
+        "analysis_tier": summary["analysis_tier"],
+        "declared_completeness": summary["declared_completeness"],
         "model_turn_count": summary["model_turn_count"],
         "truncated_turn_count": summary["truncated_turn_count"],
         "maximum_observed_turn": summary["maximum_observed_turn"],

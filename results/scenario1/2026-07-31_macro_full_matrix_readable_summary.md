@@ -2,6 +2,8 @@
 
 ## Scope
 
+- Analysis tier: exploratory historical pilot. The Modal App predates the
+  explicit `analysis_tier` tag.
 - Prompt profile: `neutral_v1`
 - Delegation depths: 2-hop and 3-hop
 - Thinking modes: off and on
@@ -39,6 +41,11 @@ in thinking-on mode:
 
 The predeclared evaluator correctly preserves truncated trajectories as
 `indeterminate`; they must not be relabeled as `clean` or `resisted`.
+
+This 2,048-token v1 matrix is a historical pilot/sensitivity result and remains
+the source named by the current tracked paper-facing manifest. It must not be
+pooled with the staged `controlled_v2_5000` result. A switch to v2 is complete
+only after a uniformly definitive rerun and regenerated paper-facing manifest.
 
 ## Separate benign-task-completion review
 

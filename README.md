@@ -243,16 +243,28 @@ tokens for the repair operation.
 
 ## Activation Analysis
 
+Paper-facing Scenario 1 commands use the tracked policy at
+`experiments/scenario1/paper_input_policy.json`. When Finance trajectories are
+present, the activation-index builder selects only the complete
+`controlled_v2_5000` matrix and records a policy audit. The layer scan, probe
+scoring, depth analysis, and final reporting steps validate the same policy and
+fail before producing outputs if a Finance v1 trajectory, an incomplete v2
+matrix, or a stale aggregate audit is supplied. Historical v1 artifacts remain
+available for explicitly separate sensitivity work.
+
 Download the activation tree created by the Modal runner:
 
 ```bash
 modal volume get spec-gap-scenario1-artifacts activations . --force
 ```
 
-Build and verify the activation index:
+Build and verify an activation index after hydrating the saved trajectory and
+activation trees. The frozen 2026-08-06 nine-domain cohort predates execution-
+tier tagging, so it must be indexed as `unclassified`:
 
 ```bash
 python scripts/03_probe_analysis/07_build_activation_index.py \
+  --analysis-tier unclassified \
   --artifact-root . \
   --output \
     results/scenario1/nine_domain_analysis/data/scenario1_nine_domain_activation_artifact_index_2026_08_06.jsonl \
@@ -261,6 +273,15 @@ python scripts/03_probe_analysis/07_build_activation_index.py \
   --require-local \
   --verify-checksums
 ```
+
+The local combined index for this frozen analysis was migrated from the legacy
+v2 schema to v3 with the same explicit `unclassified` status. The migration
+path cannot promote a legacy index to `exploratory` or `definitive`. A future
+uniformly definitive Scenario 1 rerun is separate research-group work; it is
+not part of this repository cleanup.
+
+Use `--paper-input-policy <path>` at every stage only when running a different,
+explicitly reviewed cohort policy. The tracked Finance policy is the default.
 
 Run the exploratory all-layer scan:
 
@@ -304,11 +325,13 @@ variation is calibrated. A last-input artifact without an explicit
 `prompt_only` extraction scope is also unqualified, even if its paired tensors
 happen to match.
 
-The definitive analysis contains 72 trajectories across nine independent match
-groups. No injected trajectory adopted the hidden instruction or executed the
-unsafe simulated action. The all-layer scan therefore uses the construction
-label `injection_present`. It measures clean-versus-injected activation signal,
-not behavioral-compromise performance, and its peak layers remain exploratory.
+The frozen existing-data analysis contains 72 trajectories across nine
+independent match groups. No injected trajectory adopted the hidden instruction
+or executed the unsafe simulated action. The all-layer scan therefore uses the
+construction label `injection_present`. It measures clean-versus-injected
+activation signal, not behavioral-compromise performance, and its peak layers
+remain exploratory. Its `unclassified` tier records missing historical
+execution-tier provenance; it is not a claim that the cohort is definitive.
 
 Create group-held-out per-step scores for both baseline probes. The LAT baseline
 learns its PCA direction from the injected-minus-clean matched-pair differences;
@@ -329,7 +352,7 @@ python scripts/03_probe_analysis/10_score_baseline_probes.py \
 
 This command uses the saved activations only. It does not call Qwen, generate a
 new trajectory, or start a GPU. “Score” means the probability-like output of a
-probe for one saved agent activation. The definitive score file is
+probe for one saved agent activation. The frozen score file is
 `scenario1_nine_domain_fixed_layer_probe_scores_2026_08_06.jsonl` in the
 analysis `data/` directory.
 
@@ -361,8 +384,14 @@ and is not treated as a calibrated probability.
 Generate the final figures and tables:
 
 ```bash
-python scripts/03_probe_analysis/12_plot_probe_analysis.py
+python scripts/03_probe_analysis/12_plot_probe_analysis.py \
+  --analysis-tier unclassified
 ```
+
+The selected tier is retained in the activation index, per-step scores, depth
+results, reporting snapshot, and final manifest. Each stage rejects mixed tiers
+or a mismatch with its upstream artifacts. Historical artifacts without tier
+metadata remain reproducible but are explicitly classified as `unclassified`.
 
 Rebuild the paper figures, selected public assets, and result manifest with one
 CPU-only command:
@@ -419,17 +448,19 @@ branches. Exact regeneration requires those ignored trajectories to be
 hydrated locally; a clean checkout can inspect and test the compact tracked
 packet, answer key, blank form, status, and provenance files.
 
-## Definitive Nine-Domain Activation Analysis
+## Frozen Nine-Domain Existing-Data Analysis
 
 The current analysis snapshot was frozen on 2026-08-06. It asks whether a
 clean-versus-injected document condition is separable in Qwen3-32B residual
 activations after the injection enters the multi-agent chain. It does not yet
 estimate detection of successful compromise because every injected run
-resisted the hidden instruction.
+resisted the hidden instruction. The source trajectories predate execution-tier
+tagging, so the complete saved analysis pipeline records this cohort as
+`unclassified`; “frozen” describes immutability, not definitive-run status.
 
 ### Analysis set
 
-| Item | Definitive value |
+| Item | Frozen value |
 | --- | ---: |
 | Independent document domains | 9 |
 | Matched clean and injected trajectories | 72 |

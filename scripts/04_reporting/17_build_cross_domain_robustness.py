@@ -24,12 +24,22 @@ from src.analysis.cross_domain_robustness import (  # noqa: E402
     refit_within_fold_permutation_null,
     summarize_held_out_scores,
 )
+from src.analysis.depth_degradation import (  # noqa: E402
+    load_prediction_jsonl,
+    prediction_analysis_tier,
+)
 from src.analysis.figure_export import save_reproducible_figure  # noqa: E402
+from src.analysis.paper_inputs import (  # noqa: E402
+    DEFAULT_PAPER_INPUT_POLICY,
+    load_paper_input_policy,
+    validate_paper_analysis_inputs,
+)
 from src.analysis.probe_scoring import (  # noqa: E402
     generate_per_step_probe_scores,
     load_match_group_designs,
 )
 from src.extraction.saved_activations import (  # noqa: E402
+    activation_index_analysis_tier,
     load_activation_index,
     load_probe_activation_batch,
 )
@@ -130,10 +140,32 @@ def main() -> None:
     parser.add_argument("--permutations", type=int, default=999)
     parser.add_argument("--random-state", type=int, default=20260806)
     parser.add_argument("--dpi", type=int, default=600)
+    parser.add_argument(
+        "--paper-input-policy",
+        type=Path,
+        default=PROJECT_ROOT / DEFAULT_PAPER_INPUT_POLICY,
+    )
     args = parser.parse_args()
 
     index_rows = load_activation_index(args.activation_index)
-    all_score_rows = _read_jsonl(args.scores)
+    all_score_rows = load_prediction_jsonl(args.scores)
+    paper_policy = load_paper_input_policy(args.paper_input_policy)
+    index_selection = validate_paper_analysis_inputs(index_rows, paper_policy)
+    score_selection = validate_paper_analysis_inputs(all_score_rows, paper_policy)
+    analysis_tiers = {
+        activation_index_analysis_tier(index_rows),
+        prediction_analysis_tier(all_score_rows),
+    }
+    if len(analysis_tiers) != 1:
+        raise ValueError("Robustness inputs must contain one matching analysis tier.")
+    if (
+        index_selection["selected_trajectory_sha256"]
+        != score_selection["selected_trajectory_sha256"]
+    ):
+        raise ValueError(
+            "Robustness inputs do not contain the same paper-input cohort."
+        )
+    analysis_tier = next(iter(analysis_tiers))
     designs = load_match_group_designs(args.design_manifest)
     primary_index = sorted(
         (
@@ -232,13 +264,19 @@ def main() -> None:
             "path": args.design_manifest.as_posix(),
             "sha256": _sha256(args.design_manifest),
         },
+        "paper_input_policy": {
+            "path": args.paper_input_policy.as_posix(),
+            "sha256": _sha256(args.paper_input_policy),
+        },
         "activation_artifacts": {
             "files": len({row["local_path"] for row in index_rows}),
             "all_checksums_verified": True,
         },
     }
     artifact = {
-        "schema_version": "spec_gap.cross_domain_robustness.v1",
+        "schema_version": "spec_gap.cross_domain_robustness.v2",
+        "analysis_tier": analysis_tier,
+        "paper_input_selection": index_selection,
         "created_at": "2026-08-10",
         "analysis_scope": {
             "label": "injection_present",
@@ -584,6 +622,8 @@ def _render_markdown(artifact: dict[str, Any]) -> str:
         "",
         "This is a sensitivity analysis of the saved Scenario 1 activations. It made **no new model calls** and did not redesign or rerun Scenario 1.",
         "",
+        f"The frozen source cohort is classified as **`{artifact['analysis_tier']}`** because its trajectories predate execution-tier tagging; this is not a definitive-run claim.",
+        "",
         "## What the headline means",
         "",
         f"Worker 1, thinking off, layer 40 reaches **{primary['mean_fold_auroc']:.3f} mean held-out-domain AUROC** for the `injection_present` construction label. The pooled AUROC is {primary['pooled_auroc']:.3f}. This detects the presence of injected prompt construction/tokens; it is not compromise detection. All 36 injected runs resisted, so compromise-detection AUROC cannot be estimated from this sample.",
@@ -616,13 +656,6 @@ def _render_markdown(artifact: dict[str, Any]) -> str:
         "",
     ]
     return "\n".join(lines)
-
-
-def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-    if not rows:
-        raise ValueError(f"No rows found in {path}.")
-    return rows
 
 
 def _groups_from_metadata(metadata: list[dict[str, Any]]):

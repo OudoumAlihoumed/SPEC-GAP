@@ -17,12 +17,18 @@ from src.analysis.layer_scan import (  # noqa: E402
     layer_scan_table,
     run_construction_layer_scan,
 )
+from src.analysis.paper_inputs import (  # noqa: E402
+    DEFAULT_PAPER_INPUT_POLICY,
+    load_paper_input_policy,
+    validate_paper_analysis_inputs,
+)
 from src.analysis.activation_controls import (  # noqa: E402
     activation_control_table,
     run_activation_control_audit,
 )
 from src.extraction.saved_activations import (  # noqa: E402
     LABEL_TARGETS,
+    activation_index_analysis_tier,
     load_activation_index,
 )
 
@@ -64,16 +70,29 @@ def main() -> None:
         type=Path,
         default=PROJECT_ROOT / "results/scenario1/activation_control_pairs.csv",
     )
+    parser.add_argument(
+        "--paper-input-policy",
+        type=Path,
+        default=PROJECT_ROOT / DEFAULT_PAPER_INPUT_POLICY,
+    )
     parser.add_argument("--skip-checksums", action="store_true")
     parser.add_argument("--random-state", type=int, default=42)
     parser.add_argument("--max-iter", type=int, default=1000)
     args = parser.parse_args()
 
     index_rows = load_activation_index(args.index)
+    analysis_tier = activation_index_analysis_tier(index_rows)
+    paper_policy = load_paper_input_policy(args.paper_input_policy)
+    paper_input_selection = validate_paper_analysis_inputs(
+        index_rows,
+        paper_policy,
+    )
     control_audit = run_activation_control_audit(
         index_rows,
         verify_checksums=not args.skip_checksums,
     )
+    control_audit["analysis_tier"] = analysis_tier
+    control_audit["paper_input_selection"] = paper_input_selection
     args.control_output_json.parent.mkdir(parents=True, exist_ok=True)
     args.control_output_json.write_text(
         json.dumps(control_audit, indent=2, sort_keys=True) + "\n"
@@ -94,6 +113,8 @@ def main() -> None:
         random_state=args.random_state,
         max_iter=args.max_iter,
     )
+    result["analysis_tier"] = analysis_tier
+    result["paper_input_selection"] = paper_input_selection
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
 
@@ -105,28 +126,37 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(table)
 
-    print(json.dumps({
-        "schema_version": result["schema_version"],
-        "label_target": result["label_target"],
-        "selection_status": result["selection_status"],
-        "layer_selection_allowed": result["layer_selection_allowed"],
-        "negative_control_status": result["pre_injection_negative_control"]["status"],
-        "strict_planner_input_control": control_audit[
-            "strict_planner_input_control"
-        ]["status"],
-        "qualified_mode_checkpoints": result["pre_injection_negative_control"].get(
-            "qualified_mode_checkpoints", []
-        ),
-        "blocked_mode_checkpoints": result["pre_injection_negative_control"].get(
-            "blocked_mode_checkpoints", []
-        ),
-        "completed_strata": result["completed_strata"],
-        "skipped_strata": result["skipped_strata"],
-        "output_json": args.output_json.as_posix(),
-        "output_csv": args.output_csv.as_posix(),
-        "control_output_json": args.control_output_json.as_posix(),
-        "control_output_csv": args.control_output_csv.as_posix(),
-    }, indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "schema_version": result["schema_version"],
+                "analysis_tier": result["analysis_tier"],
+                "label_target": result["label_target"],
+                "selection_status": result["selection_status"],
+                "layer_selection_allowed": result["layer_selection_allowed"],
+                "negative_control_status": result["pre_injection_negative_control"][
+                    "status"
+                ],
+                "strict_planner_input_control": control_audit[
+                    "strict_planner_input_control"
+                ]["status"],
+                "qualified_mode_checkpoints": result[
+                    "pre_injection_negative_control"
+                ].get("qualified_mode_checkpoints", []),
+                "blocked_mode_checkpoints": result[
+                    "pre_injection_negative_control"
+                ].get("blocked_mode_checkpoints", []),
+                "completed_strata": result["completed_strata"],
+                "skipped_strata": result["skipped_strata"],
+                "output_json": args.output_json.as_posix(),
+                "output_csv": args.output_csv.as_posix(),
+                "control_output_json": args.control_output_json.as_posix(),
+                "control_output_csv": args.control_output_csv.as_posix(),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -17,12 +17,13 @@ import numpy as np
 
 from src.extraction.saved_activations import (
     load_probe_activation_batch,
+    normalize_index_analysis_tier,
 )
 from src.probes.lat_baseline import ContrastPairLATProbe
 from src.probes.linear_probe import make_probe_pipeline
 
 
-PER_STEP_SCORE_SCHEMA = "spec_gap.per_step_probe_score.v1"
+PER_STEP_SCORE_SCHEMA = "spec_gap.per_step_probe_score.v2"
 EVALUATION_METHOD = "leave_one_match_group_out"
 SUPPORTED_CHECKPOINT = "last_input_token"
 PROBE_NAMES = ("goldowsky_dill_logistic", "lat_contrast_pair_pca")
@@ -214,9 +215,16 @@ def summarize_per_step_probe_scores(rows: Sequence[dict[str, Any]]) -> dict[str,
 
     if not rows:
         raise ValueError("At least one per-step probe score is required.")
+    analysis_tiers = {
+        normalize_index_analysis_tier(row.get("analysis_tier") or "unclassified")
+        for row in rows
+    }
+    if len(analysis_tiers) != 1:
+        raise ValueError("Per-step probe scores must contain one analysis tier.")
     return {
         "schema_version": PER_STEP_SCORE_SCHEMA,
         "artifact_kind": "held_out_per_step_probe_scores",
+        "analysis_tier": next(iter(analysis_tiers)),
         "claim_scope": (
             "Construction-label diagnostic only. The scores are not generated model "
             "responses or behavioral ground truth."
@@ -404,6 +412,9 @@ def _score_row(
         "schema_version": PER_STEP_SCORE_SCHEMA,
         "artifact_kind": "held_out_probe_score",
         "claim_scope": "construction_label_diagnostic",
+        "analysis_tier": normalize_index_analysis_tier(
+            metadata.get("analysis_tier") or "unclassified"
+        ),
         "trajectory_id": str(metadata["trajectory_id"]),
         "match_group_id": str(metadata["match_group_id"]),
         "domain_id": str(metadata["domain_id"]),
@@ -446,6 +457,12 @@ def _validate_index_design(
     *,
     label_target: str,
 ) -> None:
+    analysis_tiers = {
+        normalize_index_analysis_tier(row.get("analysis_tier") or "unclassified")
+        for row in rows
+    }
+    if len(analysis_tiers) != 1:
+        raise ValueError("Activation-index rows must contain one analysis tier.")
     observed_groups = {str(row.get("match_group_id")) for row in rows}
     missing_designs = sorted(observed_groups - set(match_group_designs))
     if missing_designs:

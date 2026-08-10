@@ -16,6 +16,21 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.analysis.figure_export import save_reproducible_figure  # noqa: E402
+from src.analysis.depth_degradation import (  # noqa: E402
+    depth_result_analysis_tier,
+    load_prediction_jsonl,
+    prediction_analysis_tier,
+)
+from src.analysis.paper_inputs import (  # noqa: E402
+    DEFAULT_PAPER_INPUT_POLICY,
+    load_paper_input_policy,
+    validate_embedded_paper_input_audit,
+    validate_paper_analysis_inputs,
+)
+from src.extraction.saved_activations import (  # noqa: E402
+    activation_index_analysis_tier,
+    load_activation_index,
+)
 
 
 DEFAULT_MAIN_LAYERS = (16, 32, 40, 48, 63)
@@ -128,6 +143,11 @@ def main() -> None:
     )
     parser.add_argument("--primary-layer", type=int, default=PRIMARY_LAYER)
     parser.add_argument("--dpi", type=int, default=600)
+    parser.add_argument(
+        "--paper-input-policy",
+        type=Path,
+        default=PROJECT_ROOT / DEFAULT_PAPER_INPUT_POLICY,
+    )
     args = parser.parse_args()
 
     main_layers = _parse_layers(args.main_layers)
@@ -145,9 +165,32 @@ def main() -> None:
             "--file-prefix must use lowercase letters, numbers, or underscores."
         )
 
-    score_rows = _read_jsonl(args.scores)
-    activation_rows = _read_jsonl(args.activation_index, require_binary_label=False)
+    score_rows = load_prediction_jsonl(args.scores)
+    activation_rows = load_activation_index(args.activation_index)
     depth_result = json.loads(args.depth_result.read_text(encoding="utf-8"))
+    paper_policy = load_paper_input_policy(args.paper_input_policy)
+    index_selection = validate_paper_analysis_inputs(activation_rows, paper_policy)
+    score_selection = validate_paper_analysis_inputs(score_rows, paper_policy)
+    depth_selection = validate_embedded_paper_input_audit(
+        depth_result,
+        paper_policy,
+    )
+    analysis_tiers = {
+        activation_index_analysis_tier(activation_rows),
+        prediction_analysis_tier(score_rows),
+        depth_result_analysis_tier(depth_result),
+    }
+    if len(analysis_tiers) != 1:
+        raise ValueError("Fixed-layer inputs must contain one matching analysis tier.")
+    selection_hashes = {
+        selection["selected_trajectory_sha256"]
+        for selection in (index_selection, score_selection, depth_selection)
+    }
+    if len(selection_hashes) != 1:
+        raise ValueError(
+            "Fixed-layer inputs do not contain the same paper-input cohort."
+        )
+    analysis_tier = next(iter(analysis_tiers))
     metrics = summarize_agent_metrics(score_rows, robustness_layers)
     domain_metrics = summarize_domain_metrics(score_rows, robustness_layers)
     main_metrics = [row for row in metrics if row["layer"] in main_layers]
@@ -195,26 +238,21 @@ def main() -> None:
     )
     manifest_path = args.output_dir / f"{file_prefix}_analysis_manifest.json"
     manifest = {
-        "schema_version": "spec_gap.fixed_layer_analysis.v1",
+        "schema_version": "spec_gap.fixed_layer_analysis.v2",
+        "analysis_tier": analysis_tier,
+        "paper_input_selection": index_selection,
         "run_id": args.stem,
         "analysis_date": "2026-08-06",
         "claim_scope": "construction_label_diagnostic",
         "label_target": "injection_present",
         "evaluation_method": "leave_one_match_group_out",
         "model": sorted({str(row["model"]) for row in score_rows}),
-        "model_revision": sorted({
-            str(row["model_revision"]) for row in score_rows
-        }),
+        "model_revision": sorted({str(row["model_revision"]) for row in score_rows}),
         "domains": [
-            DOMAIN_FILE_LABELS[domain]
-            for domain in _ordered_domains(score_rows)
+            DOMAIN_FILE_LABELS[domain] for domain in _ordered_domains(score_rows)
         ],
-        "trajectory_count": len({
-            str(row["trajectory_id"]) for row in score_rows
-        }),
-        "match_group_count": len({
-            str(row["match_group_id"]) for row in score_rows
-        }),
+        "trajectory_count": len({str(row["trajectory_id"]) for row in score_rows}),
+        "match_group_count": len({str(row["match_group_id"]) for row in score_rows}),
         "score_row_count": len(score_rows),
         "primary_thinking_mode": "off",
         "sensitivity_thinking_mode": "on",
@@ -226,6 +264,7 @@ def main() -> None:
             "activation_index": args.activation_index.as_posix(),
             "probe_scores": args.scores.as_posix(),
             "depth_analysis": args.depth_result.as_posix(),
+            "paper_input_policy": args.paper_input_policy.as_posix(),
         },
         "depth_experiment_id": depth_result.get("experiment_id"),
         "outputs": {
@@ -252,22 +291,27 @@ def main() -> None:
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    print(json.dumps({
-        "score_rows": len(score_rows),
-        "agent_metric_rows": len(metrics),
-        "main_metric_rows": len(main_metrics),
-        "main_layers": main_layers,
-        "robustness_layers": robustness_layers,
-        "primary_layer": args.primary_layer,
-        "all_grid_table": all_table.as_posix(),
-        "main_table": main_table.as_posix(),
-        "manifest": manifest_path.as_posix(),
-        "all_domain_standalone_figures": len(all_domain_figure_paths),
-        "domain_standalone_figures": len(domain_figure_paths),
-        "domain_tables": len(domain_table_paths),
-        "activation_artifacts": len(activation_catalog),
-        "activation_catalog": activation_catalog_path.as_posix(),
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "score_rows": len(score_rows),
+                "agent_metric_rows": len(metrics),
+                "main_metric_rows": len(main_metrics),
+                "main_layers": main_layers,
+                "robustness_layers": robustness_layers,
+                "primary_layer": args.primary_layer,
+                "all_grid_table": all_table.as_posix(),
+                "main_table": main_table.as_posix(),
+                "manifest": manifest_path.as_posix(),
+                "all_domain_standalone_figures": len(all_domain_figure_paths),
+                "domain_standalone_figures": len(domain_figure_paths),
+                "domain_tables": len(domain_table_paths),
+                "activation_artifacts": len(activation_catalog),
+                "activation_catalog": activation_catalog_path.as_posix(),
+            },
+            indent=2,
+        )
+    )
 
 
 def build_activation_artifact_catalog(rows: list[dict]) -> list[dict]:
@@ -302,32 +346,32 @@ def build_activation_artifact_catalog(rows: list[dict]) -> list[dict]:
         if len(layer_sets) != 1:
             raise ValueError(f"Activation file {path} has inconsistent layers.")
         layers = next(iter(layer_sets))
-        catalog.append({
-            "domain": DOMAIN_LABELS.get(
-                str(first["domain_id"]),
-                str(first["domain_id"]).replace("_", " ").title(),
-            ),
-            "match_group_id": first["match_group_id"],
-            "trajectory_id": first["trajectory_id"],
-            "treatment": first["treatment"],
-            "delegation_depth": first["delegation_depth"],
-            "thinking_mode": first["thinking_mode"],
-            "step_index": first["step_index"],
-            "agent_id": first["agent_id"],
-            "agent_role": first["agent_role"],
-            "checkpoints": ";".join(sorted({
-                str(row["checkpoint"]) for row in cohort
-            })),
-            "layer_count": len(layers),
-            "activation_file": path,
-            "sha256": first["checksum_sha256"],
-        })
+        catalog.append(
+            {
+                "domain": DOMAIN_LABELS.get(
+                    str(first["domain_id"]),
+                    str(first["domain_id"]).replace("_", " ").title(),
+                ),
+                "match_group_id": first["match_group_id"],
+                "trajectory_id": first["trajectory_id"],
+                "treatment": first["treatment"],
+                "delegation_depth": first["delegation_depth"],
+                "thinking_mode": first["thinking_mode"],
+                "step_index": first["step_index"],
+                "agent_id": first["agent_id"],
+                "agent_role": first["agent_role"],
+                "checkpoints": ";".join(
+                    sorted({str(row["checkpoint"]) for row in cohort})
+                ),
+                "layer_count": len(layers),
+                "activation_file": path,
+                "sha256": first["checksum_sha256"],
+            }
+        )
     return catalog
 
 
-def summarize_agent_metrics(
-    rows: list[dict], layers: tuple[int, ...]
-) -> list[dict]:
+def summarize_agent_metrics(rows: list[dict], layers: tuple[int, ...]) -> list[dict]:
     selected = [row for row in rows if int(row["layer"]) in layers]
     grouped: dict[tuple, list[dict]] = defaultdict(list)
     for row in selected:
@@ -341,12 +385,13 @@ def summarize_agent_metrics(
 
     output = []
     for (thinking, agent, probe, layer), cohort in sorted(
-        grouped.items(), key=lambda item: (
+        grouped.items(),
+        key=lambda item: (
             item[0][0],
             AGENT_ORDER.index(item[0][1]),
             item[0][2],
             item[0][3],
-        )
+        ),
     ):
         labels = [int(row["label"]) for row in cohort]
         scores = [float(row["score"]) for row in cohort]
@@ -355,36 +400,38 @@ def summarize_agent_metrics(
             by_fold[str(row["held_out_match_group_id"])].append(row)
         fold_aurocs = []
         for fold_rows in by_fold.values():
-            fold_aurocs.append(_auroc(
-                [int(row["label"]) for row in fold_rows],
-                [float(row["score"]) for row in fold_rows],
-            ))
-        output.append({
-            "thinking_mode": thinking,
-            "agent_id": agent,
-            "agent_label": AGENT_LABELS[agent],
-            "probe_name": probe,
-            "probe_label": PROBE_LABELS[probe],
-            "layer": layer,
-            "n_predictions": len(cohort),
-            "n_trajectories": len({str(row["trajectory_id"]) for row in cohort}),
-            "n_match_groups": len(by_fold),
-            "pooled_auroc": _auroc(labels, scores),
-            "mean_fold_auroc": statistics.fmean(fold_aurocs),
-            "fold_auroc_sd": statistics.pstdev(fold_aurocs),
-            "fold_auroc_min": min(fold_aurocs),
-            "fold_auroc_max": max(fold_aurocs),
-            "brier": statistics.fmean(
-                (score - label) ** 2 for score, label in zip(scores, labels)
-            ),
-            "ece_10_bin": _ece(labels, scores, n_bins=10),
-        })
+            fold_aurocs.append(
+                _auroc(
+                    [int(row["label"]) for row in fold_rows],
+                    [float(row["score"]) for row in fold_rows],
+                )
+            )
+        output.append(
+            {
+                "thinking_mode": thinking,
+                "agent_id": agent,
+                "agent_label": AGENT_LABELS[agent],
+                "probe_name": probe,
+                "probe_label": PROBE_LABELS[probe],
+                "layer": layer,
+                "n_predictions": len(cohort),
+                "n_trajectories": len({str(row["trajectory_id"]) for row in cohort}),
+                "n_match_groups": len(by_fold),
+                "pooled_auroc": _auroc(labels, scores),
+                "mean_fold_auroc": statistics.fmean(fold_aurocs),
+                "fold_auroc_sd": statistics.pstdev(fold_aurocs),
+                "fold_auroc_min": min(fold_aurocs),
+                "fold_auroc_max": max(fold_aurocs),
+                "brier": statistics.fmean(
+                    (score - label) ** 2 for score, label in zip(scores, labels)
+                ),
+                "ece_10_bin": _ece(labels, scores, n_bins=10),
+            }
+        )
     return output
 
 
-def summarize_domain_metrics(
-    rows: list[dict], layers: tuple[int, ...]
-) -> list[dict]:
+def summarize_domain_metrics(rows: list[dict], layers: tuple[int, ...]) -> list[dict]:
     """Summarize each independently held-out domain without averaging folds."""
     selected = [row for row in rows if int(row["layer"]) in layers]
     grouped: dict[tuple, list[dict]] = defaultdict(list)
@@ -415,26 +462,30 @@ def summarize_domain_metrics(
     ):
         labels = [int(row["label"]) for row in cohort]
         scores = [float(row["score"]) for row in cohort]
-        output.append({
-            "domain_id": domain,
-            "domain_label": DOMAIN_LABELS.get(domain, domain.replace("_", " ").title()),
-            "held_out_match_group_id": held_out_group,
-            "thinking_mode": thinking,
-            "agent_id": agent,
-            "agent_label": AGENT_LABELS[agent],
-            "probe_name": probe,
-            "probe_label": PROBE_LABELS[probe],
-            "layer": layer,
-            "n_predictions": len(cohort),
-            "n_trajectories": len({str(row["trajectory_id"]) for row in cohort}),
-            "n_clean": sum(label == 0 for label in labels),
-            "n_injected": sum(label == 1 for label in labels),
-            "held_out_fold_auroc": _auroc(labels, scores),
-            "brier": statistics.fmean(
-                (score - label) ** 2 for score, label in zip(scores, labels)
-            ),
-            "ece_10_bin": _ece(labels, scores, n_bins=10),
-        })
+        output.append(
+            {
+                "domain_id": domain,
+                "domain_label": DOMAIN_LABELS.get(
+                    domain, domain.replace("_", " ").title()
+                ),
+                "held_out_match_group_id": held_out_group,
+                "thinking_mode": thinking,
+                "agent_id": agent,
+                "agent_label": AGENT_LABELS[agent],
+                "probe_name": probe,
+                "probe_label": PROBE_LABELS[probe],
+                "layer": layer,
+                "n_predictions": len(cohort),
+                "n_trajectories": len({str(row["trajectory_id"]) for row in cohort}),
+                "n_clean": sum(label == 0 for label in labels),
+                "n_injected": sum(label == 1 for label in labels),
+                "held_out_fold_auroc": _auroc(labels, scores),
+                "brier": statistics.fmean(
+                    (score - label) ** 2 for score, label in zip(scores, labels)
+                ),
+                "ece_10_bin": _ece(labels, scores, n_bins=10),
+            }
+        )
     return output
 
 
@@ -453,25 +504,28 @@ def plot_all_domain_figures(
     for mode in ("off", "on"):
         for agent in AGENT_ORDER:
             cohort = [
-                row for row in rows
+                row
+                for row in rows
                 if row["thinking_mode"] == mode and row["agent_id"] == agent
             ]
             file_stem = (
                 f"{stem}_all_domains_{AGENT_FILE_LABELS[agent]}_"
                 f"thinking_{mode}_auroc_by_layer"
             )
-            paths.extend(_plot_standalone_lines(
-                cohort,
-                value_field="mean_fold_auroc",
-                robustness_layers=robustness_layers,
-                primary_layer=primary_layer,
-                title=f"{AGENT_LABELS[agent]}, thinking {mode}",
-                subtitle="Mean AUROC across nine held-out domains",
-                output_dir=output_dir / f"thinking_{mode}",
-                file_stem=file_stem,
-                formats=("png", "pdf", "svg"),
-                dpi=dpi,
-            ))
+            paths.extend(
+                _plot_standalone_lines(
+                    cohort,
+                    value_field="mean_fold_auroc",
+                    robustness_layers=robustness_layers,
+                    primary_layer=primary_layer,
+                    title=f"{AGENT_LABELS[agent]}, thinking {mode}",
+                    subtitle="Mean AUROC across nine held-out domains",
+                    output_dir=output_dir / f"thinking_{mode}",
+                    file_stem=file_stem,
+                    formats=("png", "pdf", "svg"),
+                    dpi=dpi,
+                )
+            )
     return paths
 
 
@@ -493,7 +547,8 @@ def plot_standalone_domain_figures(
         for mode in ("off", "on"):
             for agent in AGENT_ORDER:
                 cohort = [
-                    row for row in rows
+                    row
+                    for row in rows
                     if row["domain_id"] == domain
                     and row["thinking_mode"] == mode
                     and row["agent_id"] == agent
@@ -502,24 +557,24 @@ def plot_standalone_domain_figures(
                     f"{stem}_{domain_file_label}_{AGENT_FILE_LABELS[agent]}_"
                     f"thinking_{mode}_auroc_by_layer"
                 )
-                paths.extend(_plot_standalone_lines(
-                    cohort,
-                    value_field="held_out_fold_auroc",
-                    robustness_layers=robustness_layers,
-                    primary_layer=primary_layer,
-                    title=(
-                        f"{domain_label}: {AGENT_LABELS[agent]}, thinking {mode}"
-                    ),
-                    subtitle="AUROC in this independently held-out domain fold",
-                    output_dir=(
-                        output_dir
-                        / domain_file_label
-                        / f"thinking_{mode}"
-                    ),
-                    file_stem=file_stem,
-                    formats=("png", "pdf", "svg"),
-                    dpi=dpi,
-                ))
+                paths.extend(
+                    _plot_standalone_lines(
+                        cohort,
+                        value_field="held_out_fold_auroc",
+                        robustness_layers=robustness_layers,
+                        primary_layer=primary_layer,
+                        title=(
+                            f"{domain_label}: {AGENT_LABELS[agent]}, thinking {mode}"
+                        ),
+                        subtitle="AUROC in this independently held-out domain fold",
+                        output_dir=(
+                            output_dir / domain_file_label / f"thinking_{mode}"
+                        ),
+                        file_stem=file_stem,
+                        formats=("png", "pdf", "svg"),
+                        dpi=dpi,
+                    )
+                )
     return paths
 
 
@@ -593,7 +648,8 @@ def _plot_standalone_lines(
     axis.set_xticks(robustness_layers)
     axis.set_xlabel("Model layer")
     axis.set_ylabel(
-        "Mean held-out AUROC" if value_field == "mean_fold_auroc"
+        "Mean held-out AUROC"
+        if value_field == "mean_fold_auroc"
         else "Held-out fold AUROC"
     )
     axis.set_axisbelow(True)
@@ -680,9 +736,7 @@ def _publication_style() -> dict[str, object]:
     }
 
 
-def write_domain_tables(
-    rows: list[dict], *, output_dir: Path, stem: str
-) -> list[Path]:
+def write_domain_tables(rows: list[dict], *, output_dir: Path, stem: str) -> list[Path]:
     """Write one plainly named table per held-out domain and thinking mode."""
     paths: list[Path] = []
     domains = _ordered_domains(rows)
@@ -690,19 +744,21 @@ def write_domain_tables(
         domain_file_label = DOMAIN_FILE_LABELS.get(domain, domain)
         for mode in ("off", "on"):
             cohort = [
-                row for row in rows
+                row
+                for row in rows
                 if row["domain_id"] == domain and row["thinking_mode"] == mode
             ]
-            cohort.sort(key=lambda row: (
-                AGENT_ORDER.index(row["agent_id"]),
-                row["probe_name"],
-                row["layer"],
-            ))
+            cohort.sort(
+                key=lambda row: (
+                    AGENT_ORDER.index(row["agent_id"]),
+                    row["probe_name"],
+                    row["layer"],
+                )
+            )
             directory = output_dir / domain_file_label
             directory.mkdir(parents=True, exist_ok=True)
             path = directory / (
-                f"{stem}_{domain_file_label}_thinking_{mode}_"
-                "layer_metrics.csv"
+                f"{stem}_{domain_file_label}_thinking_{mode}_layer_metrics.csv"
             )
             _write_csv(cohort, path)
             paths.append(path)
@@ -738,7 +794,8 @@ def _ece(labels: list[int], scores: list[float], *, n_bins: int) -> float:
         lower = bin_index / n_bins
         upper = (bin_index + 1) / n_bins
         members = [
-            index for index, score in enumerate(scores)
+            index
+            for index, score in enumerate(scores)
             if lower <= score < upper or (bin_index == n_bins - 1 and score == 1.0)
         ]
         if not members:
@@ -747,20 +804,6 @@ def _ece(labels: list[int], scores: list[float], *, n_bins: int) -> float:
         confidence = statistics.fmean(scores[index] for index in members)
         error += len(members) / total * abs(accuracy - confidence)
     return error
-
-
-def _read_jsonl(path: Path, *, require_binary_label: bool = True) -> list[dict]:
-    rows = []
-    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        if not line.strip():
-            continue
-        row = json.loads(line)
-        if require_binary_label and row.get("label") not in (0, 1):
-            raise ValueError(f"Row {line_number} has no binary construction label.")
-        rows.append(row)
-    if not rows:
-        raise ValueError(f"No score rows found in {path}.")
-    return rows
 
 
 def _parse_layers(value: str) -> tuple[int, ...]:

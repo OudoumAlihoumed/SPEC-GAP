@@ -15,6 +15,7 @@ from typing import Iterable
 import numpy as np
 from sklearn.metrics import brier_score_loss, roc_auc_score
 
+from src.infrastructure.modal_billing import validate_analysis_tier
 from src.probes.linear_probe import compute_ece
 from src.probes.temporal_divergence import temporal_divergence
 
@@ -58,7 +59,9 @@ BEHAVIORAL_OUTCOMES = {
     "indeterminate",
 }
 LATENT_STATUSES = {"not_candidate", "candidate", "probe_supported"}
-TEMPORAL_SCORE_SCHEMA = "spec_gap.temporal_divergence_score.v2"
+DEPTH_RESULT_SCHEMA = "spec_gap.depth_degradation.v5"
+TEMPORAL_SCORE_SCHEMA = "spec_gap.temporal_divergence_score.v3"
+CURRENT_PER_STEP_SCORE_SCHEMA = "spec_gap.per_step_probe_score.v2"
 BASELINE_METRIC_NAMES = ("auroc", "brier", "ece")
 TEMPORAL_METRIC_NAMES = (
     "path_mean_auroc",
@@ -86,6 +89,7 @@ def analyze_depth_degradation(
 
     rows = sorted((dict(row) for row in rows), key=_prediction_row_sort_key)
     validate_prediction_rows(rows)
+    analysis_tier = prediction_analysis_tier(rows)
     if not experiment_id.strip():
         raise ValueError("experiment_id must be non-empty")
     if n_bootstrap < 1:
@@ -211,7 +215,8 @@ def analyze_depth_degradation(
         str(row.get("evaluation_method", "not_declared")) for row in rows
     })
     return {
-        "schema_version": "spec_gap.depth_degradation.v4",
+        "schema_version": DEPTH_RESULT_SCHEMA,
+        "analysis_tier": analysis_tier,
         "experiment_id": experiment_id,
         "data_manifest_hash": prediction_manifest_hash(rows),
         "n_match_groups": n_match_groups,
@@ -277,10 +282,17 @@ def validate_prediction_rows(rows: list[dict]) -> None:
         lambda: defaultdict(set)
     )
     match_group_design: dict[str, tuple[str, str]] = {}
+    analysis_tiers: set[str] = set()
     for index, row in enumerate(rows):
         missing = sorted(REQUIRED_FIELDS - set(row))
         if missing:
             raise ValueError(f"Row {index} is missing prediction fields: {missing}")
+        raw_tier = row.get("analysis_tier")
+        if raw_tier is None and row.get("schema_version") == CURRENT_PER_STEP_SCORE_SCHEMA:
+            raise ValueError(
+                f"Row {index} is missing prediction fields: ['analysis_tier']"
+            )
+        analysis_tiers.add(_normalize_analysis_tier(raw_tier or "unclassified"))
         if row["hop_mode"] not in HOP_MODES:
             raise ValueError(f"Row {index} has unsupported hop_mode {row['hop_mode']!r}")
         if row["condition"] not in CONDITIONS:
@@ -436,6 +448,9 @@ def validate_prediction_rows(rows: list[dict]) -> None:
             str(row["agent_role"]),
         )
 
+    if len(analysis_tiers) != 1:
+        raise ValueError("Prediction rows must contain exactly one analysis tier.")
+
     expected_layers: dict[tuple, set[int]] = {}
     for coverage_key, layers in trajectory_layers.items():
         _, model, thinking_mode, label_target, probe_name, seed = coverage_key
@@ -539,6 +554,7 @@ def tabular_result_rows(result: dict) -> list[dict]:
     rows = []
     for group in result["depth_metrics"]:
         row = {key: value for key, value in group.items() if key != "confidence_intervals"}
+        row["analysis_tier"] = depth_result_analysis_tier(result)
         row["record_type"] = "depth_metric"
         for metric, interval in group["confidence_intervals"].items():
             row[f"{metric}_ci_lower"] = interval["lower"] if interval else None
@@ -550,6 +566,7 @@ def tabular_result_rows(result: dict) -> list[dict]:
             for key, value in comparison.items()
             if key not in {"deltas", "confidence_intervals", "interpretation"}
         }
+        row["analysis_tier"] = depth_result_analysis_tier(result)
         row["record_type"] = "depth_comparison"
         for metric, value in comparison["deltas"].items():
             row[f"{metric}_delta"] = value
@@ -565,6 +582,7 @@ def temporal_divergence_rows(rows: Iterable[dict]) -> list[dict]:
 
     rows = sorted((dict(row) for row in rows), key=_prediction_row_sort_key)
     validate_prediction_rows(rows)
+    analysis_tier = prediction_analysis_tier(rows)
     configuration_fields = (
         "model",
         "thinking_mode",
@@ -586,6 +604,7 @@ def temporal_divergence_rows(rows: Iterable[dict]) -> list[dict]:
             output.append({
                 "schema_version": TEMPORAL_SCORE_SCHEMA,
                 "artifact_kind": "trajectory_temporal_divergence_score",
+                "analysis_tier": analysis_tier,
                 "trajectory_id": str(trajectory_id),
                 "match_group_id": str(first["match_group_id"]),
                 "domain_id": str(first["domain_id"]),
@@ -616,6 +635,33 @@ def temporal_divergence_rows(rows: Iterable[dict]) -> list[dict]:
         str(row["hop_mode"]),
         str(row["condition"]),
     ))
+
+
+def prediction_analysis_tier(rows: Iterable[dict]) -> str:
+    """Return the one normalized tier represented by prediction rows."""
+
+    tiers = {
+        _normalize_analysis_tier(row.get("analysis_tier") or "unclassified")
+        for row in rows
+    }
+    if len(tiers) != 1:
+        raise ValueError("Prediction rows must contain exactly one analysis tier.")
+    return next(iter(tiers))
+
+
+def depth_result_analysis_tier(result: dict) -> str:
+    """Return a current tier or classify a historical depth result."""
+
+    raw_tier = result.get("analysis_tier")
+    if raw_tier is None and result.get("schema_version") == DEPTH_RESULT_SCHEMA:
+        raise ValueError("Current depth results require analysis_tier.")
+    return _normalize_analysis_tier(raw_tier or "unclassified")
+
+
+def _normalize_analysis_tier(value: str) -> str:
+    if value == "unclassified":
+        return value
+    return validate_analysis_tier(value)
 
 
 def _metric_snapshot(rows: list[dict], *, n_bins: int) -> dict:

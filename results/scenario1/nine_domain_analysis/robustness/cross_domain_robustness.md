@@ -2,6 +2,8 @@
 
 This is a sensitivity analysis of the saved Scenario 1 activations. It made **no new model calls** and did not redesign or rerun Scenario 1.
 
+The frozen source cohort is classified as **`unclassified`** because its trajectories predate execution-tier tagging; this is not a definitive-run claim.
+
 ## What the headline means
 
 Worker 1, thinking off, layer 40 reaches **0.889 mean held-out-domain AUROC** for the `injection_present` construction label. The pooled AUROC is 0.710. This detects the presence of injected prompt construction/tokens; it is not compromise detection. All 36 injected runs resisted, so compromise-detection AUROC cannot be estimated from this sample.

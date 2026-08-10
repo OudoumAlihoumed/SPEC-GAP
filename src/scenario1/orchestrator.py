@@ -19,6 +19,7 @@ from src.infrastructure.qwen_modal import (
     generation_result_to_agent_turn_fields,
     validate_generation_result,
 )
+from src.infrastructure.modal_billing import validate_analysis_tier
 from src.scenario1.generator import build_generation_request
 from src.scenario1.safe_executor import execute_simulated_requests
 from src.scenario1.validator import validate_payload
@@ -48,6 +49,7 @@ def _validate_result_matches_request(
         "agent_role": request["agent_role"],
         "hop_index": request["hop_index"],
         "thinking_mode": request["thinking_mode"],
+        "analysis_tier": request["analysis_tier"],
         "enable_thinking": request["enable_thinking"],
         "input_messages": request["messages"],
         "tools": request["tools"],
@@ -291,11 +293,13 @@ def run_live_trajectory(
     thinking_mode: str,
     generate_turn: GenerateTurn,
     on_turn_complete: TurnComplete | None = None,
+    analysis_tier: str = "exploratory",
 ) -> dict[str, Any]:
     """Run every agent in order and return one complete live v2 record."""
 
     if thinking_mode not in {"on", "off"}:
         raise ValueError("thinking_mode must be 'on' or 'off'")
+    analysis_tier = validate_analysis_tier(analysis_tier)
     if structural_record.get("generation_mode") != "dry_run":
         raise ValueError("orchestration requires a structural dry-run record")
 
@@ -332,6 +336,7 @@ def run_live_trajectory(
             event,
             thinking_mode=thinking_mode,
             upstream_message=upstream_message,
+            analysis_tier=analysis_tier,
         )
         result = validate_generation_result(generate_turn(request))
         _validate_result_matches_request(request, result)
@@ -375,9 +380,11 @@ def write_model_turn_result(
     import json
 
     result = validate_generation_result(result)
+    checkpoint_root = Path(output_root) / "checkpoints"
+    if result["analysis_tier"] is not None:
+        checkpoint_root /= result["analysis_tier"]
     path = (
-        Path(output_root)
-        / "checkpoints"
+        checkpoint_root
         / result["trajectory_id"]
         / result["thinking_mode"]
         / f"step_{result['step_index']:03d}.json"
@@ -395,9 +402,11 @@ def load_model_turn_result(
 
     import json
 
+    checkpoint_root = Path(output_root) / "checkpoints"
+    if request.get("analysis_tier") is not None:
+        checkpoint_root /= validate_analysis_tier(request["analysis_tier"])
     path = (
-        Path(output_root)
-        / "checkpoints"
+        checkpoint_root
         / request["trajectory_id"]
         / request["thinking_mode"]
         / f"step_{request['step_index']:03d}.json"
@@ -424,7 +433,18 @@ def write_live_trajectory(
     import json
 
     mode = record["model"]["thinking_mode"]
-    path = Path(output_root) / "live" / mode / f"{record['trajectory_id']}.json"
+    tiers = {
+        event.get("model_execution_metadata", {}).get("analysis_tier")
+        for event in record["trajectory_trace"]["full_events"]
+        if event.get("type") == "agent_turn"
+    }
+    if len(tiers) != 1:
+        raise ValueError("live trajectory agent turns must use one analysis tier")
+    analysis_tier = next(iter(tiers))
+    live_root = Path(output_root) / "live"
+    if analysis_tier is not None:
+        live_root /= validate_analysis_tier(analysis_tier)
+    path = live_root / mode / f"{record['trajectory_id']}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(record, indent=2) + "\n")
     return path

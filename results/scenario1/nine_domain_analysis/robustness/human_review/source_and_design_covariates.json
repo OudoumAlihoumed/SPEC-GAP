@@ -1,8 +1,10 @@
 {
+  "analysis_tier": "unclassified",
+  "analysis_tier_note": "The combined historical cohort predates execution-tier tagging and is explicitly unclassified rather than definitive.",
   "combined_activation_index": {
-    "expected_sha256": "d1dc6a17b241f2900982683fc133d2a97644dc19cb00087dc414ac06cea3d42b",
+    "expected_sha256": "059b24c0efe05562eafbabeff302d827569362cab2fea41c8cbf19f1be1e8dd8",
     "path": "results/scenario1/nine_domain_analysis/data/scenario1_nine_domain_activation_artifact_index_2026_08_06.jsonl",
-    "sha256": "d1dc6a17b241f2900982683fc133d2a97644dc19cb00087dc414ac06cea3d42b"
+    "sha256": "059b24c0efe05562eafbabeff302d827569362cab2fea41c8cbf19f1be1e8dd8"
   },
   "created_at": "2026-08-10",
   "domains": [

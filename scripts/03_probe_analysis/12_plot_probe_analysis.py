@@ -16,6 +16,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.analysis.depth_degradation import load_prediction_jsonl  # noqa: E402
+from src.analysis.paper_inputs import (  # noqa: E402
+    DEFAULT_PAPER_INPUT_POLICY,
+    load_paper_input_policy,
+    validate_paper_analysis_inputs,
+)
 from src.analysis.probe_analysis_figures import (  # noqa: E402
     REFERENCE_LAYER,
     figure_catalog,
@@ -24,8 +29,15 @@ from src.analysis.probe_analysis_figures import (  # noqa: E402
 from src.analysis.reporting_snapshot import (  # noqa: E402
     build_reporting_snapshot,
     load_reporting_snapshot,
+    reporting_snapshot_analysis_tier,
     sha256_file,
     write_reporting_snapshot,
+)
+from src.extraction.saved_activations import (  # noqa: E402
+    ACTIVATION_INDEX_ANALYSIS_TIERS,
+    load_trajectory_records,
+    trajectory_analysis_tier,
+    trajectory_paths_for_analysis_tier,
 )
 
 
@@ -36,12 +48,14 @@ def main() -> None:
     parser.add_argument(
         "--reference-result",
         type=Path,
-        default=PROJECT_ROOT / "results/scenario1/depth_analysis/depth_degradation.json",
+        default=PROJECT_ROOT
+        / "results/scenario1/depth_analysis/depth_degradation.json",
     )
     parser.add_argument(
         "--all-layer-result",
         type=Path,
-        default=PROJECT_ROOT / "results/scenario1/depth_analysis/all_layer_descriptive.json",
+        default=PROJECT_ROOT
+        / "results/scenario1/depth_analysis/all_layer_descriptive.json",
     )
     parser.add_argument(
         "--per-step-scores",
@@ -59,9 +73,7 @@ def main() -> None:
     parser.add_argument(
         "--snapshot-output",
         type=Path,
-        default=(
-            PROJECT_ROOT / "docs/data/scenario1/reporting_snapshot.json"
-        ),
+        default=(PROJECT_ROOT / "docs/data/scenario1/reporting_snapshot.json"),
         help="Compact public snapshot written when raw analysis outputs are used.",
     )
     parser.add_argument(
@@ -69,6 +81,14 @@ def main() -> None:
         type=Path,
         default=PROJECT_ROOT / "experiments/scenario1/trajectories/live",
         help="Live trajectory tree used to record model and decoding provenance.",
+    )
+    parser.add_argument(
+        "--analysis-tier",
+        choices=sorted(ACTIVATION_INDEX_ANALYSIS_TIERS),
+        help=(
+            "Required when rebuilding the snapshot from raw outputs. Selects one "
+            "live trajectory namespace and must match the probe-score tier."
+        ),
     )
     parser.add_argument(
         "--analysis-revision",
@@ -84,18 +104,35 @@ def main() -> None:
         type=Path,
         default=PROJECT_ROOT / "results/scenario1/final_analysis",
     )
+    parser.add_argument(
+        "--paper-input-policy",
+        type=Path,
+        default=PROJECT_ROOT / DEFAULT_PAPER_INPUT_POLICY,
+    )
     parser.add_argument("--dpi", type=int, default=300)
     args = parser.parse_args()
+    paper_policy = load_paper_input_policy(args.paper_input_policy)
 
     if args.snapshot_input:
         if args.analysis_revision:
-            raise ValueError("--analysis-revision cannot be combined with --snapshot-input.")
+            raise ValueError(
+                "--analysis-revision cannot be combined with --snapshot-input."
+            )
         snapshot = load_reporting_snapshot(args.snapshot_input)
         reference = snapshot["reference_result"]
         all_layer = snapshot["all_layer_result"]
         score_rows = snapshot["per_step_rows"]
+        analysis_tier = reporting_snapshot_analysis_tier(snapshot)
+        if args.analysis_tier and args.analysis_tier != analysis_tier:
+            raise ValueError(
+                "--analysis-tier does not match the reporting snapshot tier."
+            )
         snapshot_path = args.snapshot_input
     else:
+        if not args.analysis_tier:
+            raise ValueError(
+                "--analysis-tier is required when rebuilding from raw analysis outputs."
+            )
         reference = _read_json(args.reference_result)
         all_layer = _read_json(args.all_layer_result)
         score_rows = load_prediction_jsonl(args.per_step_scores)
@@ -112,6 +149,10 @@ def main() -> None:
                 "path": _relative(args.all_layer_result),
                 "sha256": sha256_file(args.all_layer_result),
             },
+            "paper_input_policy": {
+                "path": _relative(args.paper_input_policy),
+                "sha256": sha256_file(args.paper_input_policy),
+            },
         }
         snapshot = build_reporting_snapshot(
             reference,
@@ -120,10 +161,21 @@ def main() -> None:
             analysis_revision=args.analysis_revision or _git_revision(),
             reporting_revision=_git_revision(),
             source_artifacts=source_artifacts,
-            model_configs=_load_model_configs(args.trajectory_root),
+            model_configs=_load_model_configs(
+                args.trajectory_root,
+                args.analysis_tier,
+            ),
         )
-        write_reporting_snapshot(snapshot, args.snapshot_output)
+        analysis_tier = reporting_snapshot_analysis_tier(snapshot)
         snapshot_path = args.snapshot_output
+
+    paper_input_selection = validate_paper_analysis_inputs(
+        score_rows,
+        paper_policy,
+    )
+    snapshot["paper_input_selection"] = paper_input_selection
+    if not args.snapshot_input:
+        write_reporting_snapshot(snapshot, args.snapshot_output)
 
     figure_paths = save_probe_analysis_figures(
         reference,
@@ -145,13 +197,16 @@ def main() -> None:
     figure_entries = []
     for stem in sorted(by_stem):
         paths = [path for path in figure_paths if path.stem == stem]
-        figure_entries.append({
-            **by_stem[stem],
-            "files": [_relative(path) for path in sorted(paths)],
-        })
+        figure_entries.append(
+            {
+                **by_stem[stem],
+                "files": [_relative(path) for path in sorted(paths)],
+            }
+        )
 
     manifest = {
         "schema_version": "spec_gap.final_analysis_manifest.v3",
+        "analysis_tier": analysis_tier,
         "experiment_id": reference["experiment_id"],
         "analysis_revision": snapshot["analysis_revision"],
         "reporting_revision": snapshot["reporting_revision"],
@@ -175,6 +230,11 @@ def main() -> None:
         },
         "sample": sample,
         "source_artifacts": snapshot["source_artifacts"],
+        "paper_input_selection": paper_input_selection,
+        "paper_input_policy": {
+            "path": _relative(args.paper_input_policy),
+            "sha256": sha256_file(args.paper_input_policy),
+        },
         "reporting_snapshot": {
             "path": _relative(snapshot_path),
             "sha256": _sha256(snapshot_path),
@@ -197,15 +257,22 @@ def main() -> None:
     }
     manifest_path = args.analysis_dir / "analysis_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
-    print(json.dumps({
-        "analysis_manifest": _relative(manifest_path),
-        "reporting_snapshot": _relative(snapshot_path),
-        "figure_files": len(figure_paths),
-        "figure_stems": [entry["stem"] for entry in catalog],
-        "metric_table": _relative(metric_table),
-        "delta_table": _relative(delta_table),
-        "analysis_status": manifest["analysis_status"],
-    }, indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "analysis_manifest": _relative(manifest_path),
+                "reporting_snapshot": _relative(snapshot_path),
+                "figure_files": len(figure_paths),
+                "figure_stems": [entry["stem"] for entry in catalog],
+                "metric_table": _relative(metric_table),
+                "delta_table": _relative(delta_table),
+                "analysis_status": manifest["analysis_status"],
+                "paper_input_policy_id": paper_input_selection["policy_id"],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 def _reference_metric_rows(result: dict) -> list[dict]:
@@ -238,9 +305,9 @@ def _reference_metric_rows(result: dict) -> list[dict]:
             row[f"{metric}_ci_lower"] = interval["lower"] if interval else None
             row[f"{metric}_ci_upper"] = interval["upper"] if interval else None
         rows.append(row)
-    return sorted(rows, key=lambda row: (
-        row["thinking_mode"], row["probe_name"], row["hop_mode"]
-    ))
+    return sorted(
+        rows, key=lambda row: (row["thinking_mode"], row["probe_name"], row["hop_mode"])
+    )
 
 
 def _reference_delta_rows(result: dict) -> list[dict]:
@@ -290,15 +357,18 @@ def _read_json(path: Path) -> dict:
     return payload
 
 
-def _load_model_configs(trajectory_root: Path) -> list[dict]:
+def _load_model_configs(trajectory_root: Path, analysis_tier: str) -> list[dict]:
     """Read one consistent model configuration for each thinking mode."""
 
     configs: dict[str, dict] = {}
-    for path in sorted(trajectory_root.rglob("*.json")):
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as error:
-            raise ValueError(f"Cannot read live trajectory {path}: {error}") from error
+    paths = trajectory_paths_for_analysis_tier(trajectory_root, analysis_tier)
+    for payload in load_trajectory_records(paths):
+        observed_tier = trajectory_analysis_tier(payload)
+        if observed_tier != analysis_tier:
+            raise ValueError(
+                f"Live trajectory tier {observed_tier!r} does not match "
+                f"{analysis_tier!r}."
+            )
         model = payload.get("model") if isinstance(payload, dict) else None
         if not isinstance(model, dict):
             continue
@@ -306,19 +376,22 @@ def _load_model_configs(trajectory_root: Path) -> list[dict]:
         if mode not in {"off", "on"}:
             continue
         normalized = {
-            field: model.get(field)
-            for field in (
-                "model_name",
-                "provider",
-                "model_revision",
-                "tokenizer_name",
-                "tokenizer_revision",
-                "dtype",
-                "seed",
-                "num_hidden_layers",
-                "thinking_mode",
-                "decoding_settings",
-            )
+            "analysis_tier": observed_tier,
+            **{
+                field: model.get(field)
+                for field in (
+                    "model_name",
+                    "provider",
+                    "model_revision",
+                    "tokenizer_name",
+                    "tokenizer_revision",
+                    "dtype",
+                    "seed",
+                    "num_hidden_layers",
+                    "thinking_mode",
+                    "decoding_settings",
+                )
+            },
         }
         previous = configs.setdefault(str(mode), normalized)
         if previous != normalized:

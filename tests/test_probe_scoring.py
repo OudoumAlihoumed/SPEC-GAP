@@ -97,8 +97,10 @@ def test_generates_two_group_held_out_probe_scores(monkeypatch):
     assert all(0.0 <= row["score"] <= 1.0 for row in scores)
     assert all(row["label_target"] == "injection_present" for row in scores)
     assert all(row["claim_scope"] == "construction_label_diagnostic" for row in scores)
+    assert {row["analysis_tier"] for row in scores} == {"unclassified"}
 
     summary = summarize_per_step_probe_scores(scores)
+    assert summary["analysis_tier"] == "unclassified"
     assert summary["score_rows"] == len(scores)
     assert summary["prespecified_reference_layer"] == 40
     assert summary["prespecified_ablation_layers"] == [32, 48]
@@ -242,3 +244,16 @@ def test_generated_residualized_scores_record_the_preprocessing(monkeypatch):
     assert {row["activation_preprocessing"] for row in scores} == {
         "train_domain_mean_residualized"
     }
+
+
+def test_mixed_analysis_tiers_are_rejected_before_scoring():
+    rows = _index_rows()
+    for index, row in enumerate(rows):
+        row["analysis_tier"] = "definitive" if index % 2 else "exploratory"
+
+    with pytest.raises(ValueError, match="one analysis tier"):
+        generate_per_step_probe_scores(
+            rows,
+            match_group_designs=_designs(),
+            verify_checksums=False,
+        )

@@ -19,6 +19,7 @@ def _prediction_rows(
     thinking_modes=("off",),
     label_target="trajectory_action_executed",
     all_negative=False,
+    analysis_tier="definitive",
 ):
     rows = []
     agents = {
@@ -80,6 +81,7 @@ def _prediction_rows(
                         )
                         for hop_index, (agent_id, agent_role) in enumerate(agents[hop_mode]):
                             rows.append({
+                                "analysis_tier": analysis_tier,
                                 "trajectory_id": trajectory_id,
                                 "match_group_id": match_group_id,
                                 "domain_id": domain_id,
@@ -134,7 +136,8 @@ def _analyze(rows, *, random_state=11):
 def test_reports_executor_metrics_and_match_group_depth_delta():
     result = _analyze(_prediction_rows())
 
-    assert result["schema_version"] == "spec_gap.depth_degradation.v4"
+    assert result["schema_version"] == "spec_gap.depth_degradation.v5"
+    assert result["analysis_tier"] == "definitive"
     assert result["sampling_grid"]["fully_crossed"] is True
     assert len(result["depth_metrics"]) == 2
     assert all(group["observation_agent"] == "executor" for group in result["depth_metrics"])
@@ -208,7 +211,8 @@ def test_exports_one_temporal_row_per_trajectory_and_configuration():
     } == {"temporal_path_mean"}
     assert {
         row["schema_version"] for row in temporal_rows
-    } == {"spec_gap.temporal_divergence_score.v2"}
+    } == {"spec_gap.temporal_divergence_score.v3"}
+    assert {row["analysis_tier"] for row in temporal_rows} == {"definitive"}
     assert {row["layer"] for row in temporal_rows} == {16, 32}
     assert {row["thinking_mode"] for row in temporal_rows} == {"off", "on"}
 
@@ -228,6 +232,32 @@ def test_classification_metrics_ignore_non_executor_score_changes():
         assert before["ece"] == after["ece"]
         assert before["temporal_divergence_mean"] != after["temporal_divergence_mean"]
         assert before["path_mean_brier"] != after["path_mean_brier"]
+
+
+def test_rejects_mixed_or_missing_current_analysis_tiers():
+    mixed = _prediction_rows()
+    mixed[0]["analysis_tier"] = "exploratory"
+    with pytest.raises(ValueError, match="exactly one analysis tier"):
+        _analyze(mixed)
+
+    missing = _prediction_rows()
+    missing[0]["schema_version"] = "spec_gap.per_step_probe_score.v2"
+    missing[0].pop("analysis_tier")
+    with pytest.raises(ValueError, match="analysis_tier"):
+        _analyze(missing)
+
+
+def test_legacy_prediction_rows_are_explicitly_unclassified():
+    rows = _prediction_rows()
+    for row in rows:
+        row.pop("analysis_tier")
+
+    result = _analyze(rows)
+
+    assert result["analysis_tier"] == "unclassified"
+    assert {row["analysis_tier"] for row in temporal_divergence_rows(rows)} == {
+        "unclassified"
+    }
 
 
 def test_rejects_missing_hop_condition_in_match_group():

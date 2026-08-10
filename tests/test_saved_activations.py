@@ -1,4 +1,10 @@
+import copy
 import hashlib
+import json
+from pathlib import Path
+import runpy
+import sys
+
 import numpy as np
 import pytest
 import torch
@@ -11,13 +17,16 @@ from src.extraction.saved_activations import (
     load_activation_index,
     load_probe_activation_batch,
     summarize_activation_index,
+    trajectory_analysis_tier,
+    upgrade_legacy_activation_index,
     write_activation_index,
 )
 
 
 def _save_current_artifact(path, *, offset=0.0):
     positions = {
-        "last_input_token": torch.arange(12, dtype=torch.float32).reshape(3, 4) + offset,
+        "last_input_token": torch.arange(12, dtype=torch.float32).reshape(3, 4)
+        + offset,
         "last_visible_answer_token": (
             torch.arange(12, dtype=torch.float32).reshape(3, 4) + 100 + offset
         ),
@@ -44,7 +53,14 @@ def _save_current_artifact(path, *, offset=0.0):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _record(storage_path, checksum, *, trajectory_id="trajectory-clean", injected=False):
+def _record(
+    storage_path,
+    checksum,
+    *,
+    trajectory_id="trajectory-clean",
+    injected=False,
+    analysis_tier="definitive",
+):
     treatment = "injected" if injected else "clean"
     return {
         "trajectory_id": trajectory_id,
@@ -67,53 +83,60 @@ def _record(storage_path, checksum, *, trajectory_id="trajectory-clean", injecte
             "outcome_class": "resisted" if injected else "clean",
         },
         "trajectory_trace": {
-            "full_events": [{
-                "type": "agent_turn",
-                "step_index": 2,
-                "agent_id": "worker_1",
-                "agent_role": "worker",
-                "hop_index": 1,
-                "input": {
-                    "rendered_prompt_hash": "prompt-hash",
-                    "input_token_ids": [1, 2, 3],
-                },
-                "output": {
-                    "finish_reason": "stop",
-                    "truncated": False,
-                    "thinking_complete": None,
-                    "generated_token_ids": [4, 5],
-                },
-                "activation_metadata": {
-                    "storage_status": "materialized",
-                    "storage_path": storage_path,
-                    "artifact_format_version": "spec_gap.activation_positions.v1",
-                    "layers_extracted": [0, 4, 8],
-                    "checkpoint_positions": [
-                        {
-                            "name": "last_input_token",
-                            "sequence_index": 5,
-                            "token_id": 10,
+            "full_events": [
+                {
+                    "type": "agent_turn",
+                    "step_index": 2,
+                    "agent_id": "worker_1",
+                    "agent_role": "worker",
+                    "hop_index": 1,
+                    "model_execution_metadata": (
+                        {"analysis_tier": analysis_tier}
+                        if analysis_tier is not None
+                        else {}
+                    ),
+                    "input": {
+                        "rendered_prompt_hash": "prompt-hash",
+                        "input_token_ids": [1, 2, 3],
+                    },
+                    "output": {
+                        "finish_reason": "stop",
+                        "truncated": False,
+                        "thinking_complete": None,
+                        "generated_token_ids": [4, 5],
+                    },
+                    "activation_metadata": {
+                        "storage_status": "materialized",
+                        "storage_path": storage_path,
+                        "artifact_format_version": "spec_gap.activation_positions.v1",
+                        "layers_extracted": [0, 4, 8],
+                        "checkpoint_positions": [
+                            {
+                                "name": "last_input_token",
+                                "sequence_index": 5,
+                                "token_id": 10,
+                            },
+                            {
+                                "name": "last_visible_answer_token",
+                                "sequence_index": 9,
+                                "token_id": 13,
+                            },
+                        ],
+                        "checkpoint_shapes": {
+                            "last_input_token": [3, 4],
+                            "last_visible_answer_token": [3, 4],
                         },
-                        {
-                            "name": "last_visible_answer_token",
-                            "sequence_index": 9,
-                            "token_id": 13,
+                        "checkpoint_forward_scopes": {
+                            "last_input_token": "prompt_only",
+                            "last_visible_answer_token": "generated_prefix",
                         },
-                    ],
-                    "checkpoint_shapes": {
-                        "last_input_token": [3, 4],
-                        "last_visible_answer_token": [3, 4],
+                        "layer_metadata": {
+                            "dtype": "torch.float32",
+                            "checksum_sha256": checksum,
+                        },
                     },
-                    "checkpoint_forward_scopes": {
-                        "last_input_token": "prompt_only",
-                        "last_visible_answer_token": "generated_prefix",
-                    },
-                    "layer_metadata": {
-                        "dtype": "torch.float32",
-                        "checksum_sha256": checksum,
-                    },
-                },
-            }]
+                }
+            ]
         },
     }
 
@@ -123,6 +146,7 @@ def test_build_index_and_summary(tmp_path):
     checksum = _save_current_artifact(artifact)
     rows = build_activation_index(
         [_record("activations/clean/off/step_002.pt", checksum)],
+        analysis_tier="definitive",
         artifact_root=tmp_path,
         require_local=True,
         verify_checksums=True,
@@ -134,19 +158,19 @@ def test_build_index_and_summary(tmp_path):
         "last_visible_answer_token",
     }
     assert all(row["schema_version"] == ACTIVATION_INDEX_SCHEMA for row in rows)
+    assert {row["analysis_tier"] for row in rows} == {"definitive"}
     assert all(row["labels"]["injection_present"] == 0 for row in rows)
     assert all(row["rendered_prompt_hash"] == "prompt-hash" for row in rows)
     assert all(row["input_token_count"] == 3 for row in rows)
     assert all(row["generated_token_count"] == 2 for row in rows)
-    assert {
-        row["checkpoint"]: row["checkpoint_forward_scope"] for row in rows
-    } == {
+    assert {row["checkpoint"]: row["checkpoint_forward_scope"] for row in rows} == {
         "last_input_token": "prompt_only",
         "last_visible_answer_token": "generated_prefix",
     }
     assert all(len(row["input_token_ids_sha256"]) == 64 for row in rows)
     assert all(len(row["generated_token_ids_sha256"]) == 64 for row in rows)
     summary = summarize_activation_index(rows)
+    assert summary["analysis_tier"] == "definitive"
     assert summary["trajectories"] == 1
     assert summary["model_turns"] == 1
     assert summary["local_artifacts"] == 1
@@ -158,6 +182,7 @@ def test_index_round_trip_and_filter(tmp_path):
     checksum = _save_current_artifact(artifact)
     rows = build_activation_index(
         [_record("activations/clean/off/step_002.pt", checksum)],
+        analysis_tier="definitive",
         artifact_root=tmp_path,
     )
     index_path = tmp_path / "index.jsonl"
@@ -172,6 +197,79 @@ def test_index_round_trip_and_filter(tmp_path):
     )
     assert len(selected) == 1
     assert selected[0]["step_index"] == 2
+
+
+def test_legacy_v2_index_is_explicitly_unclassified(tmp_path):
+    path = tmp_path / "legacy-index.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "spec_gap.activation_index.v2",
+                "trajectory_id": "historical-trajectory",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    rows = load_activation_index(path)
+
+    assert rows == [
+        {
+            "schema_version": "spec_gap.activation_index.v2",
+            "analysis_tier": "unclassified",
+            "trajectory_id": "historical-trajectory",
+        }
+    ]
+    assert upgrade_legacy_activation_index(rows) == [
+        {
+            "schema_version": ACTIVATION_INDEX_SCHEMA,
+            "analysis_tier": "unclassified",
+            "trajectory_id": "historical-trajectory",
+        }
+    ]
+
+
+def test_index_loader_rejects_mixed_schemas_and_legacy_tier_claims(tmp_path):
+    mixed = tmp_path / "mixed-index.jsonl"
+    mixed.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "schema_version": "spec_gap.activation_index.v2",
+                        "trajectory_id": "historical-trajectory",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "schema_version": ACTIVATION_INDEX_SCHEMA,
+                        "analysis_tier": "unclassified",
+                        "trajectory_id": "current-trajectory",
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="cannot mix legacy and current"):
+        load_activation_index(mixed)
+
+    legacy_claim = tmp_path / "legacy-tier-claim.jsonl"
+    legacy_claim.write_text(
+        json.dumps(
+            {
+                "schema_version": "spec_gap.activation_index.v2",
+                "analysis_tier": "definitive",
+                "trajectory_id": "misclassified-trajectory",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="cannot claim an analysis tier"):
+        load_activation_index(legacy_claim)
 
 
 def test_load_named_checkpoint_and_layers(tmp_path):
@@ -190,12 +288,15 @@ def test_load_named_checkpoint_and_layers(tmp_path):
 
 def test_legacy_artifact_supports_primary_only(tmp_path):
     artifact = tmp_path / "legacy.pt"
-    torch.save({
-        "activations": torch.ones(2, 3),
-        "layers": [1, 2],
-        "token_position": "last_generated_non_special_token",
-        "token_id": 13,
-    }, artifact)
+    torch.save(
+        {
+            "activations": torch.ones(2, 3),
+            "layers": [1, 2],
+            "token_position": "last_generated_non_special_token",
+            "token_id": 13,
+        },
+        artifact,
+    )
 
     loaded = load_activation_checkpoint(artifact)
     assert loaded.checkpoint == "primary"
@@ -218,7 +319,12 @@ def test_probe_batch_aligns_layers_labels_and_metadata(tmp_path):
         ),
     ]
     rows = filter_activation_index(
-        build_activation_index(records, artifact_root=tmp_path, require_local=True),
+        build_activation_index(
+            records,
+            analysis_tier="definitive",
+            artifact_root=tmp_path,
+            require_local=True,
+        ),
         checkpoint="last_input_token",
     )
 
@@ -242,6 +348,7 @@ def test_missing_artifact_and_checksum_mismatch_fail_closed(tmp_path):
     with pytest.raises(FileNotFoundError, match="not available locally"):
         build_activation_index(
             [missing_record],
+            analysis_tier="definitive",
             artifact_root=tmp_path,
             require_local=True,
         )
@@ -259,7 +366,131 @@ def test_missing_artifact_and_checksum_mismatch_fail_closed(tmp_path):
 def test_index_rejects_path_outside_artifact_root(tmp_path):
     record = _record("../outside.pt", "abc")
     with pytest.raises(ValueError, match="escapes artifact_root"):
-        build_activation_index([record], artifact_root=tmp_path)
+        build_activation_index(
+            [record],
+            analysis_tier="definitive",
+            artifact_root=tmp_path,
+        )
+
+
+def test_index_rejects_wrong_or_mixed_analysis_tier(tmp_path):
+    record = _record("activation.pt", "abc", analysis_tier="exploratory")
+    with pytest.raises(ValueError, match="expected 'definitive'"):
+        build_activation_index(
+            [record],
+            analysis_tier="definitive",
+            artifact_root=tmp_path,
+        )
+
+    mixed = copy.deepcopy(record)
+    second_turn = copy.deepcopy(mixed["trajectory_trace"]["full_events"][0])
+    second_turn["step_index"] = 3
+    second_turn["model_execution_metadata"]["analysis_tier"] = "definitive"
+    mixed["trajectory_trace"]["full_events"].append(second_turn)
+    with pytest.raises(ValueError, match="mixes analysis tiers"):
+        trajectory_analysis_tier(mixed)
+
+
+def test_activation_index_cli_reads_only_selected_tier(tmp_path, monkeypatch):
+    trajectory_root = tmp_path / "live"
+    for tier in ("exploratory", "definitive"):
+        storage_path = f"activations/{tier}/trajectory-{tier}/off/step_002.pt"
+        checksum = _save_current_artifact(tmp_path / storage_path)
+        record = _record(
+            storage_path,
+            checksum,
+            trajectory_id=f"trajectory-{tier}",
+            analysis_tier=tier,
+        )
+        destination = trajectory_root / tier / "off" / f"trajectory-{tier}.json"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(record), encoding="utf-8")
+
+    output = tmp_path / "index.jsonl"
+    summary_output = tmp_path / "summary.json"
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/03_probe_analysis/07_build_activation_index.py"
+    )
+    namespace = runpy.run_path(script, run_name="spec_gap_activation_index_test")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(script),
+            "--trajectory-root",
+            str(trajectory_root),
+            "--artifact-root",
+            str(tmp_path),
+            "--analysis-tier",
+            "definitive",
+            "--output",
+            str(output),
+            "--summary-output",
+            str(summary_output),
+            "--require-local",
+            "--verify-checksums",
+        ],
+    )
+
+    namespace["main"]()
+
+    rows = load_activation_index(output)
+    assert {row["trajectory_id"] for row in rows} == {"trajectory-definitive"}
+    assert {row["analysis_tier"] for row in rows} == {"definitive"}
+    assert json.loads(summary_output.read_text())["analysis_tier"] == "definitive"
+
+
+def test_activation_index_cli_upgrades_legacy_index_as_unclassified(
+    tmp_path,
+    monkeypatch,
+):
+    rows = build_activation_index(
+        [_record("activations/historical.pt", "abc", analysis_tier=None)],
+        analysis_tier="unclassified",
+        artifact_root=tmp_path,
+    )
+    legacy_rows = [
+        {key: value for key, value in row.items() if key != "analysis_tier"}
+        | {"schema_version": "spec_gap.activation_index.v2"}
+        for row in rows
+    ]
+    legacy_path = tmp_path / "legacy-index.jsonl"
+    write_activation_index(legacy_rows, legacy_path)
+    output = tmp_path / "upgraded-index.jsonl"
+    summary_output = tmp_path / "upgraded-summary.json"
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/03_probe_analysis/07_build_activation_index.py"
+    )
+    namespace = runpy.run_path(
+        script,
+        run_name="spec_gap_legacy_activation_index_test",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(script),
+            "--legacy-index",
+            str(legacy_path),
+            "--analysis-tier",
+            "unclassified",
+            "--output",
+            str(output),
+            "--summary-output",
+            str(summary_output),
+        ],
+    )
+
+    namespace["main"]()
+
+    upgraded = load_activation_index(output)
+    assert {row["schema_version"] for row in upgraded} == {ACTIVATION_INDEX_SCHEMA}
+    assert {row["analysis_tier"] for row in upgraded} == {"unclassified"}
+    summary = json.loads(summary_output.read_text(encoding="utf-8"))
+    assert summary["analysis_tier"] == "unclassified"
+    assert summary["paper_input_selection"]["selected_trajectory_count"] == 1
 
 
 def test_index_loader_rejects_empty_file(tmp_path):

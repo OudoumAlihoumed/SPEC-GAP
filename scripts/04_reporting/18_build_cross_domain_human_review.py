@@ -15,7 +15,10 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.extraction.saved_activations import load_activation_index  # noqa: E402
+from src.extraction.saved_activations import (  # noqa: E402
+    activation_index_analysis_tier,
+    load_activation_index,
+)
 
 
 DOMAIN_ORDER = (
@@ -448,6 +451,7 @@ def main() -> None:
     covariates = build_source_and_design_covariates(
         domain_sources,
         trajectory_records,
+        analysis_tier=activation_index_analysis_tier(index_rows),
         activation_index=args.activation_index,
         policy_language_audit=args.policy_language_audit,
         policy_pdf_audit=args.policy_pdf_audit,
@@ -1624,6 +1628,7 @@ def build_source_and_design_covariates(
     domain_sources: dict[str, dict[str, Any]],
     trajectories: dict[str, dict[str, Any]],
     *,
+    analysis_tier: str,
     activation_index: Path,
     policy_language_audit: Path,
     policy_pdf_audit: Path,
@@ -1653,7 +1658,7 @@ def build_source_and_design_covariates(
             raise ValueError(f"Cross-PR source hash does not match for {path}.")
     combined_index_sha256 = _sha256(activation_index)
     expected_combined_index_sha256 = (
-        "d1dc6a17b241f2900982683fc133d2a97644dc19cb00087dc414ac06cea3d42b"
+        "059b24c0efe05562eafbabeff302d827569362cab2fea41c8cbf19f1be1e8dd8"
     )
     if combined_index_sha256 != expected_combined_index_sha256:
         raise ValueError("Combined activation index hash does not match.")
@@ -1696,6 +1701,11 @@ def build_source_and_design_covariates(
     return {
         "schema_version": "spec_gap.cross_domain_source_and_covariates.v1",
         "created_at": "2026-08-10",
+        "analysis_tier": analysis_tier,
+        "analysis_tier_note": (
+            "The combined historical cohort predates execution-tier tagging and "
+            "is explicitly unclassified rather than definitive."
+        ),
         "combined_activation_index": {
             "path": _repo_relative(activation_index),
             "sha256": combined_index_sha256,

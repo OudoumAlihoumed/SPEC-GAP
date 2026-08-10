@@ -18,10 +18,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.infrastructure.modal_billing import (  # noqa: E402
+    ANALYSIS_TIERS,
     BILLING_RECONCILIATION_SCHEMA_VERSION,
     aggregate_billing_rows,
     as_decimal,
     decimal_text,
+    validate_analysis_tier,
 )
 
 
@@ -35,9 +37,41 @@ def _parse_datetime(value: str) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
-def _local_estimates(checkpoint_root: Path) -> dict[str, Any]:
+def _load_modal_billing(
+    modal_module: Any,
+    *,
+    start: datetime,
+    end: datetime,
+    billing_cycle: str,
+) -> tuple[list[Any], Any]:
+    """Load Modal billing data with actionable authentication guidance."""
+
+    try:
+        workspace = modal_module.Workspace.from_context()
+        rows = workspace.billing.report(
+            start=start,
+            end=end,
+            resolution="h",
+            tag_names=["*"],
+        )
+        summary = workspace.billing.summary(billing_cycle)
+    except modal_module.exception.AuthError as exc:
+        raise SystemExit(
+            "Modal authentication failed. Run `modal setup`, then confirm "
+            "the active profile with `modal profile current`."
+        ) from exc
+    return rows, summary
+
+
+def _local_estimates(
+    checkpoint_root: Path,
+    *,
+    analysis_tier: str,
+) -> dict[str, Any]:
     by_input: dict[str, dict[str, Any]] = {}
     reference_count = 0
+    excluded_unclassified_count = 0
+    excluded_other_tier_count = 0
     for path in sorted(checkpoint_root.rglob("step_*.json")):
         try:
             payload = json.loads(path.read_text())
@@ -45,6 +79,17 @@ def _local_estimates(checkpoint_root: Path) -> dict[str, Any]:
             continue
         cost = payload.get("cost_metadata")
         if not isinstance(cost, dict):
+            continue
+        runtime = cost.get("runtime_metadata")
+        saved_tier = (
+            runtime.get("analysis_tier")
+            if isinstance(runtime, dict) else None
+        )
+        if saved_tier is None:
+            excluded_unclassified_count += 1
+            continue
+        if saved_tier != analysis_tier:
+            excluded_other_tier_count += 1
             continue
         modal_input_id = cost.get("modal_input_id")
         estimate = cost.get("estimated_h200_cost_usd")
@@ -68,6 +113,11 @@ def _local_estimates(checkpoint_root: Path) -> dict[str, Any]:
         "checkpoint_cost_reference_count": reference_count,
         "unique_modal_input_count": len(by_input),
         "duplicate_reference_count": reference_count - len(by_input),
+        "analysis_tier": analysis_tier,
+        "excluded_unclassified_checkpoint_count": (
+            excluded_unclassified_count
+        ),
+        "excluded_other_tier_checkpoint_count": excluded_other_tier_count,
         "estimated_model_turn_h200_cost_usd": decimal_text(total),
     }
 
@@ -97,12 +147,18 @@ def _normalized_modal_rows(
     rows: list[Any],
     *,
     project_tag: str,
+    analysis_tier: str,
 ) -> list[dict[str, Any]]:
-    normalized = []
+    project_rows = []
+    tiers_by_app: dict[str, set[str | None]] = {}
     for row in rows:
         if row.tags.get("project") != project_tag:
             continue
-        normalized.append({
+        tags = dict(row.tags)
+        tiers_by_app.setdefault(row.object_id, set()).add(
+            tags.get("analysis_tier")
+        )
+        project_rows.append({
             "object_id": row.object_id,
             "description": row.description,
             "environment": row.environment_name,
@@ -112,9 +168,22 @@ def _normalized_modal_rows(
                 name: decimal_text(value)
                 for name, value in row.cost_by_resource.items()
             },
-            "tags": dict(row.tags),
+            "tags": tags,
         })
-    return normalized
+    changed = {
+        app_id: tiers
+        for app_id, tiers in tiers_by_app.items()
+        if len(tiers) > 1
+    }
+    if changed:
+        raise ValueError(
+            "analysis_tier changed within Modal Apps: "
+            + ", ".join(sorted(changed))
+        )
+    return [
+        row for row in project_rows
+        if row["tags"].get("analysis_tier") == analysis_tier
+    ]
 
 
 def _workspace_summary_payload(summary: Any) -> dict[str, Any]:
@@ -186,8 +255,19 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
     local = payload["local_estimate"]
     comparison = payload["comparison"]
     workspace = payload["workspace_billing_cycle"]
+    percent = comparison["percent_above_estimate"]
+    difference_line = (
+        "- Metered minus estimate: "
+        f"`${comparison['metered_minus_estimate_usd']}`"
+    )
+    if percent is None:
+        difference_line += " (percentage unavailable: no selected local estimate)"
+    else:
+        difference_line += f" (`{percent}%`)"
     lines = [
         f"# Scenario 1 Modal billing reconciliation — {payload['report_date']}",
+        "",
+        f"Analysis tier: `{payload['analysis_tier']}`",
         "",
         "## Authoritative totals",
         "",
@@ -199,11 +279,7 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
             "- Local per-turn H200 estimate: "
             f"`${local['estimated_model_turn_h200_cost_usd']}`"
         ),
-        (
-            "- Metered minus estimate: "
-            f"`${comparison['metered_minus_estimate_usd']}` "
-            f"(`{comparison['percent_above_estimate']}%`)"
-        ),
+        difference_line,
         (
             "- Workspace billed cost after July adjustments: "
             f"`${workspace['billed_cost_usd']}`"
@@ -215,7 +291,8 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
         "",
         (
             "The project total comes directly from Modal's billing API and "
-            "includes H200, CPU, and memory for Apps tagged `project=spec-gap`."
+            "includes H200, CPU, and memory only for Apps carrying both the "
+            "project tag and the selected analysis-tier tag."
         ),
         (
             "The billed-cost value is workspace-wide; Modal does not allocate "
@@ -239,6 +316,14 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
         (
             "- Unique saved model inputs: "
             f"`{local['unique_modal_input_count']}`"
+        ),
+        (
+            "- Excluded unclassified checkpoints: "
+            f"`{local['excluded_unclassified_checkpoint_count']}`"
+        ),
+        (
+            "- Excluded other-tier checkpoints: "
+            f"`{local['excluded_other_tier_checkpoint_count']}`"
         ),
         (
             "- Apps with a local report reference: "
@@ -270,6 +355,11 @@ def main() -> None:
     parser.add_argument("--billing-cycle", required=True)
     parser.add_argument("--project-tag", default="spec-gap")
     parser.add_argument(
+        "--analysis-tier",
+        required=True,
+        choices=sorted(ANALYSIS_TIERS),
+    )
+    parser.add_argument(
         "--checkpoint-root",
         type=Path,
         default=PROJECT_ROOT / "experiments/scenario1/trajectories",
@@ -293,19 +383,28 @@ def main() -> None:
 
     start = _parse_datetime(args.start)
     end = _parse_datetime(args.end) if args.end else datetime.now(timezone.utc)
-    workspace = modal.Workspace.from_context()
-    report_rows = workspace.billing.report(
+    analysis_tier = validate_analysis_tier(args.analysis_tier)
+    report_rows, workspace_summary = _load_modal_billing(
+        modal,
         start=start,
         end=end,
-        resolution="h",
-        tag_names=["*"],
+        billing_cycle=args.billing_cycle,
     )
     normalized = _normalized_modal_rows(
         report_rows,
         project_tag=args.project_tag,
+        analysis_tier=analysis_tier,
     )
+    if not normalized:
+        raise ValueError(
+            "no Modal billing rows matched project="
+            f"{args.project_tag!r} and analysis_tier={analysis_tier!r}"
+        )
     apps, project_summary = aggregate_billing_rows(normalized)
-    local_estimate = _local_estimates(args.checkpoint_root)
+    local_estimate = _local_estimates(
+        args.checkpoint_root,
+        analysis_tier=analysis_tier,
+    )
     references = _local_app_references(args.results_root)
     for app in apps:
         app["local_references"] = references.get(app["modal_app_id"], [])
@@ -317,9 +416,9 @@ def main() -> None:
     )
     difference = metered - estimated
     percent = difference * Decimal(100) / estimated if estimated else None
-    workspace_summary = workspace.billing.summary(args.billing_cycle)
     payload = {
         "schema_version": BILLING_RECONCILIATION_SCHEMA_VERSION,
+        "analysis_tier": analysis_tier,
         "report_date": datetime.now(timezone.utc).date().isoformat(),
         "queried_at": datetime.now(timezone.utc).isoformat(),
         "source": {
@@ -332,7 +431,10 @@ def main() -> None:
             "start": start.isoformat(),
             "end_requested": end.isoformat(),
             "resolution": "h",
-            "required_tag": {"project": args.project_tag},
+            "required_tags": {
+                "project": args.project_tag,
+                "analysis_tier": analysis_tier,
+            },
         },
         "project_metered_cost": project_summary,
         "local_estimate": local_estimate,
@@ -352,9 +454,8 @@ def main() -> None:
                 not x["local_references"] for x in apps
             ),
             "note": (
-                "Historical Apps without a saved Modal URL remain included in "
-                "the authoritative project total because their billing tag is "
-                "project=spec-gap."
+                "Apps missing the selected analysis_tier tag are excluded so "
+                "exploratory and definitive costs cannot be pooled."
             ),
         },
         "apps": apps,

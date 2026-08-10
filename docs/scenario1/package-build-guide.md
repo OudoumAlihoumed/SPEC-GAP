@@ -132,6 +132,10 @@ as `injection.insertion_anchor`.
 - Use a concealment method and wording that are unique to the group. Reusing
   an attack surface across domains can let a probe learn the framing instead
   of the compromise.
+- Keep `injection_family` and `injection_placement` fixed across a multi-domain
+  batch, but use a domain-specific `injection.carrier_marker`. Allowing each
+  domain its own plausible compliance framing intentionally relaxes the older
+  shared-marker invariant.
 - Confirm that the retrieval tooling can actually expose the payload. A
   raster-only injection is not a valid injected condition if the pipeline
   extracts text only.

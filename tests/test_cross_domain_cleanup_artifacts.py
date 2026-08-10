@@ -8,13 +8,22 @@ import json
 from pathlib import Path
 import runpy
 import shutil
+import sys
 
 import pytest
+
+from src.analysis.paper_inputs import (
+    load_paper_input_policy,
+    validate_embedded_paper_input_audit,
+    validate_paper_analysis_inputs,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ROBUSTNESS_ROOT = PROJECT_ROOT / "results/scenario1/nine_domain_analysis/robustness"
 HUMAN_REVIEW_ROOT = ROBUSTNESS_ROOT / "human_review"
+PAPER_INPUT_POLICY = PROJECT_ROOT / "experiments/scenario1/paper_input_policy.json"
+LAYER_PLOT_SCRIPT = PROJECT_ROOT / "scripts/03_probe_analysis/09_plot_layer_scan.py"
 PRIMARY_PROBE = "goldowsky_dill_logistic"
 HUMAN_REVIEW_SCRIPT = (
     PROJECT_ROOT / "scripts/04_reporting/18_build_cross_domain_human_review.py"
@@ -37,6 +46,132 @@ def _walk_keys(value):
     elif isinstance(value, list):
         for child in value:
             yield from _walk_keys(child)
+
+
+def test_tracked_public_outputs_are_unclassified_and_policy_bound():
+    policy = load_paper_input_policy(PAPER_INPUT_POLICY)
+    aggregate_paths = [
+        PROJECT_ROOT
+        / "results/scenario1/nine_domain_analysis/fixed_layer_analysis"
+        / "scenario1_nine_domain_2026_08_06_analysis_manifest.json",
+        ROBUSTNESS_ROOT / "cross_domain_robustness.json",
+    ]
+    for path in aggregate_paths:
+        artifact = _load_json(path)
+        assert artifact["analysis_tier"] == "unclassified"
+        validate_embedded_paper_input_audit(artifact, policy)
+
+    assert (
+        _load_json(HUMAN_REVIEW_ROOT / "source_and_design_covariates.json")[
+            "analysis_tier"
+        ]
+        == "unclassified"
+    )
+
+
+def test_tracked_layer_scan_plot_cli_honors_policy_and_prefix(tmp_path, monkeypatch):
+    policy = load_paper_input_policy(PAPER_INPUT_POLICY)
+    layers = {
+        str(layer): {"auroc_mean": 0.5, "auroc_per_fold": [0.25, 0.75]}
+        for layer in range(64)
+    }
+    strata = []
+    controls = []
+    for mode, checkpoints in (
+        ("off", ("last_input_token", "last_visible_answer_token")),
+        (
+            "on",
+            (
+                "last_input_token",
+                "last_reasoning_token",
+                "last_visible_answer_token",
+            ),
+        ),
+    ):
+        for checkpoint in checkpoints:
+            controls.append(
+                {
+                    "thinking_mode": mode,
+                    "checkpoint": checkpoint,
+                    "status": (
+                        "passed_strict_input_control"
+                        if checkpoint == "last_input_token"
+                        else "stochastic_null_uncalibrated"
+                    ),
+                }
+            )
+            for agent_id, role, sample_count in (
+                ("planner_1", "planner", 8),
+                ("worker_1", "worker", 8),
+                ("worker_2", "worker", 4),
+                ("executor_1", "executor", 8),
+            ):
+                strata.append(
+                    {
+                        "status": "completed",
+                        "thinking_mode": mode,
+                        "agent_id": agent_id,
+                        "agent_role": role,
+                        "checkpoint": checkpoint,
+                        "sample_count": sample_count,
+                        "match_group_count": 2,
+                        "layer_results": layers,
+                    }
+                )
+    paper_input_selection = validate_paper_analysis_inputs(
+        [
+            {
+                "trajectory_id": "synthetic-trajectory",
+                "domain_id": "synthetic",
+                "treatment": "clean",
+                "delegation_depth": "2-hop",
+                "thinking_mode": "off",
+            }
+        ],
+        policy,
+    )
+    input_path = tmp_path / "layer-scan.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "analysis_tier": "unclassified",
+                "claim_scope": "Exploratory construction-label signal only.",
+                "strata": strata,
+                "pre_injection_negative_control": {"checkpoint_controls": controls},
+                "paper_input_selection": paper_input_selection,
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "figures"
+    namespace = runpy.run_path(
+        str(LAYER_PLOT_SCRIPT),
+        run_name="spec_gap_tracked_layer_plot_integration",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(LAYER_PLOT_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output-dir",
+            str(output_dir),
+            "--filename-prefix",
+            "integration_check_",
+            "--paper-input-policy",
+            str(PAPER_INPUT_POLICY),
+            "--dpi",
+            "72",
+        ],
+    )
+
+    namespace["main"]()
+
+    assert len(list(output_dir.iterdir())) == 9
+    assert all(
+        path.name.startswith("integration_check_") for path in output_dir.iterdir()
+    )
 
 
 def test_tracked_robustness_results_keep_claim_boundaries_and_sensitivities():
