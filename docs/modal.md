@@ -14,6 +14,12 @@ profile. The app creates or reuses:
 - model volume: `spec-gap-qwen3-32b-model`;
 - activation volume: `spec-gap-scenario1-artifacts`.
 
+These names are workspace-local. The code does not depend on one person's
+filesystem or require the original lab workspace: an authorized contributor
+may select another workspace, where Modal creates separate named Volumes. A
+new workspace starts with an empty model cache and has its own access, storage,
+and compute billing.
+
 The active model contract is:
 
 ```text
@@ -29,9 +35,19 @@ thinking-mode comparison.
 
 ## 1. Confirm the workspace
 
+Modal credentials are user- and workspace-specific and must never be committed
+to this repository. From the project environment, authenticate once and inspect
+the selected workspace:
+
 ```bash
+modal setup
+modal token info
 modal profile current
 ```
+
+If the executable is not on `PATH`, run `python -m modal setup` or activate the
+virtual environment created during installation. CI may instead provide
+`MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` through its secret store.
 
 Confirm that the selected profile points to the workspace where the model and
 artifact volumes should live.
@@ -42,7 +58,23 @@ scale down for reuse, then Modal releases it automatically. To inspect recent
 state, run `modal app list`; a stopped app or an app with zero active tasks is
 not using an H200.
 
-## 2. Validate without remote compute
+## 2. Validate locally and check credentials
+
+The repository-wide portable check builds both supported construction cohorts
+in temporary storage and optionally verifies the selected Modal credentials:
+
+```bash
+python scripts/run_portable_smoke_test.py --check-modal
+```
+
+It covers 11 domains, 44 structural trajectories, and 308 request templates.
+The access check runs only `modal token info` and read-only `modal app list
+--json`; it does not register the production app, build its image, call Qwen,
+or allocate a GPU.
+
+The following lower-level command enters Modal's app lifecycle. `--action
+validate` never calls Qwen or allocates a GPU, but Modal may prepare the app
+image and named resources, so workspace usage may occur:
 
 ```bash
 modal run scripts/02_model_execution/03_modal_qwen_runner.py \
@@ -50,8 +82,7 @@ modal run scripts/02_model_execution/03_modal_qwen_runner.py \
   --action validate
 ```
 
-This checks the request contract and starts no remote function or GPU. The
-fixture is infrastructure-only and must not be added to the Scenario 1
+The fixture is infrastructure-only and must not be added to the Scenario 1
 manifest.
 
 ## 3. Cache the model without a GPU
@@ -64,8 +95,9 @@ modal run scripts/02_model_execution/03_modal_qwen_runner.py \
 ```
 
 This uses remote CPU, memory, network, and Volume storage. It does not start an
-H200. The shared workspace already has this revision cached, so rerunning this
-command should only be necessary if the Volume is removed.
+H200. Run it once when the selected workspace's model Volume is new or has been
+removed. An existing workspace may already contain the pinned revision, but a
+contributor must not assume that a cache from another workspace is available.
 
 ## 4. Run one paid model turn
 
