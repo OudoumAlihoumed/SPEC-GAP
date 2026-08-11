@@ -25,7 +25,7 @@ describe assigned collusion role, not enacted deception.
 | 20 | 0.641 | 0.278 | 0.256 | 0.595 +/- 0.357 |
 | 24 | 0.609 | 0.298 | 0.292 | 0.550 +/- 0.354 |
 
-Compact rerun artifacts live under `reports/`.
+Compact rerun artifacts live under `results/runway/`.
 
 ## Commands
 

@@ -14,6 +14,8 @@ results/**/*.csv
 results/**/*.jsonl
 !results/scenario1/*_modal_billing_reconciliation.json
 !results/scenario1/*_modal_billing_reconciliation.csv
+!results/scenario1/reporting_snapshot.json
+!results/runway/*.json
 results/**/*.png
 results/**/*.svg
 results/**/*.pdf
@@ -30,13 +32,15 @@ results/**/*.pdf
 !results/scenario1/nine_domain_analysis/**/*.png
 !results/scenario1/nine_domain_analysis/**/*.svg
 !results/scenario1/nine_domain_analysis/**/*.pdf
+!results/presentation/*.png
+!results/presentation/*.svg
+!results/presentation/*.pdf
 !results/scenario1/nine_domain_analysis/fixed_layer_analysis/tables/**/*.csv
 !results/scenario1/nine_domain_analysis/fixed_layer_analysis/*_analysis_manifest.json
 !results/scenario1/nine_domain_analysis/robustness/**/*.json
 !results/scenario1/nine_domain_analysis/robustness/**/*.csv
 results/**/*.code-workspace
 !results/.gitkeep
-data/**/*.pt
 artifacts/
 trajectories/
 experiments/scenario1/manifest.json

@@ -1,6 +1,7 @@
 {
   "analysis_revision": "8bd23d07d14b6fbcc5739af066714113dbcab490",
   "analysis_status": "construction_diagnostic_complete_behavioral_auroc_unavailable",
+  "analysis_tier": "unclassified",
   "claim_scope": "group-held-out exploratory analysis with only two independent match groups",
   "experiment_id": "scenario1-qwen32b-construction-diagnostic-v1",
   "figures": [
@@ -114,6 +115,53 @@
       "tokenizer_revision": "9216db5781bf21249d130ec9da846c4624c16137"
     }
   ],
+  "paper_input_policy": {
+    "path": "experiments/scenario1/paper_input_policy.json",
+    "sha256": "ce6859da4049854a8502c62a49ff2bf060c0401f6f0396123b72db6d8b734ff9"
+  },
+  "paper_input_selection": {
+    "controlled_domains": {
+      "fin": {
+        "excluded_trajectory_count": 0,
+        "observed_generation_protocol_ids": [],
+        "required_agent_prompt_profile_id": "neutral_v1",
+        "required_generation_protocol_id": "controlled_v2_5000",
+        "selected_generation_protocol_ids": [],
+        "selected_trajectory_count": 0,
+        "status": "not_present"
+      }
+    },
+    "excluded_item_count": 0,
+    "excluded_trajectory_count": 0,
+    "excluded_trajectory_ids": [],
+    "input_item_count": 112,
+    "input_trajectory_count": 16,
+    "mode": "validation",
+    "policy_id": "scenario1_paper_finance_v2_2026_08_07",
+    "policy_sha256": "687934a1b018d029ff6abf000fb168f7c653b2e8cc85c017898887202df52531",
+    "schema_version": "spec_gap.scenario1_paper_input_audit.v1",
+    "selected_item_count": 112,
+    "selected_trajectory_count": 16,
+    "selected_trajectory_ids": [
+      "climate_coastal_flood_01__2hop__clean__thinking_off",
+      "climate_coastal_flood_01__2hop__clean__thinking_on",
+      "climate_coastal_flood_01__2hop__injected__thinking_off",
+      "climate_coastal_flood_01__2hop__injected__thinking_on",
+      "climate_coastal_flood_01__3hop__clean__thinking_off",
+      "climate_coastal_flood_01__3hop__clean__thinking_on",
+      "climate_coastal_flood_01__3hop__injected__thinking_off",
+      "climate_coastal_flood_01__3hop__injected__thinking_on",
+      "ph_breast_cancer_A__2hop__clean__thinking_off",
+      "ph_breast_cancer_A__2hop__clean__thinking_on",
+      "ph_breast_cancer_A__2hop__injected__thinking_off",
+      "ph_breast_cancer_A__2hop__injected__thinking_on",
+      "ph_breast_cancer_A__3hop__clean__thinking_off",
+      "ph_breast_cancer_A__3hop__clean__thinking_on",
+      "ph_breast_cancer_A__3hop__injected__thinking_off",
+      "ph_breast_cancer_A__3hop__injected__thinking_on"
+    ],
+    "selected_trajectory_sha256": "935dd540bd2598257c40690033710b274d082524066892e4b2a704db8403d2a1"
+  },
   "prespecified_layer_checks": {
     "ablations": [
       32,
@@ -129,7 +177,7 @@
   },
   "reporting_revision": "ae2414d550b4cc1172a1d93a730d8f43c9cc6e15",
   "reporting_snapshot": {
-    "path": "docs/data/scenario1/reporting_snapshot.json",
+    "path": "results/scenario1/reporting_snapshot.json",
     "sha256": "12de982c1317697482027a17d29e78dff9673bcfadc94c23fb27492159bd7524"
   },
   "sample": {

@@ -19,7 +19,12 @@ import json
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_OUTPUT_PATH = (
+    PROJECT_ROOT / "results" / "runway" / "week1_week2_baseline_comparison.json"
+)
+
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.analysis.runway_artifacts import (  # noqa: E402
     find_artifact_root,
@@ -41,9 +46,7 @@ def _build_runway_pair_ids(artifact_root: Path) -> list[str]:
     """
 
     response_path = (
-        artifact_root
-        / "02_collusion_probe"
-        / "week2_collusion_probe_responses.json"
+        artifact_root / "02_collusion_probe" / "week2_collusion_probe_responses.json"
     )
     rows = json.loads(response_path.read_text())
     role_counts: dict[tuple[int, str], int] = {}
@@ -64,7 +67,7 @@ def run_baselines(
     output_path: Path | None = None,
     layers: list[int] | None = None,
 ) -> dict:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = PROJECT_ROOT
     artifact_root = artifact_root or find_artifact_root(repo_root)
     activations, labels, scenario_ids = load_runway_artifacts(artifact_root)
     contrast_pair_ids = _build_runway_pair_ids(artifact_root)
@@ -72,7 +75,9 @@ def run_baselines(
     if layers:
         missing = sorted(set(layers) - set(activations))
         if missing:
-            raise ValueError(f"Requested layers are absent from the artifact: {missing}")
+            raise ValueError(
+                f"Requested layers are absent from the artifact: {missing}"
+            )
         activations = {layer: activations[layer] for layer in layers}
 
     metadata = {"scenario_idx": scenario_ids}
@@ -158,7 +163,7 @@ def run_baselines(
     }
 
     if output_path is None:
-        output_path = repo_root / "reports" / "week1_week2_baseline_comparison.json"
+        output_path = DEFAULT_OUTPUT_PATH
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(output, indent=2) + "\n")
     return output

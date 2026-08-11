@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from src.analysis.reporting_snapshot import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-TRACKED_SNAPSHOT = PROJECT_ROOT / "docs/data/scenario1/reporting_snapshot.json"
+TRACKED_SNAPSHOT = PROJECT_ROOT / "results/scenario1/reporting_snapshot.json"
 TRACKED_MANIFEST = (
     PROJECT_ROOT / "results/scenario1/final_analysis/analysis_manifest.json"
 )
@@ -197,9 +198,7 @@ def test_snapshot_requires_depth_results_to_match_definitive_inputs():
             rows,
             analysis_revision="analysis123",
             reporting_revision="reporting123",
-            source_artifacts={
-                "scores": {"path": "scores.jsonl", "sha256": "a" * 64}
-            },
+            source_artifacts={"scores": {"path": "scores.jsonl", "sha256": "a" * 64}},
             model_configs=configs,
         )
 
@@ -218,9 +217,7 @@ def test_snapshot_records_one_uniform_definitive_tier():
         rows,
         analysis_revision="analysis123",
         reporting_revision="reporting123",
-        source_artifacts={
-            "scores": {"path": "scores.jsonl", "sha256": "a" * 64}
-        },
+        source_artifacts={"scores": {"path": "scores.jsonl", "sha256": "a" * 64}},
         model_configs=configs,
     )
 
@@ -243,6 +240,11 @@ def test_repository_includes_a_valid_public_reporting_snapshot():
 
 def test_repository_includes_manifest_tables_figures_and_temporal_records():
     manifest = json.loads(TRACKED_MANIFEST.read_text(encoding="utf-8"))
+
+    assert manifest["reporting_snapshot"] == {
+        "path": "results/scenario1/reporting_snapshot.json",
+        "sha256": hashlib.sha256(TRACKED_SNAPSHOT.read_bytes()).hexdigest(),
+    }
 
     published_paths = [PROJECT_ROOT / path for path in manifest["tables"]]
     published_paths.extend(
